@@ -9,6 +9,24 @@ Kibernikto can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will n
 operate.
 Private chat is only available for one master user (`TG_MASTER_ID`).
 
+# how to run
+
+- Create your bot using BotFather and obtain it's key. You can also change the picture and other details there. Set
+  env `TG_BOT_KEY`.  
+
+  Turn off Group Privacy for your bot to be able to react to group messages:
+  
+  <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/9f2ec25d-bde4-4eec-9ec6-65741101ce8d">  
+  <br>
+  <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/bf1ac575-ad1a-464c-8535-2cf7f5ebb162">  
+
+- Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using getidsbot.
+- Configure other env variables.
+- Install the requirements `pip install -r requirements.txt`
+- Run `main.py` file using the environment provided.
+- Enjoy!
+
+
 # environment:
 
 - Default [OpenAI](https://openai.com)
@@ -57,24 +75,3 @@ To obtain group/user ids etc: https://t.me/getidsbot
 To obtain sticker ids: https://t.me/idstickerbot  
 To get familiar with basic OpenAI principles: https://openai.com  
 To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models.
-
-# how to run
-
-- Create your bot using BotFather and obtain it's key. You can also change the picture and other details there. Set
-  env `TG_BOT_KEY`
-- Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using getidsbot.
-- Add proper permissions to your bot in the group.
-- Configure other env variables.
-- Install the requirements `pip install -r requirements.txt`
-- Run `main.py` file using the environment provided.
-- Enjoy!
-
-# QA
-Q: What if I can not add my bot to the group?  
-A: Check if groups are allowed for yr bot in @BotFather.
-![img.png](img/allow_groups.png)  
-
-
-Q: My bot can not see the messages in group. What's wrong?   
-A: Turn off the group privacy for your bot.
-![img.png](img/group_privacy.png)
