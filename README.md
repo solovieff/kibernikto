@@ -1,6 +1,9 @@
 # kibernikto
 
-Kibernikto is the app to easily run telegram bots connected to AI models
+Kibernikto is the app to easily run telegram bots connected to AI models.  
+
+One Kibernikto instance can be connected to one Telegram bot and work with one group chat. Privately it talks to master
+only and denies other users.
 
 Kibernikto can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will need chat messages access set in group to
 operate.
@@ -47,6 +50,6 @@ To obtain sticker ids: https://t.me/idstickerbot
 - Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using getidsbot.
 - Add proper permissions to your bot in the group.
 - Configure other env variables.
-- Install the requirements `pip install -r requirements.txt`  
+- Install the requirements `pip install -r requirements.txt`
 - Run `main.py` file using the environment provided.
 - Enjoy!
