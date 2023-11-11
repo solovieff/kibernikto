@@ -68,3 +68,13 @@ To find out more on models and multi-model api details: https://vsegpt.ru/Docs/M
 - Install the requirements `pip install -r requirements.txt`
 - Run `main.py` file using the environment provided.
 - Enjoy!
+
+# QA
+Q: What if I can not add my bot to the group?  
+A: Check if groups are allowed for yr bot in @BotFather.
+![img.png](img/allow_groups.png)  
+
+
+Q: My bot can not see the messages in group. What's wrong?   
+A: Turn off the group privacy for your bot.
+![img.png](img/group_privacy.png)
