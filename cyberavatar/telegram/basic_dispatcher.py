@@ -90,8 +90,8 @@ async def send_random_sticker(chat_id):
 @dp.message(F.chat.type == enums.ChatType.PRIVATE)
 async def private_message(message: types.Message):
     if not PRIVATE_BOT.check_master(message.from_user.id, message.text):
-        reply_text = "Я не отвечаю на вопросы в личных беседах с незанкомыми людьми (если это конечно не мой Господин " \
-                     "Создатель снизошёл до меня). Идите нахуй."
+        reply_text = f"Я не отвечаю на вопросы в личных беседах с незанкомыми людьми (если это конечно не мой Господин " \
+                     f"Создатель снизошёл до меня). Лично я говорю только с {constants.TG_MASTER_ID}!"
     else:
         reply_text = await PRIVATE_BOT.heed_and_reply(message=message.text)
     chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)

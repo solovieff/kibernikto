@@ -12,10 +12,10 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 # how to run
 
 - Create your bot using BotFather and obtain it's key. You can also change the picture and other details there. Set
-  env `TG_BOT_KEY`.  
+  env `TG_BOT_KEY`.
 
   Turn off Group Privacy for your bot to be able to react to group messages:
-  
+
   <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/9f2ec25d-bde4-4eec-9ec6-65741101ce8d">  
   <br>
   <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/bf1ac575-ad1a-464c-8535-2cf7f5ebb162">  
@@ -25,7 +25,6 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 - Install the requirements `pip install -r requirements.txt`
 - Run `main.py` file using the environment provided.
 - Enjoy!
-
 
 # environment:
 
@@ -59,6 +58,7 @@ SUMMARIZATION_MODEL=anthropic/claude-instant-v1
 TG_BOT_KEY=XXXXXXXXXX:XXXxxxXXXxxxxXXXxxx  
 TG_BOT_MAX_HISTORY=8  
 TG_FRIEND_GROUP_ID=-XXXXXXXXXX  
+# Your telegram ID. For example 122740245. Forward your message to @idstickerbot to get it.  
 TG_MASTER_ID=XXXXXXXXX
 # Cybernoone reacts to direct replies or when sees the following words  
 TG_REACTION_CALLS=киберникто,государь  
