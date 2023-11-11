@@ -47,5 +47,6 @@ To obtain sticker ids: https://t.me/idstickerbot
 - Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using getidsbot.
 - Add proper permissions to your bot in the group.
 - Configure other env variables.
+- Install the requirements `pip install -r requirements.txt`  
 - Run `main.py` file using the environment provided.
 - Enjoy!
