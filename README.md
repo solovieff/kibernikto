@@ -1,8 +1,8 @@
-# cybernoonebot
+# kibernikto
 
-Cybernoone is the app to easily run telegram bots connected to AI models
+Kibernikto is the app to easily run telegram bots connected to AI models
 
-Cybernoone can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will need chat messages access set in group to
+Kibernikto can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will need chat messages access set in group to
 operate.
 Private chat is only available for one master user (`TG_MASTER_ID`).
 
