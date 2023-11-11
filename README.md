@@ -58,11 +58,11 @@ SUMMARIZATION_MODEL=anthropic/claude-instant-v1
 TG_BOT_KEY=XXXXXXXXXX:XXXxxxXXXxxxxXXXxxx  
 TG_BOT_MAX_HISTORY=8  
 TG_FRIEND_GROUP_ID=-XXXXXXXXXX  
-# Your telegram ID. For example 122740245. Forward your message to @idstickerbot to get it.  
+# Your telegram ID. For example 122349245. Forward your message to @idstickerbot to get it.  
 TG_MASTER_ID=XXXXXXXXX
-# Cybernoone reacts to direct replies or when sees the following words  
+# Kibernikto reacts to direct replies or when sees the following words  
 TG_REACTION_CALLS=киберникто,государь  
-# sometimes Cybernoone sends stickers for fun together with his answers  
+# sometimes Kibernikto sends stickers for fun together with his answers  
 TG_STICKER_LIST=CAACAgIAAxkBAAEKqsplQ8BRyPbGj_B_K4ujCLsDAe-l7wAC8AIAAs-71A7mCrGe-zzi0DME,CAACAgIAAxkBAAEIgoxkMaHv1maOeEne8CYAAY5s4kJ1e4wAAo4JAAIItxkCXSMuZ6bo59gvBA
 ```
 
