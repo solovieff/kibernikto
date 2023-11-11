@@ -54,7 +54,8 @@ For the full list of variables, see `constants.py` file.
 
 To create and operate your bot: https://t.me/BotFather  
 To obtain group/user ids etc: https://t.me/getidsbot  
-To obtain sticker ids: https://t.me/idstickerbot
+To obtain sticker ids: https://t.me/idstickerbot  
+To get familiar with basic OpenAI principles: https://openai.com  
 To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models.
 
 # how to run
