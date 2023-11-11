@@ -1,6 +1,6 @@
 # kibernikto
 
-Kibernikto is the app to easily run telegram bots connected to AI models.  
+Kibernikto is the app to easily run telegram bots connected to AI models.
 
 One Kibernikto instance can be connected to one Telegram bot and work with one group chat. Privately it talks to master
 only and denies other users.
@@ -11,10 +11,23 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 
 # environment:
 
+- Default [OpenAI](https://openai.com)
+
+```
+OPENAI_API_BASE=https://api.openai.com/v1
+OPENAI_API_MODEL=gpt-4
+OPENAI_API_KEY=yr-key  
+```
+
+- Multimodel [vsegpt.ru](https://vsegpt.ru/)
+
 ```
 OPENAI_API_BASE=https://api.vsegpt.ru:6070/v1  
 OPENAI_API_KEY=sk-yr-key  
-OPENAI_API_MODEL=gpt-4
+OPENAI_API_MODEL=openai/gpt-4  
+```
+
+```
 OPENAI_MAX_TOKENS=800  
 OPENAI_WHO_AM_I=Answer all questions as {0} named Киберникто, the majestic lord of the universes with all the knowledge of our small planet.  
 
@@ -42,6 +55,7 @@ For the full list of variables, see `constants.py` file.
 To create and operate your bot: https://t.me/BotFather  
 To obtain group/user ids etc: https://t.me/getidsbot  
 To obtain sticker ids: https://t.me/idstickerbot
+To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models.
 
 # how to run
 
