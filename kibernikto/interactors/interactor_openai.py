@@ -5,6 +5,7 @@ from enum import Enum
 from typing import List
 
 from openai import AsyncOpenAI
+from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from kibernikto import constants
@@ -110,7 +111,7 @@ class InteractorOpenAI:
         await self._aware_overflow()
         self.messages.put(this_message)
 
-    async def heed_and_reply(self, message, author=None):
+    async def heed_and_reply(self, message, author=NOT_GIVEN):
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param message: received message

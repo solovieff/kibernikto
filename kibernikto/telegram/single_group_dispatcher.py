@@ -119,7 +119,8 @@ async def group_message(message: types.Message):
     logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(message.text, author=message.from_user.full_name)
+        # not using author not to send usernames to openai :)
+        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(message.text)  # author=message.from_user.full_name
         chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)
         for chunk in chunks:
             await message.reply(text=chunk)
