@@ -2,15 +2,17 @@
 
 Kibernikto is the app to easily run telegram bots connected to AI models.
 
-Kibernikto based bots can summarize most of youtube videos and webpages using plugins.  
+Having a link, Kibernikto based bots can summarize most of 
+- youtube videos 
+- webpages
+- images
 
 One Kibernikto instance can be connected to one Telegram bot and work with one group chat. Privately it talks to master
 only and denies other users.
 
 Kibernikto can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will need chat messages access set in group to
 operate.
-Private chat is only available for one master user (`TG_MASTER_ID`).  
-
+Private chat is only available for one master user (`TG_MASTER_ID`).
 
 # how to run
 
@@ -34,7 +36,7 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 - Default [OpenAI](https://openai.com)
 
 ```
-OPENAI_API_BASE=https://api.openai.com/v1
+OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_API_MODEL=gpt-4
 OPENAI_API_KEY=yr-key  
 ```
@@ -57,6 +59,11 @@ SUMMARIZATION_KEY=sk-yr-key
 SUMMARIZATION_API_BASE_URL=https://api.vsegpt.ru:6070/v1  
 SUMMARIZATION_MODEL=anthropic/claude-instant-v1
 
+# image analysis. works only with gpt-4-vision-preview and direct openai for now  
+IMAGE_SUMMARIZATION_KEY=yr-key
+IMAGE_SUMMARIZATION_MODEL=gpt-4-vision-preview
+IMAGE_SUMMARIZATION_API_BASE_URL=https://api.openai.com/v1
+
 # Telegram configuration
 TG_BOT_KEY=XXXXXXXXXX:XXXxxxXXXxxxxXXXxxx  
 TG_BOT_MAX_HISTORY=8  
@@ -77,5 +84,6 @@ To create and operate your bot: https://t.me/BotFather
 To obtain group/user ids etc: https://t.me/getidsbot  
 To obtain sticker ids: https://t.me/idstickerbot  
 To get familiar with basic OpenAI principles: https://openai.com  
-To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models.
-Website to text and other helpful tools https://toolsyep.com/
+Basics on Gpt-4 vision: https://gptpluginz.com/gpt-4-vision-api  
+To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models
+Website to text and other helpful tools https://toolsyep.com
