@@ -2,12 +2,15 @@
 
 Kibernikto is the app to easily run telegram bots connected to AI models.
 
+Kibernikto based bots can summarize most of youtube videos and webpages using plugins.  
+
 One Kibernikto instance can be connected to one Telegram bot and work with one group chat. Privately it talks to master
 only and denies other users.
 
 Kibernikto can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will need chat messages access set in group to
 operate.
-Private chat is only available for one master user (`TG_MASTER_ID`).
+Private chat is only available for one master user (`TG_MASTER_ID`).  
+
 
 # how to run
 
@@ -48,8 +51,8 @@ OPENAI_API_MODEL=openai/gpt-4
 OPENAI_MAX_TOKENS=800  
 OPENAI_WHO_AM_I=Answer all questions as {0} named Киберникто, the majestic lord of the universes with all the knowledge of our small planet.  
 
-# Youtube video summaries
-# If no key is provided, youtube videos will be ignored.
+# Youtube videos and webpages summaries
+# If no key is provided, youtube videos and webpages will be ignored.
 SUMMARIZATION_KEY=sk-yr-key
 SUMMARIZATION_API_BASE_URL=https://api.vsegpt.ru:6070/v1  
 SUMMARIZATION_MODEL=anthropic/claude-instant-v1

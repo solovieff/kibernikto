@@ -80,8 +80,8 @@ async def on_startup(bot: Bot):
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
 
             await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
-            #hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
-            #await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
+            hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
+            await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
         logging.error(f"failed to send hello message! {str(e)}")
         if FRIEND_GROUP_BOT.client is not None:
@@ -119,7 +119,7 @@ async def group_message(message: types.Message):
     logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(message.text)  # , author=message.from_user.full_name
+        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(message.text, author=message.from_user.full_name)
         chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)
         for chunk in chunks:
             await message.reply(text=chunk)

@@ -120,10 +120,7 @@ class InteractorOpenAI:
         user_message = message
         self.reset_if_usercall(user_message)
 
-        if author:
-            this_message = dict(content=f"{author}: {user_message}", role=OpenAIRoles.user.value)
-        else:
-            this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
+        this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
 
         for plugin in self.plugins:
             plugin_result = await plugin.run_for_message(user_message)
@@ -149,6 +146,7 @@ class InteractorOpenAI:
             messages=prompt,
             max_tokens=constants.OPENAI_MAX_TOKENS,
             temperature=0.8,
+            user=author
         )
         response_message: ChatCompletionMessage = completion.choices[0].message
 
