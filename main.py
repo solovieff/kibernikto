@@ -1,5 +1,5 @@
 import logging
-from cyberavatar.bots.cybernoone import listener
+from kibernikto.bots.cybernoone import listener
 
 logging.basicConfig(
     format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
@@ -7,20 +7,30 @@ logging.basicConfig(
     level=logging.DEBUG)
 logger = logging.getLogger('openai')
 logger.setLevel(logging.INFO)
+
+logger = logging.getLogger('httpcore')
+logger.setLevel(logging.INFO)
+
+logger = logging.getLogger('httpx')
+logger.setLevel(logging.INFO)
+
+logger = logging.getLogger('asyncio')
+logger.setLevel(logging.INFO)
+
 # Initialize bot and dispatcher
 if __name__ == '__main__':
-    from cyberavatar import constants
+    from kibernikto import constants
 
-    from cyberavatar.telegram import basic_dispatcher
+    from kibernikto.telegram import basic_dispatcher
 
     print("\t")
     print('\t%-15s%-15s' % ("avatar model:", constants.OPENAI_API_MODEL))
-    print('\t%-15s%-15s' % ("avatar host:", constants.OPENAI_API_BASE))
+    print('\t%-15s%-15s' % ("avatar host:", constants.OPENAI_BASE_URL))
     print('\t%-15s%-15s' % ("avatar temp:", constants.OPENAI_TEMPERATURE))
     if constants.SUMMARIZATION_KEY:
         print("\t")
         print('\t%-15s%-15s' % ("sum model:", constants.SUMMARIZATION_MODEL))
-        print('\t%-15s%-15s' % ("sum host:", constants.SUMMARIZATION_API_BASE))
+        print('\t%-15s%-15s' % ("sum host:", constants.SUMMARIZATION_API_BASE_URL))
     else:
         print('\t%-15s%-15s' % ("summarization:", 'disabled'))
     print("\t")

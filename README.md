@@ -39,7 +39,7 @@ OPENAI_API_KEY=yr-key
 - Multimodel [vsegpt.ru](https://vsegpt.ru/)
 
 ```
-OPENAI_API_BASE=https://api.vsegpt.ru:6070/v1  
+OPENAI_BASE_URL=https://api.vsegpt.ru:6070/v1  
 OPENAI_API_KEY=sk-yr-key  
 OPENAI_API_MODEL=openai/gpt-4  
 ```
@@ -51,7 +51,7 @@ OPENAI_WHO_AM_I=Answer all questions as {0} named Киберникто, the maje
 # Youtube video summaries
 # If no key is provided, youtube videos will be ignored.
 SUMMARIZATION_KEY=sk-yr-key
-SUMMARIZATION_API_BASE=https://api.vsegpt.ru:6070/v1  
+SUMMARIZATION_API_BASE_URL=https://api.vsegpt.ru:6070/v1  
 SUMMARIZATION_MODEL=anthropic/claude-instant-v1
 
 # Telegram configuration

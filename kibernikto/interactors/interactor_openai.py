@@ -3,10 +3,14 @@ import os
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
+from typing import List
 
-import openai
+from openai import OpenAI, AsyncOpenAI
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
-from cyberavatar.constants import OPENAI_MAX_TOKENS, OPENAI_RESET_CALL
+import constants
+from kibernikto.constants import OPENAI_MAX_TOKENS, OPENAI_RESET_CALL
+from plugins import KiberniktoPlugin
 
 _defaults = {
     "game_rules": """We are going to have a roleplay. You will respond to all of my questions as Киберникто, the master of truth.""",
@@ -58,17 +62,19 @@ class InteractorOpenAI:
         self.summarize = default_config.summarize_request is not None
         self._reset()
 
+        self.client = AsyncOpenAI(base_url=constants.OPENAI_BASE_URL, api_key=constants.OPENAI_API_KEY)
+
         self.model = model
         self.defaults = default_config
 
         # user messages preprocessing entities to go here
-        self.filters = []
+        self.plugins: List[KiberniktoPlugin] = []
         if self.max_messages < 2:
             self.max_messages = 2  # hahaha
 
         # default configuration. TODO: rework
         wai = default_config.who_am_i.format(default_config.my_name)
-        self.about_me = {"role": OpenAIRoles.system.value, "content": wai}
+        self.about_me = dict(role=OpenAIRoles.system.value, content=wai)
 
     @property
     def token_overflow(self):
@@ -100,9 +106,9 @@ class InteractorOpenAI:
         if len(message) > 200:
             return
         if author:
-            this_message = self._form_message(OpenAIRoles.user.value, f"{author}: {message}")
+            this_message = dict(role=OpenAIRoles.user.value, content=f"{author}: {message}")
         else:
-            this_message = self._form_message(OpenAIRoles.user.value, f"{message}")
+            this_message = dict(OpenAIRoles.user.value, f"{message}")
         await self._aware_overflow()
         self.messages.put(this_message)
 
@@ -113,17 +119,21 @@ class InteractorOpenAI:
         :param author: outer chat message author. can be more or less understood by chat gpt.
         :return: the text of OpenAI response
         """
-        for preprocessor in self.filters:
-            filter_result = preprocessor(message)
-            if filter_result is not None:
-                return filter_result
+        user_message = message
+        self.reset_if_usercall(user_message)
 
-        self.reset_if_usercall(message)
+        for plugin in self.plugins:
+            plugin_result = await plugin.run_for_message(user_message)
+            if plugin_result is not None:
+                if not plugin.post_process_reply:
+                    return plugin_result
+                else:
+                    user_message = plugin_result
 
         if author:
-            this_message = self._form_message(OpenAIRoles.user.value, f"{author}: {message}")
+            this_message = dict(content=f"{author}: {user_message}", role=OpenAIRoles.user.value)
         else:
-            this_message = self._form_message(OpenAIRoles.user.value, f"{message}")
+            this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
 
         await self._aware_overflow()
 
@@ -131,17 +141,20 @@ class InteractorOpenAI:
 
         logging.debug(f"sending {prompt}")
 
-        response = await openai.ChatCompletion.acreate(
+        client: AsyncOpenAI = self.client
+
+        completion: ChatCompletion = await client.chat.completions.create(
             model=self.model,
             messages=prompt,
             max_tokens=OPENAI_MAX_TOKENS,
             temperature=0.8,
         )
-        response_text = response['choices'][0]['message']['content'].strip()
+        response_message: ChatCompletionMessage = completion.choices[0].message
+
         self.messages.append(this_message)
-        response_message = self._form_message(OpenAIRoles.assistant.value, response_text)
-        self.messages.append(response_message)
-        return response_text
+        self.messages.append(dict(role=response_message.role, content=response_message.content))
+
+        return response_message.content
 
     def reset_if_usercall(self, message):
         if self.reset_call in message:
@@ -151,28 +164,19 @@ class InteractorOpenAI:
         # never gets full
         self.messages = deque(maxlen=self.max_messages)
 
-    def _form_message(self, user, text):
-        """
-
-        :param user: OpenAIRoles
-        :param text:
-        :return:
-        """
-        return {"role": user, "content": text}
-
     async def _get_summary(self):
         """
         Performs OpenAPI call to summarize previous messages. Does not put about_me message, that can be a problem.
         :return: summary for current messages
         """
         logging.info(f"getting summary for {len(self.messages)} messages")
-        response = await openai.ChatCompletion.acreate(
+        response: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "system", "content": self.defaults['summary']}] + self.messages,
-            max_tokens=OPENAI_MAX_TOKENS / 2,
-            temperature=0.7,
+            max_tokens=OPENAI_MAX_TOKENS,
+            temperature=0.8,
         )
-        response_text = response['choices'][0]['message']['content'].strip()
+        response_text = response.choices[0].message.content.strip()
         logging.info(response_text)
         return response_text
 
@@ -192,6 +196,6 @@ class InteractorOpenAI:
             # summarizing previous discussion if needed
             if self.token_overflow:
                 summary_text = await self._get_summary()
-                summary = self._form_message(OpenAIRoles.system, summary_text)
+                summary = dict(role=OpenAIRoles.system.value, content=summary_text)
                 self._reset()
                 self.messages.append(summary)

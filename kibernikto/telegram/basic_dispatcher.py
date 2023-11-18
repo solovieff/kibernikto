@@ -6,8 +6,9 @@ from random import choice
 
 from aiogram import Bot, Dispatcher, types, enums, F
 
-from cyberavatar import constants, utils as cyberutils
-from cyberavatar.utils.text import split_text, MAX_MESSAGE_LENGTH
+from kibernikto import constants, utils as cyberutils
+from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
+from kibernikto.plugins import YoutubePlugin
 
 # Initialize tg_bot and dispatcher
 
@@ -61,10 +62,14 @@ async def on_startup(bot: Bot):
                                           who_am_i=constants.OPENAI_WHO_AM_I,
                                           reaction_calls=constants.TG_REACTION_CALLS)
 
-            # Initialize message processing filters
+            # Initialize message processing plugins
             if constants.SUMMARIZATION_KEY:
-                PRIVATE_BOT.filters.append(cyberutils.youtube.get_transcript_if_video)
-                FRIEND_GROUP_BOT.filters.append(cyberutils.youtube.get_transcript_if_video)
+                sum_youtube_plugin = YoutubePlugin(model=constants.SUMMARIZATION_MODEL,
+                                                   base_url=constants.SUMMARIZATION_API_BASE_URL,
+                                                   api_key=constants.SUMMARIZATION_KEY,
+                                                   summarization_request=constants.SUMMARIZATION_REQUEST)
+                PRIVATE_BOT.plugins.append(sum_youtube_plugin)
+                FRIEND_GROUP_BOT.plugins.append(sum_youtube_plugin)
 
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.username)
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
@@ -73,8 +78,13 @@ async def on_startup(bot: Bot):
             hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
             await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
-        logging.error("failed to send hello message!", e)
-        dp.stop_polling()
+        logging.error(f"failed to send hello message! {str(e)}")
+        if FRIEND_GROUP_BOT.client is not None:
+            await FRIEND_GROUP_BOT.client.close()
+        if PRIVATE_BOT.client is not None:
+            await PRIVATE_BOT.client.close()
+
+        await dp.stop_polling()
         exit(os.EX_CONFIG)
 
 

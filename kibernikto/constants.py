@@ -26,7 +26,7 @@ try:
     TG_PUBLICATION_CHANNEL_ID = int(os.environ.get('TG_PUBLICATION_CHANNEL_ID', 0))
 
     OPENAI_API_MODEL = os.environ.get('OPENAI_API_MODEL', "gpt-4")
-    OPENAI_API_BASE = os.environ.get('OPENAI_API_BASE', "https://api.vsegpt.ru:6070/v1")
+    OPENAI_BASE_URL = os.environ.get('OPENAI_BASE_URL', "https://api.vsegpt.ru:6070/v1")
     OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
     OPENAI_MAX_TOKENS = int(os.environ.get('OPENAI_MAX_TOKENS', 800))
     OPENAI_TEMPERATURE = float(os.environ.get('OPENAI_TEMPERATURE', 0.7))
@@ -36,8 +36,8 @@ try:
 
     SUMMARIZATION_KEY = os.environ.get('SUMMARIZATION_KEY')
     SUMMARIZATION_REQUEST = os.environ.get('SUMMARIZATION_REQUEST',
-                                           "Summarize video by transcript and tell me all the important things provided in this video. {info_text}. \n{text}")
-    SUMMARIZATION_API_BASE = os.environ.get('SUMMARIZATION_API_BASE', "https://api.vsegpt.ru:6070/v1")
+                                           "You will be provided with a video transcript. Summarize it and give 10 main video points.\n {info_text}. \n{text}\n")
+    SUMMARIZATION_API_BASE_URL = os.environ.get('SUMMARIZATION_API_BASE_URL', "https://api.vsegpt.ru:6070/v1")
     SUMMARIZATION_MODEL = os.environ.get('SUMMARIZATION_MODEL', "anthropic/claude-instant-v1")
 except KeyError as e:
     logging.error(f"{str(e)} environment variable missing missing")

@@ -1,13 +1,7 @@
-import asyncio
-
-from cyberavatar import constants
-from cyberavatar.interactors import BaseTextConfig, InteractorOpenAI
-from cyberavatar.bots.cybernoone.prompt_preqs import MAIN_VERBAGE
+from kibernikto import constants
+from kibernikto.interactors import BaseTextConfig, InteractorOpenAI
+from kibernikto.bots.cybernoone.prompt_preqs import MAIN_VERBAGE
 import openai
-
-PREFIXES = BaseTextConfig(who_am_i=MAIN_VERBAGE['who_am_i'],
-                          reaction_calls=['никто', 'падаль', 'хонда'])
-
 
 class Cybernoone(InteractorOpenAI):
 
