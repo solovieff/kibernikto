@@ -8,8 +8,7 @@ from typing import List
 from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
-import constants
-from kibernikto.constants import OPENAI_MAX_TOKENS, OPENAI_RESET_CALL
+from kibernikto import constants
 from plugins import KiberniktoPlugin
 
 _defaults = {
@@ -146,7 +145,7 @@ class InteractorOpenAI:
         completion: ChatCompletion = await client.chat.completions.create(
             model=self.model,
             messages=prompt,
-            max_tokens=OPENAI_MAX_TOKENS,
+            max_tokens=constants.OPENAI_MAX_TOKENS,
             temperature=0.8,
         )
         response_message: ChatCompletionMessage = completion.choices[0].message
@@ -173,7 +172,7 @@ class InteractorOpenAI:
         response: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "system", "content": self.defaults['summary']}] + self.messages,
-            max_tokens=OPENAI_MAX_TOKENS,
+            max_tokens=constants.OPENAI_MAX_TOKENS,
             temperature=0.8,
         )
         response_text = response.choices[0].message.content.strip()
