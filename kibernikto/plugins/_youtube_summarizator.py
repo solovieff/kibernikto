@@ -21,10 +21,8 @@ class YoutubePlugin(KiberniktoPlugin):
     """
 
     def __init__(self, model: str, base_url: str, api_key: str, summarization_request: str):
-        self.model = model
-        self.summarization_request = summarization_request
-        self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
-        super().__init__(post_process_reply=False, store_reply=True)
+        super().__init__(model=model, base_url=base_url, api_key=api_key, post_process_reply=False, store_reply=True,
+                         base_message=summarization_request)
 
     async def run_for_message(self, message: str):
         try:
@@ -57,17 +55,17 @@ class YoutubePlugin(KiberniktoPlugin):
     async def get_ai_text_summary(self, transcript, info):
         info_text = str(info) if info else ""
 
-        content_to_summarize = self.summarization_request.format(info_text=info_text, text=transcript)
+        content_to_summarize = self.base_message.format(info_text=info_text, text=transcript)
         message = {
             "role": "user",
             "content": content_to_summarize
         }
 
-        completion: ChatCompletion = await self.client.chat.completions.create(model=self.model,
-                                                                               messages=[message],
-                                                                               max_tokens=OPENAI_MAX_TOKENS,
-                                                                               temperature=0.8,
-                                                                               )
+        completion: ChatCompletion = await self.client_async.chat.completions.create(model=self.model,
+                                                                                     messages=[message],
+                                                                                     max_tokens=OPENAI_MAX_TOKENS,
+                                                                                     temperature=0.8,
+                                                                                     )
         response_text = completion.choices[0].message.content.strip()
         logging.info(response_text)
         return response_text

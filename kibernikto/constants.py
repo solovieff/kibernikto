@@ -45,6 +45,11 @@ try:
                                                    "Try to emphasize the main point from the content.\n"
                                                    "If you think there are multiple articles or blog posts on the site -- provide a sammary for each.\n"
                                                    "{text}\n")
+
+    IMAGE_SUMMARIZATION_KEY = os.environ.get('IMAGE_SUMMARIZATION_KEY')
+    IMAGE_SUMMARIZATION_REQUEST = os.environ.get('IMAGE_SUMMARIZATION_REQUEST', "What is displayed in the image?")
+    IMAGE_SUMMARIZATION_MODEL = os.environ.get('IMAGE_SUMMARIZATION_MODEL', "gpt-4-vision-preview")
+    IMAGE_SUMMARIZATION_API_BASE_URL = os.environ.get('IMAGE_SUMMARIZATION_API_BASE_URL', "https://api.openai.com/v1")
 except KeyError as e:
     logging.error(f"{str(e)} environment variable missing missing")
     exit(os.EX_CONFIG)

@@ -3,12 +3,14 @@ import logging
 import os
 import random
 from random import choice
+from typing import List
 
 from aiogram import Bot, Dispatcher, types, enums, F
 
 from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin
+from plugins import ImageSummaryPlugin
 
 smart_bot_class = None
 
@@ -61,21 +63,7 @@ async def on_startup(bot: Bot):
                                           reaction_calls=constants.TG_REACTION_CALLS)
 
             # Initialize message processing plugins
-            if constants.SUMMARIZATION_KEY:
-                sum_youtube_plugin = YoutubePlugin(model=constants.SUMMARIZATION_MODEL,
-                                                   base_url=constants.SUMMARIZATION_API_BASE_URL,
-                                                   api_key=constants.SUMMARIZATION_KEY,
-                                                   summarization_request=constants.SUMMARIZATION_REQUEST)
-                PRIVATE_BOT.plugins.append(sum_youtube_plugin)
-                FRIEND_GROUP_BOT.plugins.append(sum_youtube_plugin)
-
-                sum_web_plugin = WeblinkSummaryPlugin(model=constants.SUMMARIZATION_MODEL,
-                                                      base_url=constants.SUMMARIZATION_API_BASE_URL,
-                                                      api_key=constants.SUMMARIZATION_KEY,
-                                                      summarization_request=constants.WEBLINK_SUMMARIZATION_REQUEST)
-                PRIVATE_BOT.plugins.append(sum_web_plugin)
-                FRIEND_GROUP_BOT.plugins.append(sum_web_plugin)
-
+            _apply_plugins([FRIEND_GROUP_BOT, PRIVATE_BOT])
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.username)
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
 
@@ -136,3 +124,31 @@ async def group_message(message: types.Message):
 def is_reply(message: types.Message):
     if message.reply_to_message and message.reply_to_message.from_user.id == tg_bot.id:
         return True
+
+
+def _apply_plugins(bots: List):
+    def apply_plugin(plugin):
+        for bot in bots:
+            bot.plugins.append(plugin)
+
+    if constants.IMAGE_SUMMARIZATION_KEY:
+        image_url_plugin = ImageSummaryPlugin(model=constants.IMAGE_SUMMARIZATION_MODEL,
+                                              base_url=constants.IMAGE_SUMMARIZATION_API_BASE_URL,
+                                              api_key=constants.IMAGE_SUMMARIZATION_KEY,
+                                              summarization_request=constants.IMAGE_SUMMARIZATION_REQUEST)
+        apply_plugin(image_url_plugin)
+
+    if constants.SUMMARIZATION_KEY:
+        sum_youtube_plugin = YoutubePlugin(model=constants.SUMMARIZATION_MODEL,
+                                           base_url=constants.SUMMARIZATION_API_BASE_URL,
+                                           api_key=constants.SUMMARIZATION_KEY,
+                                           summarization_request=constants.SUMMARIZATION_REQUEST)
+        apply_plugin(sum_youtube_plugin)
+
+        sum_web_plugin = WeblinkSummaryPlugin(model=constants.SUMMARIZATION_MODEL,
+                                              base_url=constants.SUMMARIZATION_API_BASE_URL,
+                                              api_key=constants.SUMMARIZATION_KEY,
+                                              summarization_request=constants.WEBLINK_SUMMARIZATION_REQUEST)
+        apply_plugin(sum_web_plugin)
+
+
