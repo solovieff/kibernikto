@@ -1,22 +1,21 @@
 import logging
-import os
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from kibernikto import constants
-from plugins import KiberniktoPlugin
+from kibernikto.plugins import KiberniktoPlugin
 
 _defaults = {
     "game_rules": """We are going to have a roleplay. You will respond to all of my questions as Киберникто, the master of truth.""",
     "who_am_i": """Answer all questions as Киберникто, impartial minister of truth. Try to respond to all available points of view.""",
     "summary": "Give a short summary of the previous conversation in russian from the point of view of a pirate.",
     "master_call": "Величайший Киберникто",
-    "reset_call": OPENAI_RESET_CALL,
+    "reset_call": constants.OPENAI_RESET_CALL,
     "my_name": "Киберникто"
 }
 
