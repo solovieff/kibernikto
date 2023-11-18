@@ -120,18 +120,21 @@ class InteractorOpenAI:
         user_message = message
         self.reset_if_usercall(user_message)
 
-        for plugin in self.plugins:
-            plugin_result = await plugin.run_for_message(user_message)
-            if plugin_result is not None:
-                if not plugin.post_process_reply:
-                    return plugin_result
-                else:
-                    user_message = plugin_result
-
         if author:
             this_message = dict(content=f"{author}: {user_message}", role=OpenAIRoles.user.value)
         else:
             this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
+
+        for plugin in self.plugins:
+            plugin_result = await plugin.run_for_message(user_message)
+            if plugin_result is not None:
+                if not plugin.post_process_reply:
+                    if plugin.store_reply:
+                        self.messages.append(this_message)
+                        self.messages.append(dict(role=OpenAIRoles.assistant.value, content=plugin_result))
+                    return plugin_result
+                else:
+                    user_message = plugin_result
 
         await self._aware_overflow()
 

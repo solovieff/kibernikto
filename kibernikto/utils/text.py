@@ -1,4 +1,8 @@
+import logging
 import typing
+
+from aiogram.client.session import aiohttp
+from pydantic import HttpUrl
 
 MAX_MESSAGE_LENGTH = 4096
 
@@ -42,3 +46,13 @@ def safe_split_text(text: str, length: int = MAX_MESSAGE_LENGTH, split_separator
             parts.append(temp_text)
             break
     return parts
+
+
+async def get_website_as_text(url: HttpUrl):
+    to_reader_url = "https://toolsyep.com/en/webpage-to-plain-text/"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(to_reader_url, params={
+            "u": url
+        }) as response:
+            html = await response.text(encoding=response.charset)
+    return html

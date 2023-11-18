@@ -1,5 +1,6 @@
 import logging
 from kibernikto.bots.cybernoone import listener
+from kibernikto.telegram import single_group_dispatcher
 
 logging.basicConfig(
     format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
@@ -21,7 +22,7 @@ logger.setLevel(logging.INFO)
 if __name__ == '__main__':
     from kibernikto import constants
 
-    from kibernikto.telegram import basic_dispatcher
+    from kibernikto.telegram import single_group_dispatcher
 
     print("\t")
     print('\t%-15s%-15s' % ("avatar model:", constants.OPENAI_API_MODEL))
@@ -38,4 +39,4 @@ if __name__ == '__main__':
     print('\t%-15s%-15s' % ("tg group:", constants.TG_FRIEND_GROUP_ID))
     print("\t")
 
-    basic_dispatcher.start(bot_class=listener.Cybernoone)
+    single_group_dispatcher.start(bot_class=listener.Cybernoone)

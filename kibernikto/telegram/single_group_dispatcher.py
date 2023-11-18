@@ -6,11 +6,9 @@ from random import choice
 
 from aiogram import Bot, Dispatcher, types, enums, F
 
-from kibernikto import constants, utils as cyberutils
+from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
-from kibernikto.plugins import YoutubePlugin
-
-# Initialize tg_bot and dispatcher
+from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin
 
 smart_bot_class = None
 
@@ -71,12 +69,19 @@ async def on_startup(bot: Bot):
                 PRIVATE_BOT.plugins.append(sum_youtube_plugin)
                 FRIEND_GROUP_BOT.plugins.append(sum_youtube_plugin)
 
+                sum_web_plugin = WeblinkSummaryPlugin(model=constants.SUMMARIZATION_MODEL,
+                                                      base_url=constants.SUMMARIZATION_API_BASE_URL,
+                                                      api_key=constants.SUMMARIZATION_KEY,
+                                                      summarization_request=constants.WEBLINK_SUMMARIZATION_REQUEST)
+                PRIVATE_BOT.plugins.append(sum_web_plugin)
+                FRIEND_GROUP_BOT.plugins.append(sum_web_plugin)
+
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.username)
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
 
             await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
-            hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
-            await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
+            #hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
+            #await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
         logging.error(f"failed to send hello message! {str(e)}")
         if FRIEND_GROUP_BOT.client is not None:
@@ -100,7 +105,7 @@ async def send_random_sticker(chat_id):
 @dp.message(F.chat.type == enums.ChatType.PRIVATE)
 async def private_message(message: types.Message):
     if not PRIVATE_BOT.check_master(message.from_user.id, message.text):
-        reply_text = f"Я не отвечаю на вопросы в личных беседах с незанкомыми людьми (если это конечно не мой Господин " \
+        reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не мой Господин " \
                      f"Создатель снизошёл до меня). Лично я говорю только с {constants.TG_MASTER_ID}!"
     else:
         reply_text = await PRIVATE_BOT.heed_and_reply(message=message.text)

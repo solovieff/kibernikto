@@ -23,16 +23,15 @@ class YoutubePlugin(KiberniktoPlugin):
     def __init__(self, model: str, base_url: str, api_key: str, summarization_request: str):
         self.model = model
         self.summarization_request = summarization_request
-        super().__init__(False)
         self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+        super().__init__(post_process_reply=False, store_reply=True)
 
     async def run_for_message(self, message: str):
         try:
             result = await self._run(message)
             return result
         except Exception as error:
-            logging.error(f'failed to get video transcript from {message}', error)
-            logging.error(error)
+            logging.error(f'failed to get video transcript from {message}: {str(error)}', )
             return None
 
     async def _run(self, message: str):
@@ -75,8 +74,12 @@ class YoutubePlugin(KiberniktoPlugin):
 
 
 def _get_video_details(message):
-    youtube_video: YouTube = _get_video_from_text(message)
-    if not youtube_video:
+    try:
+        youtube_video: YouTube = _get_video_from_text(message)
+    except:
+        return None, None
+
+    if youtube_video is None:
         return None, None
 
     info = _get_video_info(youtube_video)
@@ -134,7 +137,8 @@ def _get_video_from_text(text):
     match = regex.match(text)
     if match:
         video_id = match.group('id')
-        youtube_video = YouTube(f'{YOUTUBE_VIDEO_PRE_URL}{video_id}')
+        # youtube_video = YouTube(f'{YOUTUBE_VIDEO_PRE_URL}{video_id}')
+        youtube_video = YouTube(f'{text}')
         return youtube_video
     else:
         return None

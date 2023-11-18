@@ -36,9 +36,15 @@ try:
 
     SUMMARIZATION_KEY = os.environ.get('SUMMARIZATION_KEY')
     SUMMARIZATION_REQUEST = os.environ.get('SUMMARIZATION_REQUEST',
-                                           "You will be provided with a video transcript. Summarize it and give 10 main video points.\n {info_text}. \n{text}\n")
+                                           "You will be provided with a video transcript. Summarize it and try to give 13 main points.\n {info_text}. \n{text}\n")
     SUMMARIZATION_API_BASE_URL = os.environ.get('SUMMARIZATION_API_BASE_URL', "https://api.vsegpt.ru:6070/v1")
     SUMMARIZATION_MODEL = os.environ.get('SUMMARIZATION_MODEL', "anthropic/claude-instant-v1")
+
+    WEBLINK_SUMMARIZATION_REQUEST = os.environ.get('WEBLINK_SUMMARIZATION_REQUEST',
+                                                   "Above is the web page in text form. Try to ignore the site section titles and additional links that don't carry information. \n"
+                                                   "Try to emphasize the main point from the content.\n"
+                                                   "If you think there are multiple articles or blog posts on the site -- provide a sammary for each.\n"
+                                                   "{text}\n")
 except KeyError as e:
     logging.error(f"{str(e)} environment variable missing missing")
     exit(os.EX_CONFIG)
