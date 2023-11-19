@@ -43,6 +43,8 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 
 # environment:
 
+In general, you can use one Ai provider API for all available Kibernikto actions, in that case all the AI related variables values will be the same.  
+However it is strongly recommended to use cheaper models for summarization tasks.
 - Default [OpenAI](https://openai.com)
 
 ```
