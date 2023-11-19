@@ -2,8 +2,9 @@
 
 Kibernikto is the app to easily run telegram bots connected to AI models.
 
-Having a link, Kibernikto based bots can summarize most of 
-- youtube videos 
+Having a link, Kibernikto based bots can summarize most of
+
+- youtube videos
 - webpages
 - images
 
@@ -13,6 +14,10 @@ only and denies other users.
 Kibernikto can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will need chat messages access set in group to
 operate.
 Private chat is only available for one master user (`TG_MASTER_ID`).
+
+# install from pip
+
+``pip install tonetube``
 
 # how to run
 
@@ -27,6 +32,12 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 
 - Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using getidsbot.
 - Configure other env variables.
+
+**cmd**  
+``kibernikto --env_file_path local.env``
+
+**python code**
+
 - Install the requirements `pip install -r requirements.txt`
 - Run `main.py` file using the environment provided.
 - Enjoy!

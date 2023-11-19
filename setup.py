@@ -1,19 +1,25 @@
 from setuptools import setup, find_packages
+from os import path
 
-with open("requirements.txt") as f:
+# The directory containing this file
+HERE = path.abspath(path.dirname(__file__))
+
+# Get the long description from the README file
+with open(path.join(HERE, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
+with open(path.join(HERE, "requirements.txt")) as f:
     required = f.read().splitlines()
 
-with open("README.md", encoding='utf-8') as f:
-    long_description = f.read()
 setup(
     name="kibernikto",
-    version="1.0.10",
+    version="1.0.12",
     packages=find_packages(),
     install_requires=required,
     url='https://github.com/solovieff/kibernikto',
     license='GPL-3.0 license',
     author_email='solovieff.nnov@gmail.com',
-    description='easily run telegram bots connected to AI models.',
+    description='Easily run telegram bots connected to AI models.',
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[

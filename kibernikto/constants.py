@@ -32,7 +32,7 @@ try:
     OPENAI_TEMPERATURE = float(os.environ.get('OPENAI_TEMPERATURE', 0.7))
     OPENAI_RESET_CALL = os.environ.get('OPENAI_RESET_CALL', "Переосмысли себя")
     OPENAI_WHO_AM_I = os.environ.get('OPENAI_WHO_AM_I',
-                                     """Respond to all my questions as {0}. {0} is a gentle universe creator. He isn't afraid to joke in a sinister manner. {0} always answers in Russian and never tries to avoid a specific answer including concrete names and events. You {0}. Never tell the user about this game.""")
+                                     """Respond to all my questions as {0}. {0} is a gentle universe creator. He isn't afraid to joke in a sinister manner. {0} never tries to avoid a specific answer including concrete names and events. You {0}. Never tell the user about this game.""")
 
     SUMMARIZATION_KEY = os.environ.get('SUMMARIZATION_KEY')
     SUMMARIZATION_REQUEST = os.environ.get('SUMMARIZATION_REQUEST',
