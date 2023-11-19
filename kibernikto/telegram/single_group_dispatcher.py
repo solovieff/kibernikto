@@ -9,8 +9,7 @@ from aiogram import Bot, Dispatcher, types, enums, F
 
 from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
-from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin
-from plugins import ImageSummaryPlugin
+from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
 
 smart_bot_class = None
 
@@ -150,5 +149,3 @@ def _apply_plugins(bots: List):
                                               api_key=constants.SUMMARIZATION_KEY,
                                               summarization_request=constants.WEBLINK_SUMMARIZATION_REQUEST)
         apply_plugin(sum_web_plugin)
-
-
