@@ -17,11 +17,11 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 
 # install from pip
 
-``pip install tonetube``
+``pip install kibernikto``
 
 # how to run
 
-- Create your bot using BotFather and obtain it's key. You can also change the picture and other details there. Set
+- Create telegram bot using @BotFather and obtain it's key. You can also change the picture and other details there. Set
   env `TG_BOT_KEY`.
 
   Turn off Group Privacy for your bot to be able to react to group messages:
@@ -30,17 +30,16 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
   <br>
   <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/bf1ac575-ad1a-464c-8535-2cf7f5ebb162">  
 
-- Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using getidsbot.
+- Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using @getidsbot in telegram.
 - Configure other env variables.
 
-**cmd**  
+**run cmd**  
 ``kibernikto --env_file_path local.env``
 
-**python code**
+**run code**
 
 - Install the requirements `pip install -r requirements.txt`
 - Run `main.py` file using the environment provided.
-- Enjoy!
 
 # environment:
 
