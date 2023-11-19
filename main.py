@@ -1,6 +1,5 @@
 import logging
 from kibernikto.bots.cybernoone import listener
-from kibernikto.telegram import single_group_dispatcher
 
 logging.basicConfig(
     format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
