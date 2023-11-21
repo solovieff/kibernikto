@@ -50,6 +50,7 @@ try:
     IMAGE_SUMMARIZATION_REQUEST = os.environ.get('IMAGE_SUMMARIZATION_REQUEST', "What is displayed in the image?")
     IMAGE_SUMMARIZATION_MODEL = os.environ.get('IMAGE_SUMMARIZATION_MODEL', "gpt-4-vision-preview")
     IMAGE_SUMMARIZATION_API_BASE_URL = os.environ.get('IMAGE_SUMMARIZATION_API_BASE_URL', "https://api.openai.com/v1")
+    IMAGE_STORAGE_API_KEY = os.environ.get('IMAGE_STORAGE_API_KEY', "d581d52610fc664c1d632cbeb8362686")
 except KeyError as e:
     logging.error(f"{str(e)} environment variable missing missing")
     exit(os.EX_CONFIG)

@@ -3,24 +3,28 @@ import logging
 import os
 import random
 from random import choice
-from typing import List
+from typing import List, BinaryIO
 
 from aiogram import Bot, Dispatcher, types, enums, F
+from aiogram.types import User
+from kibernikto.interactors import InteractorOpenAI
 
 from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
+from utils.image import publish_image_file
 
 smart_bot_class = None
 
 # Telegram bot
-tg_bot = None
-bot_me = None
+tg_bot: Bot = None
+bot_me: User = None
 dp = Dispatcher()
 
-# Open AI bot instances
-FRIEND_GROUP_BOT = None
-PRIVATE_BOT = None
+# Open AI bot instances.
+# TODO: upper level class to create
+FRIEND_GROUP_BOT: InteractorOpenAI = None
+PRIVATE_BOT: InteractorOpenAI = None
 
 MAX_TG_MESSAGE_LEN = 4096
 
@@ -91,11 +95,14 @@ async def send_random_sticker(chat_id):
 
 @dp.message(F.chat.type == enums.ChatType.PRIVATE)
 async def private_message(message: types.Message):
-    if not PRIVATE_BOT.check_master(message.from_user.id, message.text):
+    if not PRIVATE_BOT.check_master(message.from_user.id, message.md_text):
         reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не мой Господин " \
                      f"Создатель снизошёл до меня). Лично я говорю только с {constants.TG_MASTER_ID}!"
     else:
-        reply_text = await PRIVATE_BOT.heed_and_reply(message=message.text)
+        await tg_bot.send_chat_action(message.chat.id, 'typing')
+        user_text = await _get_message_text(message)
+        await tg_bot.send_chat_action(message.chat.id, 'typing')
+        reply_text = await PRIVATE_BOT.heed_and_reply(message=user_text)
     chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)
     for chunk in chunks:
         await message.reply(text=chunk)
@@ -103,11 +110,12 @@ async def private_message(message: types.Message):
 
 @dp.message(F.chat.id == constants.TG_FRIEND_GROUP_ID)
 async def group_message(message: types.Message):
+    user_message = message.md_text
     logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
-    if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.text):
+    if is_reply(message) or FRIEND_GROUP_BOT.should_react(user_message):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         # not using author not to send usernames to openai :)
-        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(message.text)  # author=message.from_user.full_name
+        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(user_message)  # author=message.from_user.full_name
         chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)
         for chunk in chunks:
             await message.reply(text=chunk)
@@ -149,3 +157,18 @@ def _apply_plugins(bots: List):
                                               api_key=constants.SUMMARIZATION_KEY,
                                               summarization_request=constants.WEBLINK_SUMMARIZATION_REQUEST)
         apply_plugin(sum_web_plugin)
+
+
+async def _get_message_text(message: types.Message):
+    user_text = message.md_text
+    if message.content_type == enums.ContentType.PHOTO and message.photo:
+        photo = message.photo[-1]
+        file = await tg_bot.get_file(photo.file_id)
+        file_path = file.file_path
+        photo_file: BinaryIO = await tg_bot.download_file(file_path)
+        # file_path = photo_file.file_path
+        url = await publish_image_file(photo_file, photo.file_unique_id)
+        logging.info(f"published image: {url}")
+
+        user_text = f"{user_text} {url}"
+    return user_text

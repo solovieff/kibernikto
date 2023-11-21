@@ -39,7 +39,7 @@ class ImageSummaryPlugin(KiberniktoPlugin):
             summary = await self.get_ai_text_summary(web_link, text)
             return f"{summary}"
         except Exception as error:
-            logging.warning(f'failed to get ai text summary: {str(error)}', )
+            logging.error(f'failed to get ai image summary: {str(error)}', )
             # summary = _get_sber_text_summary(transcript)
             # summary = str(error)
             return None

@@ -1,6 +1,7 @@
 import logging
 import re
 
+from kibernikto.plugins._img_summarizator import _is_image
 from openai.types.chat import ChatCompletion
 
 from kibernikto.constants import OPENAI_MAX_TOKENS
@@ -31,6 +32,8 @@ class WeblinkSummaryPlugin(KiberniktoPlugin):
         if web_link is None:
             return None
 
+        if _is_image(web_link):
+            return None
         logging.info(f"found web link: {web_link}", )
         transcript = None
 
