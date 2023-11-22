@@ -8,6 +8,8 @@ Having a link, Kibernikto based bots can summarize most of
 - webpages
 - images
 
+Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
+
 One Kibernikto instance can be connected to one Telegram bot and work with one group chat. Privately it talks to master
 only and denies other users.
 
@@ -30,7 +32,8 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
   <br>
   <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/bf1ac575-ad1a-464c-8535-2cf7f5ebb162">  
 
-- Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using @getidsbot in telegram.
+- Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using @getidsbot in
+  telegram.
 - Configure other env variables.
 
 **run cmd**  
@@ -43,8 +46,10 @@ Private chat is only available for one master user (`TG_MASTER_ID`).
 
 # environment:
 
-In general, you can use one Ai provider API for all available Kibernikto actions, in that case all the AI related variables values will be the same.  
+In general, you can use one Ai provider API for all available Kibernikto actions, in that case all the AI related
+variables values will be the same.  
 However it is strongly recommended to use cheaper models for summarization tasks.
+
 - Default [OpenAI](https://openai.com)
 
 ```
@@ -76,6 +81,10 @@ IMAGE_SUMMARIZATION_KEY=yr-key
 IMAGE_SUMMARIZATION_MODEL=gpt-4-vision-preview
 IMAGE_SUMMARIZATION_API_BASE_URL=https://api.openai.com/v1
 
+# You can get your key here: https://imgbb.com. If you do no set up this variable, default one will be used.  
+# This is needed to store images send to the bot.  
+IMAGE_STORAGE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
 # Telegram configuration
 TG_BOT_KEY=XXXXXXXXXX:XXXxxxXXXxxxxXXXxxx  
 TG_BOT_MAX_HISTORY=8  
@@ -97,5 +106,6 @@ To obtain group/user ids etc: https://t.me/getidsbot
 To obtain sticker ids: https://t.me/idstickerbot  
 To get familiar with basic OpenAI principles: https://openai.com  
 Basics on Gpt-4 vision: https://gptpluginz.com/gpt-4-vision-api  
-To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models
-Website to text and other helpful tools https://toolsyep.com
+To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models  
+Website to text and other helpful tools https://toolsyep.com  
+Free image hosting: https://imgbb.com  
