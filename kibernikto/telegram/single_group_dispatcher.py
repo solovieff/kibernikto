@@ -12,7 +12,7 @@ from kibernikto.interactors import InteractorOpenAI
 from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
-from utils.image import publish_image_file
+from kibernikto.utils.image import publish_image_file
 
 smart_bot_class = None
 
