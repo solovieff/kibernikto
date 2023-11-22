@@ -175,4 +175,6 @@ async def _get_message_text(message: types.Message):
         logging.info(f"published image: {url}")
 
         user_text = f"{user_text} {url}"
+    elif message.content_type == enums.ContentType.TEXT and message.text:
+        return message.text
     return user_text

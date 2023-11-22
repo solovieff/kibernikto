@@ -29,7 +29,8 @@ class YoutubePlugin(KiberniktoPlugin):
             result = await self._run(message)
             return result
         except Exception as error:
-            logging.error(f'failed to get video transcript from {message}: {str(error)}', )
+            error_text = f'failed to get video transcript from {message}: {str(error)}'
+            logging.error(error_text)
             return None
 
     async def _run(self, message: str):
@@ -43,14 +44,8 @@ class YoutubePlugin(KiberniktoPlugin):
         if transcript is None:
             return None
 
-        try:
-            summary = await self.get_ai_text_summary(transcript, info)
-            return f"{summary}"
-        except Exception as error:
-            logging.warning(f'failed to get ai text summary: {str(error)}', )
-            # summary = _get_sber_text_summary(transcript)
-            # summary = str(error)
-            return None
+        summary = await self.get_ai_text_summary(transcript, info)
+        return f"{summary}"
 
     async def get_ai_text_summary(self, transcript, info):
         info_text = str(info) if info else ""
