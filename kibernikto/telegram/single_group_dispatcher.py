@@ -111,11 +111,15 @@ async def private_message(message: types.Message):
 @dp.message(F.chat.id == constants.TG_FRIEND_GROUP_ID)
 async def group_message(message: types.Message):
     user_message = message.md_text
-    logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
+
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(user_message):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
+        user_text = await _get_message_text(message)
+        logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
+
+        await tg_bot.send_chat_action(message.chat.id, 'typing')
         # not using author not to send usernames to openai :)
-        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(user_message)  # author=message.from_user.full_name
+        reply_text = await FRIEND_GROUP_BOT.heed_and_reply(user_text)  # author=message.from_user.full_name
         chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)
         for chunk in chunks:
             await message.reply(text=chunk)
