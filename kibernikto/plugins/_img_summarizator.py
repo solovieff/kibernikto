@@ -7,7 +7,7 @@ from openai.types.chat import ChatCompletion
 from pydantic import HttpUrl
 
 from kibernikto.constants import OPENAI_MAX_TOKENS, OPENAI_TEMPERATURE
-from ._kibernikto_plugin import KiberniktoPlugin
+from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
 
 
 class ImageSummaryPlugin(KiberniktoPlugin):
@@ -24,8 +24,8 @@ class ImageSummaryPlugin(KiberniktoPlugin):
             result = await self._run(message)
             return result
         except Exception as error:
-            logging.error(f'failed to get webpage transcript from {message}: {str(error)}', )
-            return None
+            logging.error(f'failed to get image description from {message}: {str(error)}', )
+            raise KiberniktoPluginException(plugin_name=self.__class__.__name__, error_message=str(error))
 
     async def _run(self, message: str):
         web_link, text = _extract_image_link(message)
@@ -35,16 +35,11 @@ class ImageSummaryPlugin(KiberniktoPlugin):
 
         logging.info(f"found image link: {web_link}")
 
-        try:
-            summary = await self.get_ai_text_summary(web_link, text)
-            return f"{summary}"
-        except Exception as error:
-            logging.error(f'failed to get ai image summary: {str(error)}', )
-            # summary = _get_sber_text_summary(transcript)
-            # summary = str(error)
-            return None
+        summary = await self.get_image_description(web_link, text)
+        return f"{summary}"
 
-    async def get_ai_text_summary(self, image_link: HttpUrl, image_text: str):
+
+    async def get_image_description(self, image_link: HttpUrl, image_text: str):
         text = image_text if image_text else self.base_message
         message = {
             "role": "user",

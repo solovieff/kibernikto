@@ -3,10 +3,17 @@ from abc import ABC, abstractmethod
 from openai import AsyncOpenAI
 
 
+class KiberniktoPluginException(Exception):
+    def __init__(self, plugin_name: str, error_message: str):
+        self.plugin_name = plugin_name
+        super().__init__(error_message)
+
+
 class KiberniktoPlugin(ABC):
     """
     Plugins get message as input and return processed message as output or None.
     """
+
     def __init__(self, model: str, base_url: str, api_key: str,
                  base_message: str, post_process_reply=False,
                  store_reply=False):

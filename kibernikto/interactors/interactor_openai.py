@@ -9,7 +9,7 @@ from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from kibernikto import constants
-from kibernikto.plugins import KiberniktoPlugin
+from kibernikto.plugins import KiberniktoPlugin, KiberniktoPluginException
 
 _defaults = {
     "game_rules": """We are going to have a roleplay. You will respond to all of my questions as Киберникто, the master of truth.""",
@@ -120,19 +120,12 @@ class InteractorOpenAI:
         """
         user_message = message
         self.reset_if_usercall(user_message)
+        plugins_result = await self._run_plugins_for_message(user_message)
+        if plugins_result is not None:
+            # user_message = plugins_result
+            return plugins_result
 
         this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
-
-        for plugin in self.plugins:
-            plugin_result = await plugin.run_for_message(user_message)
-            if plugin_result is not None:
-                if not plugin.post_process_reply:
-                    if plugin.store_reply:
-                        self.messages.append(this_message)
-                        self.messages.append(dict(role=OpenAIRoles.assistant.value, content=plugin_result))
-                    return plugin_result
-                else:
-                    user_message = plugin_result
 
         await self._aware_overflow()
 
@@ -156,13 +149,31 @@ class InteractorOpenAI:
 
         return response_message.content
 
+
+    async def _run_plugins_for_message(self, message_text):
+        plugins_result = None
+        for plugin in self.plugins:
+            plugin_result = await plugin.run_for_message(message_text)
+            if plugin_result is not None:
+                if not plugin.post_process_reply:
+                    if plugin.store_reply:
+                        self.messages.append(dict(content=f"{message_text}", role=OpenAIRoles.user.value))
+                        self.messages.append(dict(role=OpenAIRoles.assistant.value, content=plugin_result))
+                    return plugin_result
+                else:
+                    plugins_result = plugin_result
+        return plugins_result
+
+
     def reset_if_usercall(self, message):
         if self.reset_call in message:
             self._reset()
 
+
     def _reset(self):
         # never gets full
         self.messages = deque(maxlen=self.max_messages)
+
 
     async def _get_summary(self):
         """
@@ -180,9 +191,11 @@ class InteractorOpenAI:
         logging.info(response_text)
         return response_text
 
+
     async def needs_attention(self, message):
         """checks if the reaction needed for the given messages"""
         return self.should_react(message)
+
 
     async def _aware_overflow(self):
         """

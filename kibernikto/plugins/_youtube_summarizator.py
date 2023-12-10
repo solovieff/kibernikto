@@ -10,7 +10,8 @@ from youtube_transcript_api import YouTubeTranscriptApi, CouldNotRetrieveTranscr
 
 from kibernikto.constants import OPENAI_MAX_TOKENS
 from kibernikto.utils.text import split_text
-from ._kibernikto_plugin import KiberniktoPlugin
+from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
+from ._weblink_summarizator import _extract_link
 
 YOUTUBE_VIDEO_PRE_URL = "https://www.youtube.com/watch?v="
 
@@ -31,10 +32,10 @@ class YoutubePlugin(KiberniktoPlugin):
         except Exception as error:
             error_text = f'failed to get video transcript from {message}: {str(error)}'
             logging.error(error_text)
-            return None
+            raise KiberniktoPluginException(plugin_name=self.__class__.__name__, error_message=str(error))
 
     async def _run(self, message: str):
-        info, video = _get_video_details(message)
+        info, video, text = _get_video_details(message)
 
         if video is None:
             return None
@@ -42,18 +43,20 @@ class YoutubePlugin(KiberniktoPlugin):
         transcript = _get_video_transcript(video.video_id)
 
         if transcript is None:
-            return None
+            raise KiberniktoPluginException(plugin_name=self.__class__.__name__,
+                                            error_message="Failed to load video data!")
 
-        summary = await self.get_ai_text_summary(transcript, info)
+        summary = await self.get_ai_text_summary(transcript, info, additional_text=text)
         return f"{summary}"
 
-    async def get_ai_text_summary(self, transcript, info):
+    async def get_ai_text_summary(self, transcript, info, additional_text):
         info_text = str(info) if info else ""
+        user_text = additional_text if additional_text else ""
 
         content_to_summarize = self.base_message.format(info_text=info_text, text=transcript)
         message = {
             "role": "user",
-            "content": content_to_summarize
+            "content": f"{content_to_summarize} \n {additional_text}"
         }
 
         completion: ChatCompletion = await self.client_async.chat.completions.create(model=self.model,
@@ -68,15 +71,15 @@ class YoutubePlugin(KiberniktoPlugin):
 
 def _get_video_details(message):
     try:
-        youtube_video: YouTube = _get_video_from_text(message)
+        youtube_video, other_text = _get_video_from_text(message)
     except:
-        return None, None
+        return None, None, None
 
     if youtube_video is None:
-        return None, None
+        return None, None, None
 
     info = _get_video_info(youtube_video)
-    return info, youtube_video
+    return info, youtube_video, other_text
 
 
 def _eyesore(string_to_check):
@@ -123,36 +126,35 @@ def _get_sber_text_summary(text):
         return None
 
 
-def _get_video_from_text(text):
-    regex = re.compile(
-        r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/(watch\?v=|embed/|v/|.+\?v=)?(?P<id>[A-Za-z0-9\-=_]{11})')
+def _is_youtube_url(url):
+    youtube_regex = r'(https?://)?(www\.)?((youtube\.com/watch\?v=)|(youtu\.be/))[^\s]+'
+    match = re.match(youtube_regex, url)
+    return bool(match)
 
-    match = regex.match(text)
-    if match:
-        video_id = match.group('id')
-        # youtube_video = YouTube(f'{YOUTUBE_VIDEO_PRE_URL}{video_id}')
-        youtube_video = YouTube(f'{text}')
-        return youtube_video
-    else:
+
+def _get_video_from_text(text) -> YouTube:
+    any_link = _extract_link(text)
+    if any_link is None or not _is_youtube_url(any_link):
         return None
+
+    other_text = text.replace(any_link, "").strip()
+    youtube_video = YouTube(f'{any_link}')
+    return youtube_video, other_text
 
 
 def _get_video_transcript(video_id, langcode='ru'):
+    transcript = None
+    logging.info(f"getting transcripts for video {video_id}")
+    transcripts: TranscriptList = YouTubeTranscriptApi.list_transcripts(video_id=video_id)
     try:
-        transcript = None
-        logging.info(f"getting transcripts for video {video_id}")
-        transcripts: TranscriptList = YouTubeTranscriptApi.list_transcripts(video_id=video_id)
+        transcript = transcripts.find_manually_created_transcript()
+    except:
         try:
-            transcript = transcripts.find_manually_created_transcript()
+            transcript = transcripts.find_transcript(language_codes=[langcode])
         except:
-            try:
-                transcript = transcripts.find_transcript(language_codes=[langcode])
-            except:
-                generated_transcripts = [trans for trans in transcripts if trans.is_generated]
-                transcript = generated_transcripts[0]
-    except CouldNotRetrieveTranscript as error:
-        logging.warning(error)
-        return None
+            generated_transcripts = [trans for trans in transcripts if trans.is_generated]
+            transcript = generated_transcripts[0]
+
     if not transcript:
         return None
     else:

@@ -1,7 +1,12 @@
+from openai._types import NOT_GIVEN
+
 from kibernikto import constants
 from kibernikto.interactors import BaseTextConfig, InteractorOpenAI
 from kibernikto.bots.cybernoone.prompt_preqs import MAIN_VERBAGE
 import openai
+
+from kibernikto.plugins import KiberniktoPluginException
+
 
 class Cybernoone(InteractorOpenAI):
 
@@ -20,6 +25,14 @@ class Cybernoone(InteractorOpenAI):
         self.master_id = master_id
         self.name = name
         super().__init__(model=constants.OPENAI_API_MODEL, max_messages=max_messages, default_config=pp)
+
+    async def heed_and_reply(self, message, author=NOT_GIVEN):
+        try:
+            return await super().heed_and_reply(message, author)
+        except KiberniktoPluginException as e:
+            return f" {e.plugin_name} не сработал!\n\n {str(e)}"
+        except Exception as e:
+            return f"Я не справился! Горе мне! {str(e)}"
 
     async def ask_pure(self, prompt):
         response = await openai.ChatCompletion.acreate(
