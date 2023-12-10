@@ -5,7 +5,7 @@ from kibernikto.plugins._img_summarizator import _is_image
 from openai.types.chat import ChatCompletion
 
 from kibernikto.constants import OPENAI_MAX_TOKENS
-from kibernikto.utils.text import get_website_as_text
+from kibernikto.utils.text import get_website_as_text, get_website_html
 from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
 
 
@@ -23,11 +23,12 @@ class WeblinkSummaryPlugin(KiberniktoPlugin):
             result = await self._run(message)
             return result
         except Exception as error:
-            logging.error(f'failed to get webpage transcript from {message}: {str(error)}', )
-            raise KiberniktoPluginException(plugin_name=self.__class__.__name__, error_message=str(error))
+            logging.error(f'failed to get webpage data from {message}: {str(error)}', )
+            raise KiberniktoPluginException(plugin_name=self.__class__.__name__,
+                                            error_message='failed to get webpage data')
 
     async def _run(self, message: str):
-        web_link = _extract_link(message)
+        web_link, other_text = _extract_link(message)
 
         if web_link is None:
             return None
@@ -36,17 +37,20 @@ class WeblinkSummaryPlugin(KiberniktoPlugin):
             return None
         logging.info(f"found web link: {web_link}", )
 
+        # transcript = await get_website_html(web_link)
         transcript = await get_website_as_text(web_link)
 
         if 'Error 404' in transcript or transcript is None:
             raise KiberniktoPluginException(plugin_name=self.__class__.__name__,
                                             error_message="Failed to load web link!")
 
-        summary = await self.get_ai_text_summary(transcript)
+        summary = await self.get_ai_text_summary(transcript, other_text)
         return f"{summary}"
 
-    async def get_ai_text_summary(self, transcript):
+    async def get_ai_text_summary(self, transcript, user_text=""):
         content_to_summarize = self.base_message.format(text=transcript)
+        if user_text:
+            content_to_summarize += f"\n{user_text}"
         message = {
             "role": "user",
             "content": content_to_summarize
@@ -68,6 +72,9 @@ def _extract_link(message):
     match = re.search(link_regex, message)
     if match:
         link = match.group()
-        return link
 
-    return None
+        other_text = message.replace(link, "").strip()
+
+        return link, other_text
+
+    return None, None

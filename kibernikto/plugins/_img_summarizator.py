@@ -3,6 +3,7 @@ import os
 import re
 from urllib.parse import urlparse
 
+from openai import PermissionDeniedError
 from openai.types.chat import ChatCompletion
 from pydantic import HttpUrl
 
@@ -23,6 +24,10 @@ class ImageSummaryPlugin(KiberniktoPlugin):
         try:
             result = await self._run(message)
             return result
+        except PermissionDeniedError as pde:
+            logging.error(f'PermissionDeniedError while getting image description from {message}', )
+            raise KiberniktoPluginException(plugin_name=self.__class__.__name__,
+                                            error_message=str("image processing not allowed!"))
         except Exception as error:
             logging.error(f'failed to get image description from {message}: {str(error)}', )
             raise KiberniktoPluginException(plugin_name=self.__class__.__name__, error_message=str(error))
@@ -37,7 +42,6 @@ class ImageSummaryPlugin(KiberniktoPlugin):
 
         summary = await self.get_image_description(web_link, text)
         return f"{summary}"
-
 
     async def get_image_description(self, image_link: HttpUrl, image_text: str):
         text = image_text if image_text else self.base_message

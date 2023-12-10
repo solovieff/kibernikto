@@ -48,6 +48,13 @@ def safe_split_text(text: str, length: int = MAX_MESSAGE_LENGTH, split_separator
     return parts
 
 
+async def get_website_html(url: HttpUrl):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            html = await response.text(encoding=response.charset)
+    return html
+
+
 async def get_website_as_text(url: HttpUrl):
     to_reader_url = "https://toolsyep.com/en/webpage-to-plain-text/"
     async with aiohttp.ClientSession() as session:
