@@ -59,6 +59,7 @@ class GroundNewsItem():
             places = []
             for pl in places_dicts:
                 places.append(pl['name'])
+            return places
         return None
 
     @staticmethod

@@ -116,7 +116,7 @@ async def private_message(message: types.Message):
     if not PRIVATE_BOT.check_master(message.from_user.id, message.md_text):
         reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не мой Господин " \
                      f"Создатель снизошёл до меня). Я передам ваше соообщение мастеру."
-        await tg_bot.send_message(constants.TG_MASTER_ID, message)
+        await tg_bot.send_message(constants.TG_MASTER_ID, f"{message.from_user.id}: {message.md_text}")
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await _get_message_text(message)

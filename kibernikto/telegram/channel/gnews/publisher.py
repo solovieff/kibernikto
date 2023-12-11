@@ -51,9 +51,9 @@ async def load_news():
     logging.info("Loading the news...")
     events = await get_blindspots(known_ids=__published_ids.union(__to_publish_ids))
     _plan_events(events)
-    for interest in default_interests:
-        interest_events = await get_by_interest(interest=interest, known_ids=__published_ids.union(__to_publish_ids))
-        _plan_events(interest_events)
+    # for interest in default_interests:
+    #    interest_events = await get_by_interest(interest=interest, known_ids=__published_ids.union(__to_publish_ids))
+    #    _plan_events(interest_events)
     shuffle(__to_publish)
     logging.info("+ Done loading the news.")
 
