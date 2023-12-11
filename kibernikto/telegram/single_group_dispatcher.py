@@ -13,7 +13,7 @@ from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
 from kibernikto.utils.image import publish_image_file
-from telegram.channel.gnews.publisher import scheduler
+from kibernikto.telegram.channel.gnews.publisher import scheduler
 
 smart_bot_class = None
 
