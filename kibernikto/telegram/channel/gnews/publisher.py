@@ -8,7 +8,7 @@ import aioschedule as schedule
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
-from telegram.channel.gnews.retriever import get_blindspots, GroundNewsItem, get_by_interest
+from .retriever import get_blindspots, GroundNewsItem, get_by_interest
 
 default_interests = ['ukraine-crisis', 'russia-politics']
 __to_publish_ids = set()
