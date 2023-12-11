@@ -33,13 +33,13 @@ C: <strong>[количество центральных источников]</s
 R: <strong>[количество правых источников]</strong>
 
 <strong>Ссылки</strong>: (не более семи, в зависимости от количества источников)
-<a href="ссылка">[Название источника]</a> [L, C, R в зависимости от bias СМИ] [флаг страны utf-8]
+<a href="ссылка">[Название источника]</a> [L для left, C для center, R для right в зависимости от bias СМИ] [флаг страны utf-8]
 
 (если не знаешь bias или флага страны, не пиши ничего)
 (из названий источников убирай дополнительную информацию про affiliated, если такая есть)
 
 Если есть информация в поле summary, переведи её на русский:
-Я считаю, что \n[содержание поля summary на русском]
+\n\nЯ считаю, что \n[содержание поля summary на русском]
 (Не говори, откуда ты получил информацию для анализа)
 
 (Не добавляй никаких дополонительных символов.) 
@@ -92,7 +92,7 @@ async def item_to_html(item: GroundNewsItem):
     completion: ChatCompletion = await __client_async.chat.completions.create(model=__model,
                                                                               messages=[message],
                                                                               max_tokens=1200,
-                                                                              temperature=0.7,
+                                                                              temperature=0.5,
                                                                               )
     response_text = completion.choices[0].message.content.strip()
     logging.info(response_text)
