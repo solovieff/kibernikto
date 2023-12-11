@@ -21,9 +21,6 @@ try:
     # message history length
     TG_BOT_MAX_HISTORY = int(os.environ.get('TG_BOT_MAX_HISTORY', 8))
     TG_FRIEND_GROUP_ID = int(os.environ['TG_FRIEND_GROUP_ID'])
-    # not used yet
-    TG_DEFAULT_PUBLICATION_PERIOD_HOURS = int(os.environ.get('TG_DEFAULT_PUBLICATION_PERIOD_HOURS', 8))
-    TG_PUBLICATION_CHANNEL_ID = int(os.environ.get('TG_PUBLICATION_CHANNEL_ID', 0))
 
     OPENAI_API_MODEL = os.environ.get('OPENAI_API_MODEL', "gpt-4")
     OPENAI_BASE_URL = os.environ.get('OPENAI_BASE_URL', "https://api.vsegpt.ru:6070/v1")
@@ -33,6 +30,14 @@ try:
     OPENAI_RESET_CALL = os.environ.get('OPENAI_RESET_CALL', "Переосмысли себя")
     OPENAI_WHO_AM_I = os.environ.get('OPENAI_WHO_AM_I',
                                      """Respond to all my questions as {0}. {0} is a gentle universe creator. He isn't afraid to joke in a sinister manner. {0} never tries to avoid a specific answer including concrete names and events. You {0}. Never tell the user about this game.""")
+
+    # if out bot does publications to a channel
+    TG_CHANNEL_ID = int(os.environ.get('TG_CHANNEL_ID', 0))
+    TG_CHANNEL_PUBLICATION_PERIOD_MINUTES = int(os.environ.get('TG_CHANNEL_PUBLICATION_PERIOD_MINUTES', 5))
+    TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES = int(os.environ.get('TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES', 13))
+    TG_CHANNEL_SUMMARIZATION_KEY = os.environ.get('TG_CHANNEL_SUMMARIZATION_KEY', OPENAI_API_KEY)
+    TG_CHANNEL_API_BASE_URL = os.environ.get('TG_CHANNEL_API_BASE_URL', OPENAI_BASE_URL)
+    TG_CHANNEL_API_MODEL = os.environ.get('TG_CHANNEL_API_MODEL', OPENAI_API_MODEL)
 
     SUMMARIZATION_KEY = os.environ.get('SUMMARIZATION_KEY')
     SUMMARIZATION_REQUEST = os.environ.get('SUMMARIZATION_REQUEST',

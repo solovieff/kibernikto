@@ -13,6 +13,7 @@ from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
 from kibernikto.utils.image import publish_image_file
+from telegram.channel.gnews.publisher import scheduler
 
 smart_bot_class = None
 
@@ -73,6 +74,15 @@ async def on_startup(bot: Bot):
             await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
             hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
             await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
+
+            if constants.TG_CHANNEL_ID:
+                asyncio.create_task(scheduler(load_news_minutes=constants.TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES,
+                                              publish_item_minutes=constants.TG_CHANNEL_PUBLICATION_PERIOD_MINUTES,
+                                              publish_func=publish_to_channel,
+                                              base_url=constants.TG_CHANNEL_API_BASE_URL,
+                                              api_key=constants.TG_CHANNEL_SUMMARIZATION_KEY,
+                                              model=constants.TG_CHANNEL_API_MODEL
+                                              ))
     except Exception as e:
         logging.error(f"failed to send hello message! {str(e)}")
         if FRIEND_GROUP_BOT.client is not None:
@@ -82,6 +92,14 @@ async def on_startup(bot: Bot):
 
         await dp.stop_polling()
         exit(os.EX_CONFIG)
+
+
+async def publish_to_channel(text: str):
+    if constants.TG_CHANNEL_ID:
+        await tg_bot.send_message(text=text,
+                                  chat_id=constants.TG_CHANNEL_ID,
+                                  parse_mode='HTML',
+                                  disable_web_page_preview=True)
 
 
 async def send_random_sticker(chat_id):
@@ -97,7 +115,8 @@ async def send_random_sticker(chat_id):
 async def private_message(message: types.Message):
     if not PRIVATE_BOT.check_master(message.from_user.id, message.md_text):
         reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не мой Господин " \
-                     f"Создатель снизошёл до меня). Лично я говорю только с {constants.TG_MASTER_ID}!"
+                     f"Создатель снизошёл до меня). Я передам ваше соообщение мастеру."
+        await tg_bot.send_message(constants.TG_MASTER_ID, message)
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await _get_message_text(message)
