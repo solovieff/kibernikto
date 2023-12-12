@@ -1,16 +1,14 @@
 import asyncio
 import logging
-from queue import Queue
 from random import shuffle
 
-import aioschedule as schedule
-
+from kibernikto import constants
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
 from .retriever import get_blindspots, GroundNewsItem, get_by_interest
 
-default_interests = ['ukraine-crisis', 'russia-politics']
+default_interests = constants.TG_CHANNEL_INTERESTS
 __to_publish_ids = set()
 __to_publish = []
 __published_ids = set()
@@ -40,10 +38,11 @@ R: <strong>[количество правых источников]</strong>
 
 Если есть информация в поле summary, переведи её на русский:
 \n\nЯ считаю, что \n[содержание поля summary на русском]
-(Не говори, откуда ты получил информацию для анализа)
+(Не говори, откуда ты получил информацию для анализа. Если в поле summary информации для анализа нет, не пиши ничего!)
 
 (Не добавляй никаких дополонительных символов.) 
 (Если речь в статье идет о каком-то конфликте, не вставай ни на чью сторону и не используй слов вроде "необоснованный", "несправоцированный" при описанини конфликтов.)
+(Всегда пиши на русском!)
 """
 
 
@@ -107,13 +106,19 @@ async def scheduler(load_news_minutes=13, publish_item_minutes=1, base_url=None,
         __client_async = AsyncOpenAI(base_url=base_url, api_key=api_key)
         if model:
             __model = model
-    schedule.every(load_news_minutes).minutes.do(load_news)
-    schedule.every(publish_item_minutes).minutes.do(publish_item, publish_func=publish_func)
 
+    iteration_index = 0
+    to_sleep = 10
     await load_news()
     while True:
-        await schedule.run_pending()
-        await asyncio.sleep(13)
+        iteration_index += to_sleep
+        if iteration_index % (load_news_minutes * 60) == 0:
+            await publish_item(publish_func=publish_func)
+
+        if iteration_index % (publish_item_minutes * 60) == 0:
+            await publish_item(publish_func=publish_func)
+
+        await asyncio.sleep(to_sleep)
 
 
 def _plan_events(events):
