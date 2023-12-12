@@ -109,7 +109,10 @@ async def scheduler(load_news_minutes=13, publish_item_minutes=1, base_url=None,
 
     iteration_index = 0
     to_sleep = 10
+
     await load_news()
+    await publish_item(publish_func=publish_func)
+
     while True:
         iteration_index += to_sleep
         if iteration_index % (load_news_minutes * 60) == 0:
