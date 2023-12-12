@@ -38,7 +38,7 @@ try:
     TG_CHANNEL_SUMMARIZATION_KEY = os.environ.get('TG_CHANNEL_SUMMARIZATION_KEY', OPENAI_API_KEY)
     TG_CHANNEL_API_BASE_URL = os.environ.get('TG_CHANNEL_API_BASE_URL', OPENAI_BASE_URL)
     TG_CHANNEL_API_MODEL = os.environ.get('TG_CHANNEL_API_MODEL', OPENAI_API_MODEL)
-    TG_CHANNEL_INTERESTS = os.environ.get('TG_REACTION_CALLS', 'ukraine-crisis,russia-politics')
+    TG_CHANNEL_INTERESTS = os.environ.get('TG_CHANNEL_INTERESTS', 'ukraine-crisis,russia-politics')
     TG_CHANNEL_INTERESTS = "".join(TG_CHANNEL_INTERESTS.split())
     TG_CHANNEL_INTERESTS = TG_CHANNEL_INTERESTS.split(",")
 
