@@ -62,7 +62,7 @@ class GroundNewsItem():
     @staticmethod
     def get_place(places_dicts: List):
         if places_dicts:
-            pl = places_dicts.split(',')[-1]
+            pl = places_dicts[-1]
             return pl['id']
         return None
 
