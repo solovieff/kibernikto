@@ -1,10 +1,12 @@
 import asyncio
+import collections
 import json
 import logging
-import pprint
 from queue import Queue
 from typing import List
+from xml.sax.saxutils import quoteattr
 
+import flag
 from bs4 import BeautifulSoup
 from pydantic import HttpUrl
 
@@ -23,8 +25,8 @@ class GroundNewsItem():
         self.id = event['id']
         self.slug = event['slug']
         self.url = ARTICLE_URL.format(DEFAULT_URL=DEFAULT_URL, slug=self.slug)
-        self.title = event['title']
-        self.description = event['description']
+        self.title = event['title'].replace("\"", "")
+        self.description = event['description'].replace("\"", "")
         self.start = event['start']
 
         # left right distribution
@@ -44,9 +46,13 @@ class GroundNewsItem():
         # self.tags = event['interests']
 
         if 'chatGptSummaries' in event:
-            self.summaries = event['chatGptSummaries']
+            self.summaries = {}
+            for key, value in event['chatGptSummaries'].items():
+                self.summaries[key] = value.replace("\"", "")
         else:
             self.summaries = None
+
+        self.intrigue = None
 
         self.sources = self.get_sources(event['firstTenSources'])
         self.place = self.get_place(event['place'])
@@ -58,7 +64,7 @@ class GroundNewsItem():
         if places_dicts:
             places = []
             for pl in places_dicts:
-                places.append(pl['name'])
+                places.append(pl['id'])
             return places
         return None
 
@@ -66,20 +72,41 @@ class GroundNewsItem():
     def get_sources(first_ten_sources):
         sources = []
         for src in first_ten_sources:
+            if src['sourceInfo']['placeId']:
+                place = f":{src['sourceInfo']['placeId'].split(',')[-1]}:"
+            else:
+                place = ':EARTH:'
+            name = src['sourceInfo']['name'].split("[")[0]
+
             sources.append({
                 "url": src['url'],
-                "name": src['sourceInfo']['name'],
+                "name": name,
                 "bias": src['sourceInfo']['bias'],
-                "country": src['sourceInfo']['placeId'],
+                "place": place,
                 "factuality": src['sourceInfo']['factuality'],
             })
         return sources
 
     def as_message(self):
-        return f"<strong>{self.title}</strong> \n\n {self.description} \n<strong>{self.place}</strong>"
+        return _create_html_repr(self)
 
     def as_dict(self):
         return self.__dict__
+
+    def as_meaning(self):
+        meaning = {
+            "title": self.title,
+            "description": self.description,
+            "place": self.place,
+        }
+
+        if self.summaries:
+            meaning['summaries'] = self.summaries
+
+        meaning['published_in_left_biased_sources'] = self.leftSrcCount
+        meaning['published_in_right_biased_sources'] = self.rightSrcCount
+        meaning['published_in_center_biased_sources'] = self.cntrSrcCount
+        return meaning
 
 
 def set_tags():
@@ -147,6 +174,67 @@ async def get_by_interest(interest: str = 'ukraine-crisis', known_ids=[]):
             await asyncio.sleep(1)
 
     return articles
+
+
+def _create_html_repr(item: GroundNewsItem):
+    html = ""
+    if item.place is None:
+        place = ""
+    elif isinstance(item.place, collections.abc.Sequence):
+        # place = ' / '.join(item.place)
+        place = flag.flag(item.place[0])
+    else:
+        place = f'{flag.flag(item.place)}'
+
+    html += f"<strong>{item.title}</strong> / {place}"
+    if item.biasSourceCount:
+        html += f"\n\n🗞<strong>Медиа-спектр</strong>:\n"
+        html += f"<b>- Левые СМИ</b>: {item.leftSrcCount}\n"
+        html += f"<b>- СМИ Оси</b>: {item.cntrSrcCount}\n"
+        html += f"<b>- Правые СМИ</b>: {item.rightSrcCount}"
+    if not item.summaries:
+        html += f"\n\n<code>{item.description}</code>"
+    # html += f"Количество публикаций: {item.biasSourceCount}"
+
+    if item.intrigue:
+        html += f"\n\n🏴‍☠️<strong>Мнение Киберникто</strong>\n"
+        html += f"{item.intrigue}"
+
+    if item.summaries:
+        html += f"\n\n"
+        if 'analysis' in item.summaries and 1 == 2:
+            html += f"📍<strong>Анализ</strong>"
+            html += f"{item.summaries['analysis']}\n\n"
+        else:
+            for key, value in item.summaries.items():
+                fixed_value = (value.replace("0.", "").
+                               replace("1.", "").replace("2.", "").replace("3.", "").replace('"', ''))
+                fixed_value = fixed_value.replace("Киберникто", "\nКиберникто")
+                if key == 'left':
+                    icon = '🤦‍'
+                    html += f"{icon}<b>Левые СМИ</b>:\n"
+                elif key == 'center':
+                    icon = '🧑‍⚖️'
+                    html += f"{icon}<b>СМИ Оси</b>:\n"
+                elif key == 'right':
+                    icon = '🧑‍🚒'
+                    html += f"{icon}<b>Правые СМИ</b>:\n"
+                if key != 'analysis':
+                    html += f"{fixed_value}\n"
+
+    if item.sources and 1 == 1:
+        if len(item.sources) == 1:
+            html += "\n\n<b>Единственный источник: </b>"
+            html += f'<a href="{item.sources[0]["url"]}">{item.sources[0]["name"]}</a> {flag.flag(item.sources[0]["place"])}'
+        else:
+            html += "\n\n<b>Источники</b> (возможны иноагенты и враги!)\n"
+            for idx, src in enumerate(item.sources):
+                html += f'<a href="{src["url"]}">{src["name"]}</a> {flag.flag(src["place"])} | '
+                if idx > 4:
+                    break
+    html = html.replace("\"\"", "\"")
+    print(html)
+    return html
 
 
 def main():

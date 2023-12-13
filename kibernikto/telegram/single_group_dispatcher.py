@@ -4,8 +4,9 @@ import os
 import random
 from random import choice
 from typing import List, BinaryIO
-
+import html
 from aiogram import Bot, Dispatcher, types, enums, F
+from aiogram.enums import ParseMode
 from aiogram.types import User
 from kibernikto.interactors import InteractorOpenAI
 
@@ -98,7 +99,7 @@ async def publish_to_channel(text: str):
     if constants.TG_CHANNEL_ID:
         await tg_bot.send_message(text=text,
                                   chat_id=constants.TG_CHANNEL_ID,
-                                  parse_mode='HTML',
+                                  parse_mode=ParseMode.HTML,
                                   disable_web_page_preview=True)
 
 
