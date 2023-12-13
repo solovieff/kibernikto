@@ -230,7 +230,7 @@ def _create_html_repr(item: GroundNewsItem):
             html += "\n\n<b>Источники</b> (возможны иноагенты и враги!)\n"
             for idx, src in enumerate(item.sources):
                 html += f'<a href="{src["url"]}">{src["name"]}</a> {flag.flag(src["place"])} | '
-                if idx > 4:
+                if idx > 6:
                     break
     html = html.replace("\"\"", "\"")
     print(html)
