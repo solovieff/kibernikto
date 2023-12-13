@@ -62,10 +62,8 @@ class GroundNewsItem():
     @staticmethod
     def get_place(places_dicts: List):
         if places_dicts:
-            places = []
-            for pl in places_dicts:
-                places.append(pl['id'])
-            return places
+            pl = places_dicts.split(',')[-1]
+            return pl['id']
         return None
 
     @staticmethod
@@ -198,7 +196,7 @@ def _create_html_repr(item: GroundNewsItem):
 
     if item.intrigue:
         html += f"\n\n🏴‍☠️<strong>Мнение Киберникто</strong>\n"
-        html += f"{item.intrigue}"
+        html += f"{item.intrigue}\n<i>Прошу не забывать, что я всего лишь набор байтов и не соображаю, что несу!</i>"
 
     if item.summaries:
         html += f"\n\n"
