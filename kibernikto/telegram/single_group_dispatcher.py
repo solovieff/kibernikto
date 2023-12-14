@@ -72,9 +72,9 @@ async def on_startup(bot: Bot):
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.username)
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
 
-            await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
-            hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
-            await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
+            #await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
+            #hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
+            #await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
 
             if constants.TG_CHANNEL_ID:
                 asyncio.create_task(scheduler(load_news_minutes=constants.TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES,
