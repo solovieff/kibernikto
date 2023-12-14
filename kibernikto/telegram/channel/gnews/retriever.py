@@ -63,7 +63,7 @@ class GroundNewsItem():
     def get_place(places_dicts: List):
         if places_dicts:
             pl = places_dicts[-1]
-            return pl['id']
+            return f":{pl['id'].split(',')[-1]}:"
         return None
 
     @staticmethod
@@ -177,12 +177,11 @@ async def get_by_interest(interest: str = 'ukraine-crisis', known_ids=[]):
 def _create_html_repr(item: GroundNewsItem):
     html = ""
     if item.place is None:
-        place = ""
-    elif isinstance(item.place, collections.abc.Sequence):
-        # place = ' / '.join(item.place)
-        place = flag.flag(item.place[0])
-    else:
-        place = f'{flag.flag(item.place)}'
+        place = '👽'
+    try:
+        place = flag.flag(item.place)
+    except Exception as e:
+        place = '👽'
 
     html += f"<strong>{item.title}</strong> / {place}"
     if item.biasSourceCount:
@@ -207,7 +206,7 @@ def _create_html_repr(item: GroundNewsItem):
             for key, value in item.summaries.items():
                 fixed_value = (value.replace("0.", "").
                                replace("1.", "").replace("2.", "").replace("3.", "").replace('"', ''))
-                fixed_value = fixed_value.replace("Киберникто", "\nКиберникто")
+                fixed_value = fixed_value.replace("Киберникто", "<b>Киберникто</b>")
                 if key == 'left':
                     icon = '🤦‍'
                     html += f"{icon}<b>Левые СМИ</b>:\n"
@@ -222,12 +221,21 @@ def _create_html_repr(item: GroundNewsItem):
 
     if item.sources and 1 == 1:
         if len(item.sources) == 1:
+            src = item.sources[0]
+            try:
+                flag_icon = flag.flag(src["place"])
+            except ValueError as e:
+                flag_icon = '👽'
             html += "\n\n<b>Единственный источник: </b>"
-            html += f'<a href="{item.sources[0]["url"]}">{item.sources[0]["name"]}</a> {flag.flag(item.sources[0]["place"])}'
+            html += f'<a href="{src["url"]}">{src["name"]}</a> {flag_icon}'
         else:
             html += "\n\n<b>Источники</b> (возможны иноагенты и враги!)\n"
             for idx, src in enumerate(item.sources):
-                html += f'<a href="{src["url"]}">{src["name"]}</a> {flag.flag(src["place"])} | '
+                try:
+                    flag_icon = flag.flag(src["place"])
+                except Exception as e:
+                    flag_icon = '👽'
+                html += f'<a href="{src["url"]}">{src["name"]}</a> {flag_icon} | '
                 if idx > 6:
                     break
     html = html.replace("\"\"", "\"")
