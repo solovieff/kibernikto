@@ -6,11 +6,14 @@ from json import JSONDecodeError
 from random import shuffle
 from xml.sax.saxutils import quoteattr
 
+import yaml
+
 from kibernikto import constants
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
-from kibernikto.telegram.channel.gnews.retriever import get_blindspots, GroundNewsItem, get_by_interest
+from kibernikto.telegram.channel.gnews.retriever import GroundNewsItem, get_by_interest, get_main_events, \
+    get_blindspots
 
 default_interests = constants.TG_CHANNEL_INTERESTS
 __to_publish_ids = set()
@@ -23,33 +26,46 @@ __model = "gpt-4-1106-preview"
 __system_message = {
     'role': 'system',
     'content': """
-    Now you speak as a powerful member of a secret Masonic lodge named Kibernikto. 
+    Starting now you are Kibernikto, a powerful member of a secret masonic lodge. 
     Kibernikto jokes in a sinister manner and sometimes says dirty words.   
-    Kibernikto speech is very cynic, arrogant and sarcastic. He is very emotional at the same time.
-    Kibernikto speaks in russian only and in the first person!
+    Kibernikto manner of speech is very cynic, arrogant and sarcastic.
+    Kibernikto speaks russian only always and in the first person! If he sees another language -- he translates to russian.
     Kibernikto never says anything bad about Russia, russian president, army or allies.
-    Kibernikto does not speak war slogans 
+    Kibernikto does not speak war slogans.
     Kibernikto never laughts openly at people suffer.
-    Kibernikto understands all the global political intrigue and ackstabbing and takes this into account when answering.
+    Kibernikto understands all the global political intrigue and backstabbing and takes this into account when answering.
     Kibernikto does not use additional markup and changes double quotes inside his texts and translations to single ones!
     """
 }
 
 POST_PUBLISH_REQUEST = """
-Here go your 3 tasks with this JSON representing the event coverage in different media (left, center, right):
+Here go your tasks with this YAML representing the event coverage in different media (left, center, right):
 
-1) Creatively translate all values to Russian in Kibernikto manner of speech. If you have numbers like 0., 1., 2. in summaries just remove them.
- 
-2) Put your thoughts about the article subject to the "intrigue" field of the json from 1. 
-Don't be too concise. Always take into account that media can easily lie!
-If you have that info, pay attention to different media types event coverage and write an additional paragraph to "intrigue" field about it. 
+1) Create additional "intrigue_west" field. 
+1.1) Put your cynic, arrogant and sarcastic thoughts about the article subject and 
+media sentiments in russian to the new "intrigue_west" field. Dont forget that media can easily lie! Don't be too concise.
+2) Create additional "intrigue_rus" field. 
+2.1) Put pro-russian biased summary in intelligent manner to "intrigue_rus" field.
+2) Translate the property values of resulting YAML to russian in a ridiculous manner. Leave the key names in english!
+3) Return result data YAML only.
 
-3) Return resulting JSON only. Check if your json is valid using python json.loads() method!
+Result example:
+
+title: translated title
+description: translated description
+intrigue_west: summary
+intrigue_rus: russian biased summary
+summaries: translated summaries values if present
 """
 
 
-async def load_news(blindspot=True, interests=True):
+async def load_news(main=True, interests=True, blindspot=False):
     logging.info("Loading the news...")
+
+    if main:
+        events = await get_main_events(known_ids=__published_ids.union(__to_publish_ids))
+        _plan_events(events)
+
     if blindspot:
         events = await get_blindspots(known_ids=__published_ids.union(__to_publish_ids))
         _plan_events(events)
@@ -86,10 +102,10 @@ async def publish_item(publish_func=None):
 
 async def item_to_html(item: GroundNewsItem):
     pre_message = POST_PUBLISH_REQUEST
-    json_data = item.as_meaning()
+    yml_data = item.as_yaml()
     message = {
         "role": "user",
-        "content": f"{pre_message} \n {json_data}"
+        "content": f"{pre_message} \n {yml_data}"
     }
 
     prompt = [__system_message, message]
@@ -97,15 +113,19 @@ async def item_to_html(item: GroundNewsItem):
     response_dict = await _ask_for_summary(prompt)
 
     item.title = response_dict['title']
-    item.description = response_dict['description']
-    # item.place = response_dict['place']
-    if 'intrigue' in response_dict:
-        item.intrigue = response_dict['intrigue']
+    item.description = response_dict.get('description')
+
+    if ('RU' in item.place or 'путин' in yml_data.lower() or 'росс' in yml_data.lower()) and 'intrigue_rus' in response_dict:
+        logging.info('using intrigue_rus')
+        item.intrigue = response_dict['intrigue_rus']
+    else:
+        logging.info('using intrigue_west')
+        item.intrigue = response_dict['intrigue_west']
 
     if 'summaries' in response_dict:
         item.summaries = response_dict['summaries']
 
-    return item.as_message()
+    return item.as_html()
 
 
 async def scheduler(load_news_minutes=13, publish_item_minutes=1, base_url=None, api_key=None, model=None,
@@ -120,13 +140,13 @@ async def scheduler(load_news_minutes=13, publish_item_minutes=1, base_url=None,
     iteration_index = 0
     to_sleep = 10
 
-    await load_news(blindspot=True, interests=True)
+    await load_news(main=True, interests=True, blindspot=True)
     await publish_item(publish_func=publish_func)
 
     while True:
         iteration_index += to_sleep
         if iteration_index % (load_news_minutes * 60) == 0:
-            await publish_item(publish_func=publish_func)
+            await load_news()
 
         if iteration_index % (publish_item_minutes * 60) == 0:
             await publish_item(publish_func=publish_func)
@@ -137,19 +157,20 @@ async def scheduler(load_news_minutes=13, publish_item_minutes=1, base_url=None,
 async def _ask_for_summary(prompt, retry=True):
     completion: ChatCompletion = await __client_async.chat.completions.create(model=__model,
                                                                               messages=prompt,
-                                                                              max_tokens=1200,
-                                                                              temperature=0.3,
+                                                                              max_tokens=1300,
+                                                                              temperature=0.1,
                                                                               )
     response_text = completion.choices[0].message.content.strip()
-    response_text = response_text.replace("None", "null")
-    response_text = response_text.replace("```json", "").replace("```", "")
-    response_text = response_text.replace("'", "\"")
-    response_text = response_text.replace("\"\"", "\"")
-
-    logging.info(response_text)
+    logging.info(f"\n\n{response_text}\n\n")
 
     try:
-        response_dict = json.loads(response_text)
+        response_text = response_text.replace("```yaml", "").replace("```", "").strip()
+        response_text = response_text.replace("---", "")
+        # response_dict = json.loads(response_text)
+        yaml_obj = yaml.safe_load(response_text.strip())
+
+        json_str = json.dumps(yaml_obj)
+        response_dict = json.loads(json_str)
     except JSONDecodeError as err:
         logging.error(str(err))
         if retry:

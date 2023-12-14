@@ -4,9 +4,10 @@ import json
 import logging
 from queue import Queue
 from typing import List
-from xml.sax.saxutils import quoteattr
+import yaml
 
 import flag
+import yaml
 from bs4 import BeautifulSoup
 from pydantic import HttpUrl
 
@@ -85,11 +86,27 @@ class GroundNewsItem():
             })
         return sources
 
-    def as_message(self):
+    def as_html(self):
         return _create_html_repr(self)
 
     def as_dict(self):
         return self.__dict__
+
+    def as_yaml(self):
+        meaning = {
+            "title": self.title.replace("\"", "").replace("'", "").replace(":", ""),
+            "description": self.description.replace("\"", "").replace("'", "").replace(":", "")
+        }
+
+        if self.summaries:
+            meaning['summaries'] = self.summaries
+
+        meaning['published_in_left_biased_sources'] = self.leftSrcCount
+        meaning['published_in_right_biased_sources'] = self.rightSrcCount
+        meaning['published_in_center_biased_sources'] = self.cntrSrcCount
+
+        yaml_string = yaml.dump(meaning)
+        return yaml_string
 
     def as_meaning(self):
         meaning = {
@@ -136,6 +153,26 @@ async def get_article_data(article_url: HttpUrl):
     item = GroundNewsItem(event=article_event)
     logging.info(f"loaded {item.title} article")
     return item
+
+
+async def get_main_events(url='https://ground.news', known_ids=[]):
+    main_data = await get_ground_news_items(url)
+    articles = []
+    if 'events' not in main_data:
+        logging.error("no event data for " + url)
+        return None
+    for event in main_data['events']:
+        if event['id'] in known_ids:
+            continue
+        url = ARTICLE_URL.format(DEFAULT_URL=DEFAULT_URL, slug=event['slug'])
+        # url = f"{DEFAULT_URL}/article/{spot['slug']}"
+        spot_data = await get_article_data(url)
+        if spot_data:
+            articles.append(spot_data)
+            await asyncio.sleep(0.5)
+
+    logging.info(f"loaded {url} events")
+    return articles
 
 
 async def get_blindspots(known_ids=[]):
@@ -238,7 +275,14 @@ def _create_html_repr(item: GroundNewsItem):
                 html += f'<a href="{src["url"]}">{src["name"]}</a> {flag_icon} | '
                 if idx > 6:
                     break
+    html = html.replace("```json", "").replace("```", "")
     html = html.replace("\"\"", "\"")
+    html = html.replace(": \"", ":\"")
+    html = html.replace(" \"", "")
+    html = html.replace("\" ", "")
+    html = html.replace("\".", "")
+    html = html.replace("None", "null")
+
     print(html)
     return html
 
@@ -246,7 +290,7 @@ def _create_html_repr(item: GroundNewsItem):
 def main():
     # asyncio.run(get_ground_news_items('https://ground.news/interest/ukraine-politics'))
     # asyncio.run(get_ground_news_items('https://ground.news/blindspot'))
-    # articles = asyncio.run(get_blindspots())
+    # articles = asyncio.run(get_events())
     articles = asyncio.run(get_by_interest())
 
 
