@@ -77,17 +77,19 @@ class GroundNewsItem():
                 place = ':EARTH:'
             name = src['sourceInfo']['name'].split("[")[0]
 
-            sources.append({
+            source_dict = {
                 "url": src['url'],
                 "name": name,
                 "bias": src['sourceInfo']['bias'],
                 "place": place,
                 "factuality": src['sourceInfo']['factuality'],
-            })
-        return sources
+            }
 
-    def as_html(self):
-        return _create_html_repr(self)
+            if place == ':RU:':
+                sources.insert(0, source_dict)
+            else:
+                sources.append(source_dict)
+        return sources
 
     def as_dict(self):
         return self.__dict__
@@ -107,21 +109,6 @@ class GroundNewsItem():
 
         yaml_string = yaml.dump(meaning)
         return yaml_string
-
-    def as_meaning(self):
-        meaning = {
-            "title": self.title,
-            "description": self.description,
-            "place": self.place,
-        }
-
-        if self.summaries:
-            meaning['summaries'] = self.summaries
-
-        meaning['published_in_left_biased_sources'] = self.leftSrcCount
-        meaning['published_in_right_biased_sources'] = self.rightSrcCount
-        meaning['published_in_center_biased_sources'] = self.cntrSrcCount
-        return meaning
 
 
 def set_tags():
@@ -211,7 +198,7 @@ async def get_by_interest(interest: str = 'ukraine-crisis', known_ids=[]):
     return articles
 
 
-def _create_html_repr(item: GroundNewsItem):
+def _create_html_repr_politics(item: GroundNewsItem):
     html = ""
     if item.place is None:
         place = '👽'
@@ -284,6 +271,55 @@ def _create_html_repr(item: GroundNewsItem):
     html = html.replace("None", "null")
 
     print(html)
+    return html
+
+
+def _create_html_repr_casual(item: GroundNewsItem):
+    html = ""
+
+    try:
+        place = flag.flag(item.place)
+    except Exception as e:
+        place = '👽'
+
+    html += f"<strong>{item.title}</strong> / {place}"
+    if item.description:
+        html += f"\n\n<code>{item.description}</code>"
+
+    if item.intrigue:
+        html += f"\n\n🏴‍☠️<strong>Мнение Киберникто</strong>\n"
+        html += f"{item.intrigue}\n<i>Прошу не забывать, что я всего лишь набор байтов и не соображаю, что несу!</i>"
+
+    if item.sources and 1 == 1:
+        if len(item.sources) == 1:
+            src = item.sources[0]
+            try:
+                flag_icon = flag.flag(src["place"])
+            except ValueError as e:
+                flag_icon = '👽'
+            html += "\n\n<b>Единственный источник: </b>"
+            html += f'<a href="{src["url"]}">{src["name"]}</a> {flag_icon}'
+        else:
+            html += "\n\n<b>Источники</b> (возможны иноагенты и враги!)\n"
+            for idx, src in enumerate(item.sources):
+                try:
+                    flag_icon = flag.flag(src["place"])
+                except Exception as e:
+                    flag_icon = '👽'
+                html += f'<a href="{src["url"]}">{src["name"]}</a> {flag_icon} | '
+                if idx > 6:
+                    break
+
+    html = html.replace("```json", "").replace("```", "")
+    html = html.replace("```yaml", "").replace("```", "")
+    html = html.replace("```yml", "").replace("```", "")
+    html = html.replace("\"\"", "\"")
+    html = html.replace(": \"", ":\"")
+    html = html.replace(" \"", "")
+    html = html.replace("\" ", "")
+    html = html.replace("\".", "")
+    html = html.replace("None", "null")
+
     return html
 
 

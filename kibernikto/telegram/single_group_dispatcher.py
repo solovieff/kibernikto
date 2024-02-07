@@ -11,15 +11,16 @@ from aiogram.types import User
 from kibernikto.interactors import InteractorOpenAI
 
 from kibernikto import constants
+from kibernikto.telegram.channel import constants as channel_constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
 from kibernikto.utils.image import publish_image_file
-from kibernikto.telegram.channel.gnews.publisher import scheduler
 
 smart_bot_class = None
 
 # Telegram bot
 tg_bot: Bot = None
+tg_channel = None
 bot_me: User = None
 dp = Dispatcher()
 
@@ -33,18 +34,21 @@ MAX_TG_MESSAGE_LEN = 4096
 commands = {}
 
 
-def start(bot_class):
+def start(bot_class, channel=None):
     """
     runs the executor polling the dispatcher for incoming messages
 
+    :param channel: if a channel is specified, it will be processed in the same event loop as the bot
     :param bot_class: the bot class to use
     :return:
     """
     global smart_bot_class
     global tg_bot
+    global tg_channel
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
     tg_bot = Bot(token=constants.TG_BOT_KEY)
+    tg_channel = channel
     dp.run_polling(tg_bot, skip_updates=True)
 
 
@@ -72,18 +76,13 @@ async def on_startup(bot: Bot):
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.username)
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
 
-            #await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
-            #hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
-            #await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
+            if tg_channel is not None:
+                asyncio.create_task(tg_channel.start())
 
-            if constants.TG_CHANNEL_ID:
-                asyncio.create_task(scheduler(load_news_minutes=constants.TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES,
-                                              publish_item_minutes=constants.TG_CHANNEL_PUBLICATION_PERIOD_MINUTES,
-                                              publish_func=publish_to_channel,
-                                              base_url=constants.TG_CHANNEL_API_BASE_URL,
-                                              api_key=constants.TG_CHANNEL_SUMMARIZATION_KEY,
-                                              model=constants.TG_CHANNEL_API_MODEL
-                                              ))
+            if constants.TG_SEND_HELLO:
+                await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
+                hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
+                await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
         logging.error(f"failed to send hello message! {str(e)}")
         if FRIEND_GROUP_BOT.client is not None:
@@ -95,10 +94,16 @@ async def on_startup(bot: Bot):
         exit(os.EX_CONFIG)
 
 
+# TODO: not working, so we run channels in on_startup
+async def publish_to_channel_safe(text: str):
+    future = asyncio.run_coroutine_threadsafe(publish_to_channel(text), loop=asyncio.get_event_loop())
+    future.result()
+
+
 async def publish_to_channel(text: str):
-    if constants.TG_CHANNEL_ID:
+    if channel_constants.TG_CHANNEL_ID:
         await tg_bot.send_message(text=text,
-                                  chat_id=constants.TG_CHANNEL_ID,
+                                  chat_id=channel_constants.TG_CHANNEL_ID,
                                   parse_mode=ParseMode.HTML,
                                   disable_web_page_preview=True)
 

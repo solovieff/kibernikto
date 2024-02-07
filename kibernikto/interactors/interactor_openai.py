@@ -149,7 +149,6 @@ class InteractorOpenAI:
 
         return response_message.content
 
-
     async def _run_plugins_for_message(self, message_text):
         plugins_result = None
         for plugin in self.plugins:
@@ -164,16 +163,13 @@ class InteractorOpenAI:
                     plugins_result = plugin_result
         return plugins_result
 
-
     def reset_if_usercall(self, message):
         if self.reset_call in message:
             self._reset()
 
-
     def _reset(self):
         # never gets full
         self.messages = deque(maxlen=self.max_messages)
-
 
     async def _get_summary(self):
         """
@@ -191,11 +187,9 @@ class InteractorOpenAI:
         logging.info(response_text)
         return response_text
 
-
     async def needs_attention(self, message):
         """checks if the reaction needed for the given messages"""
         return self.should_react(message)
-
 
     async def _aware_overflow(self):
         """

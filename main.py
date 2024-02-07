@@ -1,44 +1,31 @@
-import logging
+import asyncio
+from threading import Thread
+
 from kibernikto.bots.cybernoone import listener
-
-logging.basicConfig(
-    format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
-    datefmt='%Y-%m-%d:%H:%M:%S',
-    level=logging.DEBUG)
-logger = logging.getLogger('openai')
-logger.setLevel(logging.INFO)
-
-logger = logging.getLogger('httpcore')
-logger.setLevel(logging.INFO)
-
-logger = logging.getLogger('httpx')
-logger.setLevel(logging.INFO)
-
-logger = logging.getLogger('asyncio')
-logger.setLevel(logging.INFO)
+from kibernikto.telegram.channel import constants as channel_constants
+from kibernikto.telegram.channel.gnews.politics_channel import PoliticsGnewsChannel
+from kibernikto import k_logger
+from kibernikto.telegram import single_group_dispatcher
+from telegram.channel.gnews.free_channel import FreeGnewsChannel
 
 # Initialize bot and dispatcher
 if __name__ == '__main__':
-    from kibernikto import constants
 
-    from kibernikto.telegram import single_group_dispatcher
+    k_logger.init()
+    k_logger.banner()
 
-    print("\t")
-    print('\t%-15s%-15s' % ("avatar model:", constants.OPENAI_API_MODEL))
-    print('\t%-15s%-15s' % ("avatar host:", constants.OPENAI_BASE_URL))
-    print('\t%-15s%-15s' % ("avatar temp:", constants.OPENAI_TEMPERATURE))
-    if constants.SUMMARIZATION_KEY:
-        print("\t")
-        print('\t%-15s%-15s' % ("sum model:", constants.SUMMARIZATION_MODEL))
-        print('\t%-15s%-15s' % ("sum host:", constants.SUMMARIZATION_API_BASE_URL))
+    if channel_constants.TG_CHANNEL_ID:
+        if channel_constants.TG_CHANNEL_POLITICS:
+            channel = FreeGnewsChannel(api_key=channel_constants.TG_CHANNEL_API_KEY,
+                                       model=channel_constants.TG_CHANNEL_API_MODEL,
+                                       publish_func=single_group_dispatcher.publish_to_channel,
+                                       interests=channel_constants.TG_CHANNEL_INTERESTS,
+                                       new_pub_minutes=channel_constants.TG_CHANNEL_PUBLICATION_PERIOD_MINUTES,
+                                       refresh_minutes=10
+                                       )
     else:
-        print('\t%-15s%-15s' % ("summarization:", 'disabled'))
-    print("\t")
-    print('\t%-15s%-15s' % ("tg master:", constants.TG_MASTER_ID))
-    print('\t%-15s%-15s' % ("tg group:", constants.TG_FRIEND_GROUP_ID))
-    print("\t")
-    if constants.TG_CHANNEL_ID:
-        print('\t%-15s%-15s' % ("channel id:", constants.TG_CHANNEL_ID))
-        print('\t%-15s%-15s' % ("channel model:", constants.TG_CHANNEL_API_MODEL))
-
-    single_group_dispatcher.start(bot_class=listener.Cybernoone)
+        channel = None
+        # single_group_dispatcher.dp.loop.create_task(channel.start())
+        # thread = Thread(target=asyncio.run, args=(channel.start(),))
+        # thread.start()
+    single_group_dispatcher.start(bot_class=listener.Cybernoone, channel=channel)
