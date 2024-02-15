@@ -114,7 +114,7 @@ async def private_message(message: types.Message):
 
 @dp.message(F.chat.id == constants.TG_FRIEND_GROUP_ID)
 async def group_message(message: types.Message):
-    if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.md_text):
+    if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await _get_message_text(message)
         logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
