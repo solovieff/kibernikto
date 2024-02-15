@@ -10,7 +10,7 @@ from kibernikto.plugins import KiberniktoPluginException
 
 class Cybernoone(InteractorOpenAI):
 
-    def __init__(self, max_messages=10, master_id=None, name="Киберникто", who_am_i=MAIN_VERBAGE['who_am_i'],
+    def __init__(self, max_messages=10, master_id=None, name="Киберникто", username="Cybernoonebot", who_am_i=MAIN_VERBAGE['who_am_i'],
                  reaction_calls=['никто', 'падаль', 'хонда']):
         """
 
@@ -24,6 +24,7 @@ class Cybernoone(InteractorOpenAI):
                             reaction_calls=reaction_calls, my_name=name)
         self.master_id = master_id
         self.name = name
+        self.username = username
         super().__init__(model=constants.OPENAI_API_MODEL, max_messages=max_messages, default_config=pp)
 
     async def heed_and_reply(self, message, author=NOT_GIVEN):
@@ -47,3 +48,7 @@ class Cybernoone(InteractorOpenAI):
 
     def check_master(self, user_id, message):
         return self.master_call in message or user_id == self.master_id
+
+    def should_react(self, message_text):
+        parent_should = super().should_react(message_text)
+        return parent_should or self.username in message_text

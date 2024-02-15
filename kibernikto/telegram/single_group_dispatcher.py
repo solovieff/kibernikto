@@ -14,7 +14,6 @@ from kibernikto import constants
 from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
 from kibernikto.utils.image import publish_image_file
-from kibernikto.telegram.channel.gnews.publisher import scheduler
 
 smart_bot_class = None
 
@@ -59,11 +58,13 @@ async def on_startup(bot: Bot):
             FRIEND_GROUP_BOT = smart_bot_class(max_messages=constants.TG_BOT_MAX_HISTORY,
                                                master_id=constants.TG_MASTER_ID,
                                                name=bot_me.first_name,
+                                               username=bot_me.username,
                                                who_am_i=constants.OPENAI_WHO_AM_I,
                                                reaction_calls=constants.TG_REACTION_CALLS)
             PRIVATE_BOT = smart_bot_class(max_messages=constants.TG_BOT_MAX_HISTORY,
                                           master_id=constants.TG_MASTER_ID,
                                           name=bot_me.first_name,
+                                          username=bot_me.username,
                                           who_am_i=constants.OPENAI_WHO_AM_I,
                                           reaction_calls=constants.TG_REACTION_CALLS)
 
@@ -72,18 +73,9 @@ async def on_startup(bot: Bot):
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.username)
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
 
-            #await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
-            #hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
-            #await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
-
-            if constants.TG_CHANNEL_ID:
-                asyncio.create_task(scheduler(load_news_minutes=constants.TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES,
-                                              publish_item_minutes=constants.TG_CHANNEL_PUBLICATION_PERIOD_MINUTES,
-                                              publish_func=publish_to_channel,
-                                              base_url=constants.TG_CHANNEL_API_BASE_URL,
-                                              api_key=constants.TG_CHANNEL_SUMMARIZATION_KEY,
-                                              model=constants.TG_CHANNEL_API_MODEL
-                                              ))
+            await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
+            # hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
+            # await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
         logging.error(f"failed to send hello message! {str(e)}")
         if FRIEND_GROUP_BOT.client is not None:
@@ -93,14 +85,6 @@ async def on_startup(bot: Bot):
 
         await dp.stop_polling()
         exit(os.EX_CONFIG)
-
-
-async def publish_to_channel(text: str):
-    if constants.TG_CHANNEL_ID:
-        await tg_bot.send_message(text=text,
-                                  chat_id=constants.TG_CHANNEL_ID,
-                                  parse_mode=ParseMode.HTML,
-                                  disable_web_page_preview=True)
 
 
 async def send_random_sticker(chat_id):
