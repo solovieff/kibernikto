@@ -1,5 +1,6 @@
 import logging
 from kibernikto.bots.cybernoone import listener
+from kibernikto.bots.vertihvostka import Vertihvostka
 
 logging.basicConfig(
     format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
@@ -37,8 +38,5 @@ if __name__ == '__main__':
     print('\t%-15s%-15s' % ("tg master:", constants.TG_MASTER_ID))
     print('\t%-15s%-15s' % ("tg group:", constants.TG_FRIEND_GROUP_ID))
     print("\t")
-    if constants.TG_CHANNEL_ID:
-        print('\t%-15s%-15s' % ("channel id:", constants.TG_CHANNEL_ID))
-        print('\t%-15s%-15s' % ("channel model:", constants.TG_CHANNEL_API_MODEL))
 
-    single_group_dispatcher.start(bot_class=listener.Cybernoone)
+    single_group_dispatcher.start(bot_class=Vertihvostka)

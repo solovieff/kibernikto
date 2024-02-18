@@ -8,11 +8,11 @@ import openai
 from kibernikto.plugins import KiberniktoPluginException
 
 
-class Cybernoone(InteractorOpenAI):
+class Vertihvostka(InteractorOpenAI):
 
-    def __init__(self, max_messages=10, master_id=None, name="Киберникто", username="Cybernoonebot",
+    def __init__(self, max_messages=10, master_id=None, name="Вертихвостка", username="vertihvostka_bot",
                  who_am_i=MAIN_VERBAGE['who_am_i'],
-                 reaction_calls=['никто', 'падаль', 'хонда']):
+                 reaction_calls=['verti', 'привет', 'хонда']):
         """
 
         :param max_messages: message history length
@@ -30,22 +30,12 @@ class Cybernoone(InteractorOpenAI):
 
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         try:
-            return await super().heed_and_reply(message, author, save_to_history=save_to_history)
+            reply = await super().heed_and_reply(message, author, save_to_history=save_to_history)
+            return reply
         except KiberniktoPluginException as e:
-            return f" {e.plugin_name} не сработал!\n\n {str(e)}"
+            return f" {e.plugin_name} не сработала!\n\n {str(e)}"
         except Exception as e:
-            return f"Я не справился! Горе мне! {str(e)}"
-
-    async def ask_pure(self, prompt):
-        response = await openai.ChatCompletion.acreate(
-            model=self.model,
-            messages=prompt,
-            max_tokens=constants.OPENAI_MAX_TOKENS,
-            temperature=constants.OPENAI_TEMPERATURE,
-        )
-        response_text = response['choices'][0]['message']['content'].strip()
-        print(response_text)
-        return response_text
+            return f"Я не знаю что сказать! {str(e)}"
 
     def check_master(self, user_id, message):
         return self.master_call in message or user_id == self.master_id

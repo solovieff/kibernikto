@@ -81,7 +81,8 @@ class InteractorOpenAI:
         if we exceeded max prompt tokens
         :return:
         """
-        total_word_count = sum(len(obj["content"].split()) for obj in self.messages)
+        total_word_count = sum(
+            len(obj["content"].split()) for obj in self.messages if obj["role"] != OpenAIRoles.system.value)
         return total_word_count > self.MAX_WORD_COUNT
 
     def should_react(self, message_text):
@@ -111,7 +112,7 @@ class InteractorOpenAI:
         await self._aware_overflow()
         self.messages.put(this_message)
 
-    async def heed_and_reply(self, message, author=NOT_GIVEN):
+    async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param message: received message
@@ -144,11 +145,11 @@ class InteractorOpenAI:
         )
         response_message: ChatCompletionMessage = completion.choices[0].message
 
-        self.messages.append(this_message)
-        self.messages.append(dict(role=response_message.role, content=response_message.content))
+        if save_to_history:
+            self.messages.append(this_message)
+            self.messages.append(dict(role=response_message.role, content=response_message.content))
 
         return response_message.content
-
 
     async def _run_plugins_for_message(self, message_text):
         plugins_result = None
@@ -164,16 +165,13 @@ class InteractorOpenAI:
                     plugins_result = plugin_result
         return plugins_result
 
-
     def reset_if_usercall(self, message):
         if self.reset_call in message:
             self._reset()
 
-
     def _reset(self):
         # never gets full
         self.messages = deque(maxlen=self.max_messages)
-
 
     async def _get_summary(self):
         """
@@ -191,11 +189,9 @@ class InteractorOpenAI:
         logging.info(response_text)
         return response_text
 
-
     async def needs_attention(self, message):
         """checks if the reaction needed for the given messages"""
         return self.should_react(message)
-
 
     async def _aware_overflow(self):
         """
