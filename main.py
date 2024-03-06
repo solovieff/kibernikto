@@ -28,6 +28,13 @@ if __name__ == '__main__':
     print('\t%-15s%-15s' % ("avatar model:", constants.OPENAI_API_MODEL))
     print('\t%-15s%-15s' % ("avatar host:", constants.OPENAI_BASE_URL))
     print('\t%-15s%-15s' % ("avatar temp:", constants.OPENAI_TEMPERATURE))
+    if constants.REDACTOR_OPENAI_API_KEY:
+        print("\t")
+        print('\t%-15s%-15s' % ("redact model:", constants.REDACTOR_OPENAI_API_MODEL))
+        print('\t%-15s%-15s' % ("redact host:", constants.REDACTOR_OPENAI_BASE_URL))
+    else:
+        print('\t%-15s%-15s' % ("redactor mode:", 'disabled'))
+
     if constants.SUMMARIZATION_KEY:
         print("\t")
         print('\t%-15s%-15s' % ("sum model:", constants.SUMMARIZATION_MODEL))
