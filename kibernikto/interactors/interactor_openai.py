@@ -112,6 +112,20 @@ class InteractorOpenAI:
         await self._aware_overflow()
         self.messages.put(this_message)
 
+    async def single_request(self, message, model=None):
+        this_message = dict(content=f"{message}", role=OpenAIRoles.user.value)
+
+        completion: ChatCompletion = await self.client.chat.completions.create(
+            model=self.model if not model else model,
+            messages=[this_message],
+
+            max_tokens=constants.OPENAI_MAX_TOKENS,
+            temperature=0.8
+        )
+        response_message: ChatCompletionMessage = completion.choices[0].message
+
+        return response_message
+
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
@@ -130,7 +144,7 @@ class InteractorOpenAI:
 
         await self._aware_overflow()
 
-        prompt = list(self.messages) + [self.about_me] + [this_message]
+        prompt = [self.about_me] + list(self.messages) + [this_message]
 
         logging.debug(f"sending {prompt}")
 
@@ -140,7 +154,7 @@ class InteractorOpenAI:
             model=self.model,
             messages=prompt,
             max_tokens=constants.OPENAI_MAX_TOKENS,
-            temperature=0.8,
+            temperature=constants.OPENAI_TEMPERATURE,
             user=author
         )
         response_message: ChatCompletionMessage = completion.choices[0].message

@@ -75,7 +75,7 @@ async def on_startup(bot: Bot):
 
             if constants.TG_SAY_HI:
                 await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
-                hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!",
+                hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата в двух предложениях!",
                                                                    save_to_history=False)
                 await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
@@ -125,11 +125,11 @@ async def group_message(message: types.Message):
         # not using author not to send usernames to openai :)
         reply_text = await FRIEND_GROUP_BOT.heed_and_reply(user_text)  # author=message.from_user.full_name
         await asyncio.sleep(random.uniform(0, 2))
-        chunks = split_text_into_chunks_by_sentences(reply_text, sentences_per_chunk=constants.TG_CHUNK_SENTENSES)
+        chunks = split_text_into_chunks_by_sentences(reply_text, sentences_per_chunk=constants.TG_CHUNK_SENTENCES)
         for chunk in chunks:
             await tg_bot.send_chat_action(message.chat.id, 'typing')
             await asyncio.sleep(random.uniform(0.5, 3))
-            await message.reply(text=chunk.rstrip('.'))
+            await message.reply(text=chunk)
 
         if random.random() < 0.1:
             await send_random_sticker(chat_id=message.chat.id)

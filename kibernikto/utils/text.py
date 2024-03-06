@@ -1,5 +1,6 @@
 import logging
 import typing
+import re
 
 from aiogram.client.session import aiohttp
 from kibernikto import constants
@@ -16,6 +17,10 @@ def split_text(text: str, length: int = constants.TG_MAX_MESSAGE_LENGTH) -> typi
     :rtype: :obj:`typing.List[str]`
     """
     return [text[i:i + length] for i in range(0, len(text), length)]
+
+
+def remove_text_in_brackets_and_parentheses(text):
+    return re.sub("[\(\[].*?[\)\]]", "", text)
 
 
 def split_text_by_sentences(text, max_length):
@@ -63,6 +68,7 @@ def split_text_into_chunks_by_sentences(text, sentences_per_chunk=2):
         chunks.append('. '.join(current_chunk) + '.')
 
     return chunks
+
 
 async def get_website_html(url: HttpUrl):
     async with aiohttp.ClientSession() as session:
