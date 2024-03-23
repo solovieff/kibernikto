@@ -11,7 +11,7 @@ from aiogram.types import User
 from kibernikto.interactors import InteractorOpenAI
 
 from kibernikto import constants
-from kibernikto.utils.text import split_text, MAX_MESSAGE_LENGTH
+from kibernikto.utils.text import split_text, split_text_by_sentences, split_text_into_chunks_by_sentences
 from kibernikto.plugins import YoutubePlugin, WeblinkSummaryPlugin, ImageSummaryPlugin
 from kibernikto.utils.image import publish_image_file
 
@@ -73,9 +73,11 @@ async def on_startup(bot: Bot):
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.username)
             FRIEND_GROUP_BOT.defaults.reaction_calls.append(bot_me.first_name)
 
-            await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
-            # hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата!")
-            # await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
+            if constants.TG_SAY_HI:
+                await send_random_sticker(chat_id=constants.TG_FRIEND_GROUP_ID)
+                hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата в двух предложениях!",
+                                                                   save_to_history=False)
+                await tg_bot.send_message(chat_id=constants.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
         logging.error(f"failed to send hello message! {str(e)}")
         if FRIEND_GROUP_BOT.client is not None:
@@ -107,7 +109,7 @@ async def private_message(message: types.Message):
         user_text = await _get_message_text(message)
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await PRIVATE_BOT.heed_and_reply(message=user_text)
-    chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)
+    chunks = split_text_by_sentences(reply_text, constants.TG_MAX_MESSAGE_LENGTH)
     for chunk in chunks:
         await message.reply(text=chunk)
 
@@ -122,8 +124,11 @@ async def group_message(message: types.Message):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         # not using author not to send usernames to openai :)
         reply_text = await FRIEND_GROUP_BOT.heed_and_reply(user_text)  # author=message.from_user.full_name
-        chunks = split_text(reply_text, MAX_MESSAGE_LENGTH)
+        await asyncio.sleep(random.uniform(0, 2))
+        chunks = split_text_into_chunks_by_sentences(reply_text, sentences_per_chunk=constants.TG_CHUNK_SENTENCES)
         for chunk in chunks:
+            await tg_bot.send_chat_action(message.chat.id, 'typing')
+            await asyncio.sleep(random.uniform(0.5, 3))
             await message.reply(text=chunk)
 
         if random.random() < 0.1:

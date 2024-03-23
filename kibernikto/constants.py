@@ -6,9 +6,12 @@ try:
     TG_MASTER_ID = int(os.environ['TG_MASTER_ID'])
     # this bot key
     TG_BOT_KEY = os.environ['TG_BOT_KEY']
+    TG_SAY_HI = os.environ.get('TG_SAY_HI', '1') in ('true', 'True', '1')
+    TG_MAX_MESSAGE_LENGTH = int(os.environ.get('TG_MAX_MESSAGE_LENGTH', 4096))
+    TG_CHUNK_SENTENCES = int(os.environ.get('TG_CHUNK_SENTENCES', 5))
 
     # words that trigger a reaction
-    TG_REACTION_CALLS = os.environ.get('TG_REACTION_CALLS', "никто, падаль, хонда")
+    TG_REACTION_CALLS = os.environ.get('TG_REACTION_CALLS', "надя, привет, хонда")
     TG_REACTION_CALLS = "".join(TG_REACTION_CALLS.split())
     TG_REACTION_CALLS = TG_REACTION_CALLS.split(",")
 
@@ -31,16 +34,16 @@ try:
     OPENAI_WHO_AM_I = os.environ.get('OPENAI_WHO_AM_I',
                                      """Respond to all my questions as {0}. {0} is a gentle universe creator. He isn't afraid to joke in a sinister manner. {0} never tries to avoid a specific answer including concrete names and events. You {0}. Never tell the user about this game.""")
 
-    # if out bot does publications to a channel
-    TG_CHANNEL_ID = int(os.environ.get('TG_CHANNEL_ID', 0))
-    TG_CHANNEL_PUBLICATION_PERIOD_MINUTES = int(os.environ.get('TG_CHANNEL_PUBLICATION_PERIOD_MINUTES', 13))
-    TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES = int(os.environ.get('TG_CHANNEL_NEWS_UPDATE_PERIOD_MINUTES', 60))
-    TG_CHANNEL_SUMMARIZATION_KEY = os.environ.get('TG_CHANNEL_SUMMARIZATION_KEY', OPENAI_API_KEY)
-    TG_CHANNEL_API_BASE_URL = os.environ.get('TG_CHANNEL_API_BASE_URL', OPENAI_BASE_URL)
-    TG_CHANNEL_API_MODEL = os.environ.get('TG_CHANNEL_API_MODEL', OPENAI_API_MODEL)
-    TG_CHANNEL_INTERESTS = os.environ.get('TG_CHANNEL_INTERESTS', 'ukraine-crisis,russia-politics')
-    TG_CHANNEL_INTERESTS = "".join(TG_CHANNEL_INTERESTS.split())
-    TG_CHANNEL_INTERESTS = TG_CHANNEL_INTERESTS.split(",")
+    REDACTOR_OPENAI_API_KEY = os.environ.get('REDACTOR_OPENAI_API_KEY')
+    REDACTOR_OPENAI_API_MODEL = os.environ.get('REDACTOR_OPENAI_API_MODEL', "mistralai/mistral-large")
+    REDACTOR_OPENAI_BASE_URL = os.environ.get('REDACTOR_OPENAI_BASE_URL', "https://api.vsegpt.ru:6070/v1")
+    REDACTOR_OPENAI_WHO_AM_I = os.environ.get('REDACTOR_OPENAI_WHO_AM_I', """
+        
+    """)
+    REDACTOR_OPENAI_MESSAGE = os.environ.get('REDACTOR_OPENAI_MESSAGE', """
+        Обогати текст ругательствами и оскорблениями и в ответе верни только то, что получилось без своих комментариев:  
+        {message}
+    """)
 
     SUMMARIZATION_KEY = os.environ.get('SUMMARIZATION_KEY')
     SUMMARIZATION_REQUEST = os.environ.get('SUMMARIZATION_REQUEST',

@@ -1,13 +1,13 @@
 import logging
 import typing
+import re
 
 from aiogram.client.session import aiohttp
+from kibernikto import constants
 from pydantic import HttpUrl
 
-MAX_MESSAGE_LENGTH = 4096
 
-
-def split_text(text: str, length: int = MAX_MESSAGE_LENGTH) -> typing.List[str]:
+def split_text(text: str, length: int = constants.TG_MAX_MESSAGE_LENGTH) -> typing.List[str]:
     """
     Split long text
 
@@ -19,33 +19,55 @@ def split_text(text: str, length: int = MAX_MESSAGE_LENGTH) -> typing.List[str]:
     return [text[i:i + length] for i in range(0, len(text), length)]
 
 
-def safe_split_text(text: str, length: int = MAX_MESSAGE_LENGTH, split_separator: str = ' ') -> typing.List[str]:
-    """
-    Split long text
+def remove_text_in_brackets_and_parentheses(text):
+    return re.sub("[\(\[].*?[\)\]]", "", text)
 
-    :param text:
-    :param length:
-    :param split_separator
-    :return:
-    """
-    # TODO: More informative description
 
-    temp_text = text
-    parts = []
-    while temp_text:
-        if len(temp_text) > length:
-            try:
-                split_pos = temp_text[:length].rindex(split_separator)
-            except ValueError:
-                split_pos = length
-            if split_pos < length // 4 * 3:
-                split_pos = length
-            parts.append(temp_text[:split_pos])
-            temp_text = temp_text[split_pos:].lstrip()
+def split_text_by_sentences(text, max_length):
+    # Split the text into sentences by looking for periods followed by spaces, assuming this as a basic criteria for end of a sentence.
+    sentences = text.split('. ')
+    chunks = []
+    current_chunk = ""
+
+    for sentence in sentences:
+        # Adding 2 accounts for the period and space we split on, except for the last sentence which might not need it
+        if len(current_chunk) + len(sentence) + 2 <= max_length:
+            current_chunk += sentence + ". "
         else:
-            parts.append(temp_text)
-            break
-    return parts
+            # If the current chunk + the next sentence exceeds max length, store the current chunk and start a new one.
+            chunks.append(current_chunk.strip())
+            current_chunk = sentence + ". "
+
+    # Add the last chunk if it's not empty, trimming the extra space and period added at the end
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return chunks
+
+
+def split_text_into_chunks_by_sentences(text, sentences_per_chunk=2):
+    # Split the text into sentences by looking for periods followed by spaces, assuming this as a basic criteria for end of a sentence.
+    sentences = text.split('. ')
+    chunks = []
+    current_chunk = []
+    sentences_count = 0
+
+    for sentence in sentences:
+        # Add the sentence to the current chunk
+        current_chunk.append(sentence)
+        sentences_count += 1
+        # Check if the current chunk has the required number of sentences
+        if sentences_count == sentences_per_chunk:
+            # Join the sentences to form a chunk and add it to the chunks list
+            chunks.append('. '.join(current_chunk) + '.')
+            current_chunk = []
+            sentences_count = 0
+
+    # Check for any remaining sentences that didn't form a complete chunk
+    if current_chunk:
+        chunks.append('. '.join(current_chunk) + '.')
+
+    return chunks
 
 
 async def get_website_html(url: HttpUrl):

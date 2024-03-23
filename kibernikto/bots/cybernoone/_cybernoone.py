@@ -28,9 +28,9 @@ class Cybernoone(InteractorOpenAI):
         self.username = username
         super().__init__(model=constants.OPENAI_API_MODEL, max_messages=max_messages, default_config=pp)
 
-    async def heed_and_reply(self, message, author=NOT_GIVEN):
+    async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         try:
-            return await super().heed_and_reply(message, author)
+            return await super().heed_and_reply(message, author, save_to_history=save_to_history)
         except KiberniktoPluginException as e:
             return f" {e.plugin_name} не сработал!\n\n {str(e)}"
         except Exception as e:

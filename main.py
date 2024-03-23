@@ -1,5 +1,6 @@
 import logging
 from kibernikto.bots.cybernoone import listener
+from kibernikto.bots.vertihvostka import Vertihvostka
 
 logging.basicConfig(
     format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
@@ -27,6 +28,13 @@ if __name__ == '__main__':
     print('\t%-15s%-15s' % ("avatar model:", constants.OPENAI_API_MODEL))
     print('\t%-15s%-15s' % ("avatar host:", constants.OPENAI_BASE_URL))
     print('\t%-15s%-15s' % ("avatar temp:", constants.OPENAI_TEMPERATURE))
+    if constants.REDACTOR_OPENAI_API_KEY:
+        print("\t")
+        print('\t%-15s%-15s' % ("redact model:", constants.REDACTOR_OPENAI_API_MODEL))
+        print('\t%-15s%-15s' % ("redact host:", constants.REDACTOR_OPENAI_BASE_URL))
+    else:
+        print('\t%-15s%-15s' % ("redactor mode:", 'disabled'))
+
     if constants.SUMMARIZATION_KEY:
         print("\t")
         print('\t%-15s%-15s' % ("sum model:", constants.SUMMARIZATION_MODEL))
@@ -37,8 +45,5 @@ if __name__ == '__main__':
     print('\t%-15s%-15s' % ("tg master:", constants.TG_MASTER_ID))
     print('\t%-15s%-15s' % ("tg group:", constants.TG_FRIEND_GROUP_ID))
     print("\t")
-    if constants.TG_CHANNEL_ID:
-        print('\t%-15s%-15s' % ("channel id:", constants.TG_CHANNEL_ID))
-        print('\t%-15s%-15s' % ("channel model:", constants.TG_CHANNEL_API_MODEL))
 
-    single_group_dispatcher.start(bot_class=listener.Cybernoone)
+    single_group_dispatcher.start(bot_class=Vertihvostka)
