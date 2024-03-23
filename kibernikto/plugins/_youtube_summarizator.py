@@ -24,7 +24,7 @@ class YoutubePluginSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='SUMMARIZATION_')
 
     OPENAI_API_MODEL: str = "anthropic/claude-instant-v1"
-    OPENAI_BASE_URL: HttpUrl = "https://api.vsegpt.ru:6070/v1"
+    OPENAI_BASE_URL: str = "https://api.vsegpt.ru:6070/v1"
     OPENAI_API_KEY: str | None = None
     OPENAI_MAX_TOKENS: int = 800
     VIDEO_MESSAGE: str = _DEFAULT_TEXT
@@ -33,14 +33,14 @@ class YoutubePluginSettings(BaseSettings):
 class YoutubePlugin(KiberniktoPlugin):
 
     @staticmethod
-    def is_enabled():
+    def applicable():
         return YoutubePluginSettings.OPENAI_API_KEY is not None
 
     """
     This plugin is used to get video transcript and then get text summary from it.
     """
 
-    def __init__(selr):
+    def __init__(self):
         if YoutubePluginSettings.OPENAI_API_KEY:
             super().__init__(model=YoutubePluginSettings.OPENAI_API_MODEL,
                              base_url=YoutubePluginSettings.OPENAI_BASE_URL,

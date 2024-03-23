@@ -1,6 +1,10 @@
 import logging
+
+from kibernikto.bots.redactor_settings import RedactorSetting
 from kibernikto.bots.cybernoone import listener
 from kibernikto.bots.vertihvostka import Vertihvostka
+
+from kibernikto.bots import AiSettings
 
 logging.basicConfig(
     format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
@@ -25,25 +29,21 @@ if __name__ == '__main__':
     from kibernikto.telegram import single_group_dispatcher
 
     print("\t")
-    print('\t%-15s%-15s' % ("avatar model:", constants.OPENAI_API_MODEL))
-    print('\t%-15s%-15s' % ("avatar host:", constants.OPENAI_BASE_URL))
-    print('\t%-15s%-15s' % ("avatar temp:", constants.OPENAI_TEMPERATURE))
-    if constants.REDACTOR_OPENAI_API_KEY:
+    print('\t%-15s%-15s' % ("avatar model:", AiSettings.OPENAI_API_MODEL))
+    print('\t%-15s%-15s' % ("avatar host:", AiSettings.OPENAI_BASE_URL))
+    print('\t%-15s%-15s' % ("avatar temp:", AiSettings.OPENAI_TEMPERATURE))
+
+    if RedactorSetting.OPENAI_API_KEY:
         print("\t")
-        print('\t%-15s%-15s' % ("redact model:", constants.REDACTOR_OPENAI_API_MODEL))
-        print('\t%-15s%-15s' % ("redact host:", constants.REDACTOR_OPENAI_BASE_URL))
+        print('\t%-15s%-15s' % ("redact model:", RedactorSetting.OPENAI_API_MODEL))
+        print('\t%-15s%-15s' % ("redact host:", constants.OPENAI_BASE_URL))
     else:
         print('\t%-15s%-15s' % ("redactor mode:", 'disabled'))
 
-    if constants.SUMMARIZATION_KEY:
-        print("\t")
-        print('\t%-15s%-15s' % ("sum model:", constants.SUMMARIZATION_MODEL))
-        print('\t%-15s%-15s' % ("sum host:", constants.SUMMARIZATION_API_BASE_URL))
-    else:
-        print('\t%-15s%-15s' % ("summarization:", 'disabled'))
     print("\t")
     print('\t%-15s%-15s' % ("tg master:", constants.TG_MASTER_ID))
     print('\t%-15s%-15s' % ("tg group:", constants.TG_FRIEND_GROUP_ID))
     print("\t")
 
-    single_group_dispatcher.start(bot_class=Vertihvostka)
+    # some kind of switcher here
+    single_group_dispatcher.start(bot_class=listener.Kibernikto)

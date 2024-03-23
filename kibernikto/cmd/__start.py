@@ -36,7 +36,7 @@ def start():
     print('\t%-15s%-15s' % ("tg group:", constants.TG_FRIEND_GROUP_ID))
     print("\t")
 
-    single_group_dispatcher.start(bot_class=listener.Cybernoone)
+    single_group_dispatcher.start(bot_class=listener.Kibernikto)
 
 
 def _config_logs():

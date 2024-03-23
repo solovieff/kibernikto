@@ -7,28 +7,25 @@ from typing import List
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from pydantic import BaseModel
 
+from kibernikto.bots import AiSettings
 from kibernikto import constants
 from kibernikto.plugins import KiberniktoPlugin, KiberniktoPluginException
 
-_defaults = {
-    "game_rules": """We are going to have a roleplay. You will respond to all of my questions as Киберникто, the master of truth.""",
-    "who_am_i": """Answer all questions as Киберникто, impartial minister of truth. Try to respond to all available points of view.""",
-    "summary": "Give a short summary of the previous conversation in russian from the point of view of a pirate.",
-    "master_call": "Величайший Киберникто",
-    "reset_call": constants.OPENAI_RESET_CALL,
-    "my_name": "Киберникто"
-}
 
-
-@dataclass
-class BaseTextConfig:
-    game_rules: str = _defaults['game_rules']
-    my_name: str = _defaults['my_name']
-    who_am_i: str = _defaults['who_am_i']
-    master_call: str = _defaults['master_call']
-    reset_call: str = _defaults['reset_call']
-    summarize_request: str = None
+class OpenAiExecutorConfig(BaseModel):
+    name: str = "Киберникто"
+    model: str = AiSettings.OPENAI_API_MODEL
+    url: str = AiSettings.OPENAI_BASE_URL
+    key: str = AiSettings.OPENAI_API_KEY
+    temperature: float = AiSettings.OPENAI_TEMPERATURE
+    max_tokens: int = AiSettings.OPENAI_MAX_TOKENS
+    max_messages: int = AiSettings.OPENAI_MAX_MESSAGES
+    who_am_i: str = AiSettings.OPENAI_WHO_AM_I
+    reset_call: str = AiSettings.OPENAI_RESET_CALL
+    master_call: str = "Величайший Кибеникто!"
+    summarize_request: str | None = AiSettings.OPENAI_SUMMARY
     reaction_calls: list = ('никто', 'хонда', 'урод')
 
 
@@ -38,7 +35,7 @@ class OpenAIRoles(str, Enum):
     assistant = 'assistant'
 
 
-class InteractorOpenAI:
+class OpenAIExecutor:
     MAX_WORD_COUNT = 3000
     """
     Basic Entity on the OpenAI library level.
@@ -46,25 +43,19 @@ class InteractorOpenAI:
     Can process group chats at some point.
     """
 
-    def __init__(self, model="gpt-3.5-turbo", max_messages=10, bored_after=10,
-                 default_config=BaseTextConfig()):
-        """
-
-        :param model: openAI model name
-        :param max_messages: history buffer size (without about_me)
-        :param bored_after: stop listening for basic non-pray calls after this count of useless messages
-        """
-        self.max_messages = max_messages
+    def __init__(self,
+                 bored_after=0,
+                 config=OpenAiExecutorConfig()):
+        self.max_messages = config.max_messages
         self.bored_after = bored_after
-        self.master_call = default_config.master_call
-        self.reset_call = default_config.reset_call
-        self.summarize = default_config.summarize_request is not None
-        self._reset()
+        self.master_call = config.master_call
+        self.reset_call = config.reset_call
+        self.summarize = config.summarize_request is not None
 
-        self.client = AsyncOpenAI(base_url=constants.OPENAI_BASE_URL, api_key=constants.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(base_url=config.url, api_key=config.key)
 
-        self.model = model
-        self.defaults = default_config
+        self.model = config.model
+        self.full_config = config
 
         # user messages preprocessing entities to go here
         self.plugins: List[KiberniktoPlugin] = []
@@ -72,8 +63,8 @@ class InteractorOpenAI:
             self.max_messages = 2  # hahaha
 
         # default configuration. TODO: rework
-        wai = default_config.who_am_i.format(default_config.my_name)
-        self.about_me = dict(role=OpenAIRoles.system.value, content=wai)
+        wai = config.who_am_i.format(config.my_name)
+        self._reset()
 
     @property
     def token_overflow(self):
@@ -91,9 +82,9 @@ class InteractorOpenAI:
         :param message_text:
         :return:
         """
-        return self.defaults.master_call in message_text or any(
-            word in message_text.lower() for word in self.defaults.reaction_calls) or (
-                self.defaults.my_name in message_text)
+        return self.full_config.master_call in message_text or any(
+            word in message_text.lower() for word in self.full_config.reaction_calls) or (
+                self.full_config.my_name in message_text)
 
     async def heed(self, message, author=None):
         """
@@ -118,9 +109,8 @@ class InteractorOpenAI:
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model if not model else model,
             messages=[this_message],
-
-            max_tokens=constants.OPENAI_MAX_TOKENS,
-            temperature=0.8
+            max_tokens=self.full_config.max_tokens,
+            temperature=self.full_config.temperature
         )
         response_message: ChatCompletionMessage = completion.choices[0].message
 
@@ -131,20 +121,23 @@ class InteractorOpenAI:
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param message: received message
         :param author: outer chat message author. can be more or less understood by chat gpt.
+        :param save_to_history: if to save
         :return: the text of OpenAI response
         """
         user_message = message
         self.reset_if_usercall(user_message)
-        plugins_result = await self._run_plugins_for_message(user_message)
-        if plugins_result is not None:
+        plugins_result, continue_execution = await self._run_plugins_for_message(user_message)
+        if plugins_result is not None and not continue_execution:
             # user_message = plugins_result
             return plugins_result
+        elif continue_execution:
+            user_message = plugins_result
 
         this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
 
         await self._aware_overflow()
 
-        prompt = [self.about_me] + list(self.messages) + [this_message]
+        prompt = [list(self.messages) + [this_message]]
 
         logging.debug(f"sending {prompt}")
 
@@ -165,6 +158,23 @@ class InteractorOpenAI:
 
         return response_message.content
 
+    def reset_if_usercall(self, message):
+        if self.reset_call in message:
+            self._reset()
+
+    def _reset(self):
+        # never gets full
+        self.messages = deque(maxlen=self.max_messages)
+
+        wai = self.full_config.who_am_i.format(self.full_config.my_name)
+        self.about_me = dict(role=OpenAIRoles.system.value, content=wai)
+
+        self.messages.append(self.about_me)
+
+    async def needs_attention(self, message):
+        """checks if the reaction needed for the given messages"""
+        return self.should_react(message)
+
     async def _run_plugins_for_message(self, message_text):
         plugins_result = None
         for plugin in self.plugins:
@@ -174,18 +184,10 @@ class InteractorOpenAI:
                     if plugin.store_reply:
                         self.messages.append(dict(content=f"{message_text}", role=OpenAIRoles.user.value))
                         self.messages.append(dict(role=OpenAIRoles.assistant.value, content=plugin_result))
-                    return plugin_result
+                    return plugin_result, False
                 else:
                     plugins_result = plugin_result
-        return plugins_result
-
-    def reset_if_usercall(self, message):
-        if self.reset_call in message:
-            self._reset()
-
-    def _reset(self):
-        # never gets full
-        self.messages = deque(maxlen=self.max_messages)
+        return plugins_result, True
 
     async def _get_summary(self):
         """
@@ -195,17 +197,24 @@ class InteractorOpenAI:
         logging.info(f"getting summary for {len(self.messages)} messages")
         response: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
-            messages=[{"role": "system", "content": self.defaults['summary']}] + self.messages,
-            max_tokens=constants.OPENAI_MAX_TOKENS,
-            temperature=0.8,
+            messages=[{"role": "system", "content": self.full_config.summarize_request}] + self.messages,
+            max_tokens=self.full_config.max_tokens,
+            temperature=self.full_config.temperature,
         )
         response_text = response.choices[0].message.content.strip()
         logging.info(response_text)
         return response_text
 
-    async def needs_attention(self, message):
-        """checks if the reaction needed for the given messages"""
-        return self.should_react(message)
+    @property
+    def token_overflow(self):
+        """
+        if we exceeded max prompt tokens
+        :return:
+        """
+        total_word_count = sum(
+            len(obj["content"].split()) for obj in self.messages if
+            obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None)
+        return total_word_count > self.MAX_WORD_COUNT or len(self.messages) > self.max_messages
 
     async def _aware_overflow(self):
         """
@@ -214,7 +223,11 @@ class InteractorOpenAI:
         """
         if not self.summarize:
             while self.token_overflow:
-                self.messages.popleft()
+                system_message = self.messages.popleft()
+                for i in range(int(len(self.messages) / 3)):
+                    self.messages.popleft()
+                self.messages.appendleft(system_message)
+
         else:
             # summarizing previous discussion if needed
             if self.token_overflow:

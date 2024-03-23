@@ -16,7 +16,7 @@ class KiberniktoPlugin(ABC):
 
     @staticmethod
     @abstractmethod
-    def is_enabled():
+    def applicable():
         return False
 
     def __init__(self, model: str, base_url: str, api_key: str,

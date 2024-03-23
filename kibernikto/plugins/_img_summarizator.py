@@ -16,7 +16,7 @@ _DEFAULT_TEXT = "What is displayed in the image?"
 
 class ImagePluginSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='IMAGE_SUMMARIZATION_')
-    OPENAI_API_MODEL: str = "anthropic/claude-instant-v1"
+    OPENAI_API_MODEL: str = "vis-anthropic/claude-3-sonnet"
     OPENAI_BASE_URL: HttpUrl = "https://api.vsegpt.ru:6070/v1"
     OPENAI_API_KEY: str | None = None
     OPENAI_TEMPERATURE: float = 0.7
@@ -30,7 +30,7 @@ class ImageSummaryPlugin(KiberniktoPlugin):
     """
 
     @staticmethod
-    def is_enabled():
+    def applicable():
         return ImagePluginSettings.OPENAI_API_KEY is not None
 
     def __init__(self):

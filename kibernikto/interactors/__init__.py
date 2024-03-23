@@ -1,1 +1,1 @@
-from .interactor_openai import OpenAIRoles, InteractorOpenAI, BaseTextConfig
+from .openai_executor import OpenAIRoles, OpenAIExecutor, OpenAiExecutorConfig

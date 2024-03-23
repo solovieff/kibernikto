@@ -6,7 +6,7 @@ from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from kibernikto import constants
-from kibernikto.interactors import BaseTextConfig, InteractorOpenAI
+from kibernikto.interactors import BaseTextConfig, OpenAIExecutor
 from kibernikto.bots.cybernoone.prompt_preqs import MAIN_VERBAGE
 import openai
 
@@ -14,7 +14,7 @@ from kibernikto.plugins import KiberniktoPluginException
 from kibernikto.utils.text import remove_text_in_brackets_and_parentheses
 
 
-class Vertihvostka(InteractorOpenAI):
+class Vertihvostka(OpenAIExecutor):
 
     def __init__(self, max_messages=10, master_id=None, name="Вертихвостка", username="vertihvostka_bot",
                  who_am_i=MAIN_VERBAGE['who_am_i'],

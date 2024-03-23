@@ -32,7 +32,7 @@ class WeblinkSummaryPlugin(KiberniktoPlugin):
     """
 
     @staticmethod
-    def is_enabled():
+    def applicable():
         return WeblinkPluginSettings.OPENAI_API_KEY is not None
 
     def __init__(self, model: str, base_url: str, api_key: str, summarization_request: str):
