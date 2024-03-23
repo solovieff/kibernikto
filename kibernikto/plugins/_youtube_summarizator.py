@@ -5,6 +5,8 @@ import openai
 import requests as requests
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
+from pydantic import HttpUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pytube import YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, CouldNotRetrieveTranscript, TranscriptList
 
@@ -15,15 +17,37 @@ from ._weblink_summarizator import _extract_link
 
 YOUTUBE_VIDEO_PRE_URL = "https://www.youtube.com/watch?v="
 
+_DEFAULT_TEXT = "You will be provided with a video transcript. Summarize it and try to give 13 main points.\n {info_text}. \n{text}\n"
+
+
+class YoutubePluginSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix='SUMMARIZATION_')
+
+    OPENAI_API_MODEL: str = "anthropic/claude-instant-v1"
+    OPENAI_BASE_URL: HttpUrl = "https://api.vsegpt.ru:6070/v1"
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MAX_TOKENS: int = 800
+    VIDEO_MESSAGE: str = _DEFAULT_TEXT
+
 
 class YoutubePlugin(KiberniktoPlugin):
+
+    @staticmethod
+    def is_enabled():
+        return YoutubePluginSettings.OPENAI_API_KEY is not None
+
     """
     This plugin is used to get video transcript and then get text summary from it.
     """
 
-    def __init__(self, model: str, base_url: str, api_key: str, summarization_request: str):
-        super().__init__(model=model, base_url=base_url, api_key=api_key, post_process_reply=False, store_reply=True,
-                         base_message=summarization_request)
+    def __init__(selr):
+        if YoutubePluginSettings.OPENAI_API_KEY:
+            super().__init__(model=YoutubePluginSettings.OPENAI_API_MODEL,
+                             base_url=YoutubePluginSettings.OPENAI_BASE_URL,
+                             api_key=YoutubePluginSettings.OPENAI_API_KEY, post_process_reply=False, store_reply=True,
+                             base_message=YoutubePluginSettings.VIDEO_MESSAGE)
+        else:
+            raise EnvironmentError("No SUMMARIZATION_OPENAI_API_KEY provided!")
 
     async def run_for_message(self, message: str):
         try:
@@ -61,7 +85,7 @@ class YoutubePlugin(KiberniktoPlugin):
 
         completion: ChatCompletion = await self.client_async.chat.completions.create(model=self.model,
                                                                                      messages=[message],
-                                                                                     max_tokens=OPENAI_MAX_TOKENS,
+                                                                                     max_tokens=YoutubePluginSettings.OPENAI_MAX_TOKENS,
                                                                                      temperature=0.8,
                                                                                      )
         response_text = completion.choices[0].message.content.strip()

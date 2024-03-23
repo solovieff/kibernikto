@@ -6,9 +6,22 @@ from urllib.parse import urlparse
 from openai import PermissionDeniedError
 from openai.types.chat import ChatCompletion
 from pydantic import HttpUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from kibernikto.constants import OPENAI_MAX_TOKENS, OPENAI_TEMPERATURE
 from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
+
+_DEFAULT_TEXT = "What is displayed in the image?"
+
+
+class ImagePluginSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix='IMAGE_SUMMARIZATION_')
+    OPENAI_API_MODEL: str = "anthropic/claude-instant-v1"
+    OPENAI_BASE_URL: HttpUrl = "https://api.vsegpt.ru:6070/v1"
+    OPENAI_API_KEY: str | None = None
+    OPENAI_TEMPERATURE: float = 0.7
+    OPENAI_MAX_TOKENS: int = 800
+    MESSAGE: str = _DEFAULT_TEXT
 
 
 class ImageSummaryPlugin(KiberniktoPlugin):
@@ -16,9 +29,14 @@ class ImageSummaryPlugin(KiberniktoPlugin):
     This plugin is used to get information about the given image.
     """
 
-    def __init__(self, model: str, base_url: str, api_key: str, summarization_request: str):
-        super().__init__(model=model, base_url=base_url, api_key=api_key, post_process_reply=False, store_reply=True,
-                         base_message=summarization_request)
+    @staticmethod
+    def is_enabled():
+        return ImagePluginSettings.OPENAI_API_KEY is not None
+
+    def __init__(self):
+        super().__init__(model=ImagePluginSettings.OPENAI_API_MODEL, base_url=ImagePluginSettings.OPENAI_BASE_URL,
+                         api_key=ImagePluginSettings.OPENAI_API_KEY, post_process_reply=False, store_reply=True,
+                         base_message=ImagePluginSettings.MESSAGE)
 
     async def run_for_message(self, message: str):
         try:
@@ -58,7 +76,7 @@ class ImageSummaryPlugin(KiberniktoPlugin):
 
         completion: ChatCompletion = await self.client_async.chat.completions.create(model=self.model,
                                                                                      messages=[message],
-                                                                                     max_tokens=OPENAI_MAX_TOKENS,
+                                                                                     max_tokens=ImagePluginSettings.OPENAI_MAX_TOKENS,
                                                                                      temperature=OPENAI_TEMPERATURE)
         response_text = completion.choices[0].message.content.strip()
         logging.info(response_text)

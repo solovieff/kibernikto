@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractstaticmethod
 
 from openai import AsyncOpenAI
 
@@ -13,6 +13,11 @@ class KiberniktoPlugin(ABC):
     """
     Plugins get message as input and return processed message as output or None.
     """
+
+    @staticmethod
+    @abstractmethod
+    def is_enabled():
+        return False
 
     def __init__(self, model: str, base_url: str, api_key: str,
                  base_message: str, post_process_reply=False,

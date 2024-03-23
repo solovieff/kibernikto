@@ -1,22 +1,50 @@
 import logging
 import re
 
+from pydantic import HttpUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from kibernikto.plugins._img_summarizator import _is_image
 from openai.types.chat import ChatCompletion
 
-from kibernikto.constants import OPENAI_MAX_TOKENS
 from kibernikto.utils.text import get_website_as_text, get_website_html
 from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
+
+_DEFAULT_TEXT = """Above is the web page in text form. Try to ignore the site section titles and additional links that don't carry information. \n"
+"Try to emphasize the main point from the content.\n"
+"If you think there are multiple articles or blog posts on the site -- provide a sammary for each.\n"
+"{text}\n"""
+
+
+class WeblinkPluginSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix='SUMMARIZATION_')
+    OPENAI_API_MODEL: str = "anthropic/claude-instant-v1"
+    OPENAI_BASE_URL: HttpUrl = "https://api.vsegpt.ru:6070/v1"
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MAX_TOKENS: int = 800
+    WEBLINK_MESSAGE: str = _DEFAULT_TEXT
 
 
 class WeblinkSummaryPlugin(KiberniktoPlugin):
     """
-    This plugin is used to get video transcript and then get text summary from it.
+    This plugin is used to get weblink transcript and then get text summary from it.
+    It uses toolsyep to get text repr of the website
     """
 
+    @staticmethod
+    def is_enabled():
+        return WeblinkPluginSettings.OPENAI_API_KEY is not None
+
     def __init__(self, model: str, base_url: str, api_key: str, summarization_request: str):
-        super().__init__(model=model, base_url=base_url, api_key=api_key, post_process_reply=False, store_reply=True,
-                         base_message=summarization_request)
+        if WeblinkPluginSettings.OPENAI_API_KEY:
+            super().__init__(model=WeblinkPluginSettings.OPENAI_API_MODEL,
+                             base_url=WeblinkPluginSettings.OPENAI_BASE_URL,
+                             api_key=WeblinkPluginSettings.OPENAI_API_KEY,
+                             base_message=WeblinkPluginSettings.WEBLINK_MESSAGE,
+                             post_process_reply=False, store_reply=True,
+                             )
+        else:
+            raise EnvironmentError("No SUMMARIZATION_OPENAI_API_KEY provided!")
 
     async def run_for_message(self, message: str):
         try:
@@ -58,7 +86,7 @@ class WeblinkSummaryPlugin(KiberniktoPlugin):
 
         completion: ChatCompletion = await self.client_async.chat.completions.create(model=self.model,
                                                                                      messages=[message],
-                                                                                     max_tokens=OPENAI_MAX_TOKENS,
+                                                                                     max_tokens=WeblinkPluginSettings.OPENAI_MAX_TOKENS,
                                                                                      temperature=0.8,
                                                                                      )
         response_text = completion.choices[0].message.content.strip()
