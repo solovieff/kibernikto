@@ -1,3 +1,6 @@
+import logging
+
+from openai import PermissionDeniedError
 from openai._types import NOT_GIVEN
 
 from kibernikto.telegram.telegram_bot import TelegramBot
@@ -8,6 +11,9 @@ from kibernikto.plugins import KiberniktoPluginException
 
 
 class Kibernikto(TelegramBot):
+    """
+    Basic implementation of Telegram bot can be used as an example.
+    """
 
     def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig):
         """
@@ -22,6 +28,9 @@ class Kibernikto(TelegramBot):
             return await super().heed_and_reply(message, author, save_to_history=save_to_history)
         except KiberniktoPluginException as e:
             return f" {e.plugin_name} не сработал!\n\n {str(e)}"
+        except PermissionDeniedError as pde:
+            logging.warning(f"Что-то грубое и недопустимое! {str(pde)}")
+            return "Что-то грубое и недопустимое в ваших словах!"
         except Exception as e:
             return f"Я не справился! Горе мне! {str(e)}"
 

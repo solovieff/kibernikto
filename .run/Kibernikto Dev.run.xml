@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run kibernikto Dev" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="Kibernikto Dev" type="PythonConfigurationType" factoryName="Python">
     <module name="kibernikto" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />

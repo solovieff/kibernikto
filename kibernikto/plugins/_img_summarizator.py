@@ -7,7 +7,6 @@ from openai import PermissionDeniedError
 from openai.types.chat import ChatCompletion
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from kibernikto.constants import OPENAI_MAX_TOKENS, OPENAI_TEMPERATURE
 from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
 
 _DEFAULT_TEXT = "What is displayed in the image?"
@@ -46,9 +45,9 @@ class ImageSummaryPlugin(KiberniktoPlugin):
             result = await self._run(message)
             return result
         except PermissionDeniedError as pde:
-            logging.error(f'PermissionDeniedError while getting image description from {message}', )
+            logging.error(f'PermissionDeniedError while getting image description from {message}: {pde}', )
             raise KiberniktoPluginException(plugin_name=self.__class__.__name__,
-                                            error_message=str("image processing not allowed!"))
+                                            error_message=str("Failed to process the image! I am terribly sorry :("))
         except Exception as error:
             logging.error(f'failed to get image description from {message}: {str(error)}', )
             raise KiberniktoPluginException(plugin_name=self.__class__.__name__, error_message=str(error))
@@ -80,7 +79,7 @@ class ImageSummaryPlugin(KiberniktoPlugin):
         completion: ChatCompletion = await self.client_async.chat.completions.create(model=self.model,
                                                                                      messages=[message],
                                                                                      max_tokens=DEFAULT_SETTINGS.OPENAI_MAX_TOKENS,
-                                                                                     temperature=OPENAI_TEMPERATURE)
+                                                                                     temperature=DEFAULT_SETTINGS.OPENAI_TEMPERATURE)
         response_text = completion.choices[0].message.content.strip()
         logging.info(response_text)
         return response_text

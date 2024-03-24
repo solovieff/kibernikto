@@ -1,1 +1,1 @@
-from . import _cybernoone as listener
+from ._cybernoone import Kibernikto

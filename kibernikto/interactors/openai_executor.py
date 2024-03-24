@@ -1,6 +1,5 @@
 import logging
 from collections import deque
-from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
@@ -10,8 +9,7 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS
-from kibernikto import constants
-from kibernikto.plugins import KiberniktoPlugin, KiberniktoPluginException
+from kibernikto.plugins import KiberniktoPlugin
 
 
 class OpenAiExecutorConfig(BaseModel):
@@ -148,8 +146,8 @@ class OpenAIExecutor:
         completion: ChatCompletion = await client.chat.completions.create(
             model=self.model,
             messages=prompt,
-            max_tokens=constants.OPENAI_MAX_TOKENS,
-            temperature=constants.OPENAI_TEMPERATURE,
+            max_tokens=AI_SETTINGS.OPENAI_MAX_TOKENS,
+            temperature=AI_SETTINGS.OPENAI_TEMPERATURE,
             user=author
         )
         response_message: ChatCompletionMessage = completion.choices[0].message

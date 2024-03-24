@@ -1,13 +1,11 @@
 import logging
 import re
 
-import requests as requests
 from openai.types.chat import ChatCompletion
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pytube import YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, CouldNotRetrieveTranscript, TranscriptList
 
-from kibernikto.utils.text import split_text
 from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
 from ._weblink_summarizator import _extract_link
 
@@ -25,7 +23,9 @@ class YoutubePluginSettings(BaseSettings):
     OPENAI_MAX_TOKENS: int = 800
     VIDEO_MESSAGE: str = _DEFAULT_TEXT
 
+
 DEFAULT_SETTINGS = YoutubePluginSettings()
+
 
 class YoutubePlugin(KiberniktoPlugin):
     index = 0
@@ -111,41 +111,6 @@ def _eyesore(string_to_check):
             return True
     return False
 
-
-def _get_sber_text_summary(text):
-    NORMAL_LEN = 15000
-
-    """
-    returns text summary using api.aicloud.sbercloud.ru
-    will break at any moment
-    :param text:
-    :return:
-    """
-    if len(text) > NORMAL_LEN:
-        summary = ""
-        pieces = split_text(text, NORMAL_LEN)
-        for p in pieces:
-            part_sum = _get_sber_text_summary(p)
-            summary += f"\n\n{part_sum}"
-        return summary
-
-    r = requests.post('https://api.aicloud.sbercloud.ru/public/v2/summarizator/predict', json={
-        "instances": [
-            {
-                "text": text,
-                "num_beams": 5,
-                "num_return_sequences": 3,
-                "length_penalty": 0.5
-            }
-        ]
-    })
-    logging.debug(f"Status code: {r.status_code}")
-    json_result = r.json()
-    if 'prediction_best' in json_result:
-        return f"{json_result['prediction_best']['bertscore']}"
-    else:
-        logging.error(f"can not get summary :(, {json_result['comment']}")
-        return None
 
 
 def _is_youtube_url(url):

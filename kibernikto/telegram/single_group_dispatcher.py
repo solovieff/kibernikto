@@ -10,13 +10,13 @@ from aiogram import Bot, Dispatcher, types, enums, F
 from aiogram.types import User
 from pydantic_settings import BaseSettings
 
-from telegram.telegram_bot import TelegramBot
+from .telegram_bot import TelegramBot
 from kibernikto.interactors import OpenAiExecutorConfig
 
-from kibernikto import constants
 from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
 from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils.image import publish_image_file
+from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 
 
 class TelegramSettings(BaseSettings):
@@ -24,7 +24,7 @@ class TelegramSettings(BaseSettings):
     TG_MASTER_ID: int
     TG_FRIEND_GROUP_ID: int
     TG_MAX_MESSAGE_LENGTH: int = 4096
-    TG_CHUNK_SENTENCES: int = 5
+    TG_CHUNK_SENTENCES: int = 7
     TG_REACTION_CALLS: List[str] = ['honda', 'киберникто']
     TG_SAY_HI: bool = False
     TG_STICKER_LIST: List[str] = ()
@@ -123,7 +123,7 @@ async def private_message(message: types.Message):
     if not PRIVATE_BOT.check_master(message.from_user.id, message.md_text):
         reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не мой Господин " \
                      f"Создатель снизошёл до меня). Я передам ваше соообщение мастеру."
-        await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_ID, f"{message.from_user.id}: {message.md_text}")
+        await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_ID, f"{message.from_user.username}: {message.md_text}")
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await _get_message_text(message)
@@ -145,7 +145,7 @@ async def group_message(message: types.Message):
         # not using author not to send usernames to openai :)
         reply_text = await FRIEND_GROUP_BOT.heed_and_reply(user_text)  # author=message.from_user.full_name
         await asyncio.sleep(random.uniform(0, 2))
-        chunks = split_text_into_chunks_by_sentences(reply_text, sentences_per_chunk=constants.TG_CHUNK_SENTENCES)
+        chunks = split_text_into_chunks_by_sentences(reply_text, sentences_per_chunk=TELEGRAM_SETTINGS.TG_CHUNK_SENTENCES)
         for chunk in chunks:
             await tg_bot.send_chat_action(message.chat.id, 'typing')
             await asyncio.sleep(random.uniform(0.5, 3))
@@ -168,6 +168,7 @@ def _apply_plugins(bots: List[TelegramBot]):
     def apply_plugin(plugin):
         for bot in bots:
             bot.plugins.append(plugin)
+        print_plugin_banner(plugin)
 
     plugin_classes = KiberniktoPlugin.__subclasses__()
     plugin_classes.sort(key=lambda x: x.index)
@@ -181,6 +182,8 @@ def _apply_plugins(bots: List[TelegramBot]):
                 logging.error(str(plugin_error))
                 traceback.print_exc(file=sys.stdout)
                 logging.error("PLUGINS WERE NOT LOADED!")
+        else:
+            print_plugin_off(plugin_class)
 
 
 async def _get_message_text(message: types.Message):

@@ -3,11 +3,9 @@ import typing
 import re
 
 from aiogram.client.session import aiohttp
-from kibernikto import constants
-from pydantic import HttpUrl
 
 
-def split_text(text: str, length: int = constants.TG_MAX_MESSAGE_LENGTH) -> typing.List[str]:
+def split_text(text: str, length: int = 4096) -> typing.List[str]:
     """
     Split long text
 
@@ -59,13 +57,13 @@ def split_text_into_chunks_by_sentences(text, sentences_per_chunk=2):
         # Check if the current chunk has the required number of sentences
         if sentences_count == sentences_per_chunk:
             # Join the sentences to form a chunk and add it to the chunks list
-            chunks.append('. '.join(current_chunk) + '.')
+            chunks.append('. '.join(current_chunk))
             current_chunk = []
             sentences_count = 0
 
     # Check for any remaining sentences that didn't form a complete chunk
     if current_chunk:
-        chunks.append('. '.join(current_chunk) + '.')
+        chunks.append('. '.join(current_chunk))
 
     return chunks
 

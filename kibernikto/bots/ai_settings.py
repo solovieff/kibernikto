@@ -18,4 +18,5 @@ class AiSettings(BaseSettings):
     Give a short summary of the previous conversation in russian from the point of view of a pirate.
     """
 
+
 AI_SETTINGS = AiSettings()
