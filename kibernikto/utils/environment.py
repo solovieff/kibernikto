@@ -17,7 +17,7 @@ def print_banner():
         print('\t%-15s%-15s' % ("redact model:", REDACTOR_SETTINGS.OPENAI_API_MODEL))
         print('\t%-15s%-15s' % ("redact host:", REDACTOR_SETTINGS.OPENAI_BASE_URL))
     else:
-        print('\t%-15s%-15s' % ("redactor mode:", 'disabled'))
+        print('\t%-15s%-15s' % ("redactor:", 'disabled'))
 
     from kibernikto.telegram.single_group_dispatcher import TELEGRAM_SETTINGS
     print("\t")
