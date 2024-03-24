@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-
 from openai import AsyncOpenAI
 
 
@@ -11,8 +10,13 @@ class KiberniktoPluginException(Exception):
 
 class KiberniktoPlugin(ABC):
     """
-    Plugins get message as input and return processed message as output or None.
+    Plugins gets message as input and returns processed message as output or None.
     """
+
+    @staticmethod
+    @abstractmethod
+    def applicable():
+        return False
 
     def __init__(self, model: str, base_url: str, api_key: str,
                  base_message: str, post_process_reply=False,
@@ -23,7 +27,7 @@ class KiberniktoPlugin(ABC):
         :param base_url:
         :param api_key:
         :param base_message:
-        :param post_process_reply: if plugin reply should be used as input for further actions (i.e. other plugins)
+        :param post_process_reply: if plugin reply should be used as input for further actions (i.e. other plugins or final ai message)
         :param store_reply: if the result should be stored in the messages storage at bot level
         """
         self.post_process_reply = post_process_reply
@@ -31,6 +35,7 @@ class KiberniktoPlugin(ABC):
 
         self.model = model
         self.base_message = base_message
+        self.base_url = base_url
         self.client_async = AsyncOpenAI(base_url=base_url, api_key=api_key)
 
     @abstractmethod

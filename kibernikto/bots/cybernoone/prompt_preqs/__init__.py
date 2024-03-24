@@ -1,1 +1,0 @@
-from ._verbage import MAIN_VERBAGE

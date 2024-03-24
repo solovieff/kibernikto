@@ -3,42 +3,36 @@ import logging
 
 from openai import AsyncOpenAI, PermissionDeniedError
 from openai._types import NOT_GIVEN
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat import ChatCompletion
 
-from kibernikto import constants
-from kibernikto.interactors import BaseTextConfig, InteractorOpenAI
-from kibernikto.bots.cybernoone.prompt_preqs import MAIN_VERBAGE
-import openai
-
+from kibernikto.interactors import OpenAiExecutorConfig
 from kibernikto.plugins import KiberniktoPluginException
+from kibernikto.telegram.telegram_bot import TelegramBot
 from kibernikto.utils.text import remove_text_in_brackets_and_parentheses
+from kibernikto.utils.environment import feature_not_configured
+from ..redactor_settings import REDACTOR_SETTINGS
 
 
-class Vertihvostka(InteractorOpenAI):
+class Vertihvostka(TelegramBot):
+    """
+    Can post-process ai replies using another model conf.
+    Useful for adding style/mood or chaning the output text.
+    """
 
-    def __init__(self, max_messages=10, master_id=None, name="Вертихвостка", username="vertihvostka_bot",
-                 who_am_i=MAIN_VERBAGE['who_am_i'],
-                 reaction_calls=['verti', 'привет', 'хонда']):
+    def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig):
         """
-
-        :param max_messages: message history length
-        :param master_id: telegram id of the master user
-        :param name: current bot name
-        :param who_am_i: default avatar prompt
-        :param reaction_calls: words that trigger a reaction
+        :param master_id: telegram admin id
+        :param username: telegram username
+        :param config: ai bot config
         """
-        pp = BaseTextConfig(who_am_i=who_am_i,
-                            reaction_calls=reaction_calls, my_name=name)
-        self.master_id = master_id
-        self.name = name
-        self.username = username
-        super().__init__(model=constants.OPENAI_API_MODEL, max_messages=max_messages, default_config=pp)
-
-        if constants.REDACTOR_OPENAI_API_KEY:
-            self.redact_client = self.client = AsyncOpenAI(base_url=constants.REDACTOR_OPENAI_BASE_URL,
-                                                           api_key=constants.REDACTOR_OPENAI_API_KEY)
+        if REDACTOR_SETTINGS.OPENAI_API_KEY is not None:
+            self.redact_client = AsyncOpenAI(base_url=REDACTOR_SETTINGS.OPENAI_BASE_URL,
+                                             api_key=REDACTOR_SETTINGS.OPENAI_API_KEY)
         else:
+            feature_not_configured("redactor_ai")
             self.redact_client = None
+
+        super().__init__(config=config, username=username, master_id=master_id)
 
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         try:
@@ -46,21 +40,29 @@ class Vertihvostka(InteractorOpenAI):
                 reply = await super().heed_and_reply(message, author, save_to_history=save_to_history)
                 logging.info(reply)
             except PermissionDeniedError as pde:
-                print(f"Я не знаю что сказать! {str(pde)}")
+                logging.warning(f"Что-то грубое и недопустимое! {str(pde)}")
                 await asyncio.sleep(1)
                 reply = None
 
+            if not self.redact_client:
+                if reply is None:
+                    return "Что-то грубое и недопустимое в ваших словах!"
+                else:
+                    return reply
+
             if self.redact_client:
                 if not reply:
+                    logging.warning("sending the message right to redactor")
                     reply = await self.redact_message(message, pure=True)
                 else:
                     reply = await self.redact_message(reply)
                 logging.info(reply)
+            # this should be processed better for sure
             return reply
         except KiberniktoPluginException as e:
-            return f" {e.plugin_name} не сработала!\n\n {str(e)}"
+            return f" {e.plugin_name} поломался!\n\n {str(e)}"
         except Exception as e:
-            print(f"Я не знаю что сказать! {str(e)}")
+            logging.error(f"Я не знаю что сказать! {str(e)}")
             return f"Я не знаю что сказать! Похоже я сломался!"
 
     def check_master(self, user_id, message):
@@ -75,19 +77,23 @@ class Vertihvostka(InteractorOpenAI):
     async def redact_message(self, message, pure=False):
         if not pure:
             user_message = dict(
-                content=constants.REDACTOR_OPENAI_MESSAGE.format(message=message),
+                content=REDACTOR_SETTINGS.MESSAGE.format(message=message),
                 role="user")
         else:
             user_message = dict(
                 content=message,
                 role="user")
-        system_message = dict(content=f"{constants.REDACTOR_OPENAI_WHO_AM_I}", role="system")
+        if REDACTOR_SETTINGS.OPENAI_WHO_AM_I:
+            system_message = dict(content=f"{REDACTOR_SETTINGS.OPENAI_WHO_AM_I}", role="system")
+            red_prompt = [system_message, user_message]
+        else:
+            red_prompt = [user_message]
 
         completion: ChatCompletion = await self.redact_client.chat.completions.create(
-            model=constants.REDACTOR_OPENAI_API_MODEL,
-            messages=[system_message, user_message],
-            max_tokens=constants.OPENAI_MAX_TOKENS + 100,
-            temperature=constants.OPENAI_TEMPERATURE
+            model=REDACTOR_SETTINGS.OPENAI_API_MODEL,
+            messages=red_prompt,
+            max_tokens=REDACTOR_SETTINGS.OPENAI_MAX_TOKENS,
+            temperature=self.full_config.temperature + 0.3
         )
         redacted_result = completion.choices[0].message.content
         return remove_text_in_brackets_and_parentheses(redacted_result)
