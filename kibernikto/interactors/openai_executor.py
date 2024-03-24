@@ -9,24 +9,27 @@ from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from pydantic import BaseModel
 
-from kibernikto.bots import AiSettings
+from kibernikto.bots.ai_settings import AI_SETTINGS
 from kibernikto import constants
 from kibernikto.plugins import KiberniktoPlugin, KiberniktoPluginException
 
 
 class OpenAiExecutorConfig(BaseModel):
     name: str = "Киберникто"
-    model: str = AiSettings.OPENAI_API_MODEL
-    url: str = AiSettings.OPENAI_BASE_URL
-    key: str = AiSettings.OPENAI_API_KEY
-    temperature: float = AiSettings.OPENAI_TEMPERATURE
-    max_tokens: int = AiSettings.OPENAI_MAX_TOKENS
-    max_messages: int = AiSettings.OPENAI_MAX_MESSAGES
-    who_am_i: str = AiSettings.OPENAI_WHO_AM_I
-    reset_call: str = AiSettings.OPENAI_RESET_CALL
+    model: str = AI_SETTINGS.OPENAI_API_MODEL
+    url: str = AI_SETTINGS.OPENAI_BASE_URL
+    key: str = AI_SETTINGS.OPENAI_API_KEY
+    temperature: float = AI_SETTINGS.OPENAI_TEMPERATURE
+    max_tokens: int = AI_SETTINGS.OPENAI_MAX_TOKENS
+    max_messages: int = AI_SETTINGS.OPENAI_MAX_MESSAGES
+    who_am_i: str = AI_SETTINGS.OPENAI_WHO_AM_I
+    reset_call: str = AI_SETTINGS.OPENAI_RESET_CALL
     master_call: str = "Величайший Кибеникто!"
-    summarize_request: str | None = AiSettings.OPENAI_SUMMARY
+    summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     reaction_calls: list = ('никто', 'хонда', 'урод')
+
+
+DEFAULT_CONFIG = OpenAiExecutorConfig()
 
 
 class OpenAIRoles(str, Enum):
@@ -45,7 +48,7 @@ class OpenAIExecutor:
 
     def __init__(self,
                  bored_after=0,
-                 config=OpenAiExecutorConfig()):
+                 config=DEFAULT_CONFIG):
         self.max_messages = config.max_messages
         self.bored_after = bored_after
         self.master_call = config.master_call
@@ -63,7 +66,6 @@ class OpenAIExecutor:
             self.max_messages = 2  # hahaha
 
         # default configuration. TODO: rework
-        wai = config.who_am_i.format(config.my_name)
         self._reset()
 
     @property
@@ -84,7 +86,7 @@ class OpenAIExecutor:
         """
         return self.full_config.master_call in message_text or any(
             word in message_text.lower() for word in self.full_config.reaction_calls) or (
-                self.full_config.my_name in message_text)
+                self.full_config.name in message_text)
 
     async def heed(self, message, author=None):
         """
@@ -127,17 +129,17 @@ class OpenAIExecutor:
         user_message = message
         self.reset_if_usercall(user_message)
         plugins_result, continue_execution = await self._run_plugins_for_message(user_message)
-        if plugins_result is not None and not continue_execution:
-            # user_message = plugins_result
-            return plugins_result
-        elif continue_execution:
-            user_message = plugins_result
+        if plugins_result is not None:
+            if continue_execution is True:
+                user_message = plugins_result
+            else:
+                return plugins_result
 
         this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
 
         await self._aware_overflow()
 
-        prompt = [list(self.messages) + [this_message]]
+        prompt = list(self.messages) + [this_message]
 
         logging.debug(f"sending {prompt}")
 
@@ -166,7 +168,7 @@ class OpenAIExecutor:
         # never gets full
         self.messages = deque(maxlen=self.max_messages)
 
-        wai = self.full_config.who_am_i.format(self.full_config.my_name)
+        wai = self.full_config.who_am_i.format(self.full_config.name)
         self.about_me = dict(role=OpenAIRoles.system.value, content=wai)
 
         self.messages.append(self.about_me)

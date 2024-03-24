@@ -4,7 +4,8 @@ from kibernikto.bots.redactor_settings import RedactorSetting
 from kibernikto.bots.cybernoone import listener
 from kibernikto.bots.vertihvostka import Vertihvostka
 
-from kibernikto.bots import AiSettings
+from kibernikto.bots.ai_settings import AI_SETTINGS
+from kibernikto.bots.redactor_settings import REDACTOR_SETTINGS
 
 logging.basicConfig(
     format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
@@ -29,14 +30,14 @@ if __name__ == '__main__':
     from kibernikto.telegram import single_group_dispatcher
 
     print("\t")
-    print('\t%-15s%-15s' % ("avatar model:", AiSettings.OPENAI_API_MODEL))
-    print('\t%-15s%-15s' % ("avatar host:", AiSettings.OPENAI_BASE_URL))
-    print('\t%-15s%-15s' % ("avatar temp:", AiSettings.OPENAI_TEMPERATURE))
+    print('\t%-15s%-15s' % ("avatar model:", AI_SETTINGS.OPENAI_API_MODEL))
+    print('\t%-15s%-15s' % ("avatar host:", AI_SETTINGS.OPENAI_BASE_URL))
+    print('\t%-15s%-15s' % ("avatar temp:", AI_SETTINGS.OPENAI_TEMPERATURE))
 
-    if RedactorSetting.OPENAI_API_KEY:
+    if REDACTOR_SETTINGS.OPENAI_API_KEY is not None:
         print("\t")
-        print('\t%-15s%-15s' % ("redact model:", RedactorSetting.OPENAI_API_MODEL))
-        print('\t%-15s%-15s' % ("redact host:", constants.OPENAI_BASE_URL))
+        print('\t%-15s%-15s' % ("redact model:", REDACTOR_SETTINGS.OPENAI_API_MODEL))
+        print('\t%-15s%-15s' % ("redact host:", REDACTOR_SETTINGS.OPENAI_BASE_URL))
     else:
         print('\t%-15s%-15s' % ("redactor mode:", 'disabled'))
 

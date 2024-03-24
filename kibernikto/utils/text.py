@@ -70,14 +70,14 @@ def split_text_into_chunks_by_sentences(text, sentences_per_chunk=2):
     return chunks
 
 
-async def get_website_html(url: HttpUrl):
+async def get_website_html(url: str):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             html = await response.text(encoding=response.charset)
     return html
 
 
-async def get_website_as_text(url: HttpUrl):
+async def get_website_as_text(url: str):
     to_reader_url = "https://toolsyep.com/en/webpage-to-plain-text/"
     async with aiohttp.ClientSession() as session:
         async with session.get(to_reader_url, params={

@@ -6,9 +6,7 @@ from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 
 from kibernikto import constants
-from kibernikto.interactors import BaseTextConfig, OpenAIExecutor
-from kibernikto.bots.cybernoone.prompt_preqs import MAIN_VERBAGE
-import openai
+from kibernikto.interactors import OpenAIExecutor
 
 from kibernikto.plugins import KiberniktoPluginException
 from kibernikto.utils.text import remove_text_in_brackets_and_parentheses
@@ -17,7 +15,6 @@ from kibernikto.utils.text import remove_text_in_brackets_and_parentheses
 class Vertihvostka(OpenAIExecutor):
 
     def __init__(self, max_messages=10, master_id=None, name="Вертихвостка", username="vertihvostka_bot",
-                 who_am_i=MAIN_VERBAGE['who_am_i'],
                  reaction_calls=['verti', 'привет', 'хонда']):
         """
 
@@ -27,8 +24,6 @@ class Vertihvostka(OpenAIExecutor):
         :param who_am_i: default avatar prompt
         :param reaction_calls: words that trigger a reaction
         """
-        pp = BaseTextConfig(who_am_i=who_am_i,
-                            reaction_calls=reaction_calls, my_name=name)
         self.master_id = master_id
         self.name = name
         self.username = username

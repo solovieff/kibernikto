@@ -1,4 +1,3 @@
-from pydantic import HttpUrl
 from pydantic_settings import BaseSettings
 
 _DEFAULT_TEXT = """
@@ -6,7 +5,7 @@ _DEFAULT_TEXT = """
 """
 
 
-class AiSetting(BaseSettings):
+class AiSettings(BaseSettings):
     OPENAI_API_MODEL: str = "gpt-4"
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_API_KEY: str
@@ -18,3 +17,5 @@ class AiSetting(BaseSettings):
     OPENAI_SUMMARY: str = """
     Give a short summary of the previous conversation in russian from the point of view of a pirate.
     """
+
+AI_SETTINGS = AiSettings()

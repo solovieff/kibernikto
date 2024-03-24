@@ -1,16 +1,12 @@
 import logging
 import re
 
-import openai
 import requests as requests
-from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
-from pydantic import HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pytube import YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, CouldNotRetrieveTranscript, TranscriptList
 
-from kibernikto.constants import OPENAI_MAX_TOKENS
 from kibernikto.utils.text import split_text
 from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
 from ._weblink_summarizator import _extract_link
@@ -29,23 +25,25 @@ class YoutubePluginSettings(BaseSettings):
     OPENAI_MAX_TOKENS: int = 800
     VIDEO_MESSAGE: str = _DEFAULT_TEXT
 
+DEFAULT_SETTINGS = YoutubePluginSettings()
 
 class YoutubePlugin(KiberniktoPlugin):
+    index = 0
 
     @staticmethod
     def applicable():
-        return YoutubePluginSettings.OPENAI_API_KEY is not None
+        return DEFAULT_SETTINGS.OPENAI_API_KEY is not None
 
     """
     This plugin is used to get video transcript and then get text summary from it.
     """
 
     def __init__(self):
-        if YoutubePluginSettings.OPENAI_API_KEY:
-            super().__init__(model=YoutubePluginSettings.OPENAI_API_MODEL,
-                             base_url=YoutubePluginSettings.OPENAI_BASE_URL,
-                             api_key=YoutubePluginSettings.OPENAI_API_KEY, post_process_reply=False, store_reply=True,
-                             base_message=YoutubePluginSettings.VIDEO_MESSAGE)
+        if DEFAULT_SETTINGS.OPENAI_API_KEY:
+            super().__init__(model=DEFAULT_SETTINGS.OPENAI_API_MODEL,
+                             base_url=DEFAULT_SETTINGS.OPENAI_BASE_URL,
+                             api_key=DEFAULT_SETTINGS.OPENAI_API_KEY, post_process_reply=False, store_reply=True,
+                             base_message=DEFAULT_SETTINGS.VIDEO_MESSAGE)
         else:
             raise EnvironmentError("No SUMMARIZATION_OPENAI_API_KEY provided!")
 
@@ -85,7 +83,7 @@ class YoutubePlugin(KiberniktoPlugin):
 
         completion: ChatCompletion = await self.client_async.chat.completions.create(model=self.model,
                                                                                      messages=[message],
-                                                                                     max_tokens=YoutubePluginSettings.OPENAI_MAX_TOKENS,
+                                                                                     max_tokens=DEFAULT_SETTINGS.OPENAI_MAX_TOKENS,
                                                                                      temperature=0.8,
                                                                                      )
         response_text = completion.choices[0].message.content.strip()
@@ -157,7 +155,7 @@ def _is_youtube_url(url):
 
 
 def _get_video_from_text(text) -> YouTube:
-    any_link = _extract_link(text)
+    any_link, other_text = _extract_link(text)
     if any_link is None or not _is_youtube_url(any_link):
         return None
 
