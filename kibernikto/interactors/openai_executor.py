@@ -67,7 +67,7 @@ class OpenAIExecutor:
         self._reset()
 
     @property
-    def token_overflow(self):
+    def word_overflow(self):
         """
         if we exceeded max prompt tokens
         :return:
@@ -206,7 +206,7 @@ class OpenAIExecutor:
         return response_text
 
     @property
-    def token_overflow(self):
+    def word_overflow(self):
         """
         if we exceeded max word tokens
         :return:
@@ -222,15 +222,13 @@ class OpenAIExecutor:
         We use words not tokens here, so all numbers are very approximate
         """
         if not self.summarize:
-            while self.token_overflow:
-                system_message = self.messages.popleft()
+            while self.word_overflow:
                 for i in range(int(len(self.messages) / 3)):
                     self.messages.popleft()
-                self.messages.appendleft(system_message)
 
         else:
             # summarizing previous discussion if needed
-            if self.token_overflow:
+            if self.word_overflow:
                 summary_text = await self._get_summary()
                 summary = dict(role=OpenAIRoles.system.value, content=summary_text)
                 self._reset()
