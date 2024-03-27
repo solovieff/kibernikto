@@ -10,7 +10,7 @@ class AiSettings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_API_KEY: str
     OPENAI_MAX_TOKENS: int = 800
-    OPENAI_MAX_MESSAGES: int = 13
+    OPENAI_MAX_MESSAGES: int = 7
     OPENAI_TEMPERATURE: float = 0.7
     OPENAI_RESET_CALL: str = "Переосмысли себя"
     OPENAI_WHO_AM_I: str = _DEFAULT_TEXT

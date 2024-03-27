@@ -137,7 +137,7 @@ class OpenAIExecutor:
 
         await self._aware_overflow()
 
-        prompt = list(self.messages) + [this_message]
+        prompt = [self.about_me] + list(self.messages) + [this_message]
 
         logging.debug(f"sending {prompt}")
 
@@ -169,7 +169,7 @@ class OpenAIExecutor:
         wai = self.full_config.who_am_i.format(self.full_config.name)
         self.about_me = dict(role=OpenAIRoles.system.value, content=wai)
 
-        self.messages.append(self.about_me)
+        # self.messages.append(self.about_me)
 
     async def needs_attention(self, message):
         """checks if the reaction needed for the given messages"""
@@ -197,7 +197,7 @@ class OpenAIExecutor:
         logging.info(f"getting summary for {len(self.messages)} messages")
         response: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
-            messages=[{"role": "system", "content": self.full_config.summarize_request}] + self.messages,
+            messages=[{"role": "system", "content": self.full_config.summarize_request}] + list(self.messages),
             max_tokens=self.full_config.max_tokens,
             temperature=self.full_config.temperature,
         )
@@ -208,7 +208,7 @@ class OpenAIExecutor:
     @property
     def token_overflow(self):
         """
-        if we exceeded max prompt tokens
+        if we exceeded max word tokens
         :return:
         """
         total_word_count = sum(
