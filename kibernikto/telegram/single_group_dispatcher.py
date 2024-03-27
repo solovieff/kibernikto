@@ -11,6 +11,7 @@ from aiogram.types import User
 from pydantic_settings import BaseSettings
 
 from .telegram_bot import TelegramBot
+from ._message_preprocessors import get_message_text
 from kibernikto.interactors import OpenAiExecutorConfig
 
 from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
@@ -126,7 +127,7 @@ async def private_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_ID, f"{message.from_user.username}: {message.md_text}")
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await _get_message_text(message)
+        user_text = await get_message_text(message)
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await PRIVATE_BOT.heed_and_reply(message=user_text)
     chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
@@ -138,7 +139,7 @@ async def private_message(message: types.Message):
 async def group_message(message: types.Message):
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await _get_message_text(message)
+        user_text = await get_message_text(message)
         logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
 
         await tg_bot.send_chat_action(message.chat.id, 'typing')
@@ -186,18 +187,4 @@ def _apply_plugins(bots: List[TelegramBot]):
             print_plugin_off(plugin_class)
 
 
-async def _get_message_text(message: types.Message):
-    user_text = message.md_text
-    if message.content_type == enums.ContentType.PHOTO and message.photo:
-        photo = message.photo[-1]
-        file = await tg_bot.get_file(photo.file_id)
-        file_path = file.file_path
-        photo_file: BinaryIO = await tg_bot.download_file(file_path)
-        # file_path = photo_file.file_path
-        url = await publish_image_file(photo_file, photo.file_unique_id)
-        logging.info(f"published image: {url}")
 
-        user_text = f"{user_text} {url}"
-    elif message.content_type == enums.ContentType.TEXT and message.text:
-        return message.text
-    return user_text

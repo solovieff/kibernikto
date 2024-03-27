@@ -42,9 +42,9 @@ def start(outer_env=False):
 
         single_group_dispatcher.start(bot_class=bot_class)
     elif args.dispatcher == 'multiuser':
-        from kibernikto.telegram import single_group_dispatcher
+        from kibernikto.telegram import comprehensive_dispatcher
 
-        single_group_dispatcher.start(bot_class=bot_class)
+        comprehensive_dispatcher.start(bot_class=bot_class)
     else:
         raise RuntimeError("Wrong dispatcher!")
 
