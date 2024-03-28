@@ -3,7 +3,7 @@ import os
 import sys
 import traceback
 from random import choice
-from typing import List, BinaryIO
+from typing import List
 
 from aiogram import Bot, Dispatcher, types, enums, F
 from aiogram.filters import or_f
@@ -11,11 +11,10 @@ from aiogram.types import User
 from pydantic_settings import BaseSettings
 
 from kibernikto.interactors import OpenAiExecutorConfig
-from kibernikto.utils.image import publish_image_file
 from kibernikto.utils.text import split_text_by_sentences
 from ._executor_corral import init as init_ai_bot_corral, get_ai_executor, kill as kill_animals
-from .telegram_bot import TelegramBot
 from ._message_preprocessors import get_message_text
+from .telegram_bot import TelegramBot
 
 
 class TelegramSettings(BaseSettings):
@@ -82,7 +81,7 @@ async def on_startup(bot: Bot):
             master_id = TELEGRAM_SETTINGS.TG_MASTER_IDS[0]
             await send_random_sticker(chat_id=master_id)
             bot: TelegramBot = get_ai_executor(master_id)
-            hi_message = await bot.heed_and_reply("Поприветствуй участников чата в двух предложениях!",
+            hi_message = await bot.heed_and_reply("Поприветствуй своего хозяина!",
                                                   save_to_history=False)
             await tg_bot.send_message(chat_id=master_id, text=hi_message)
     except Exception as e:
@@ -114,7 +113,7 @@ async def private_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
 
-    user_text = await get_message_text(message)
+    user_text = await get_message_text(message, tg_bot=tg_bot)
 
     user_ai = get_ai_executor(user_id)
 
@@ -154,20 +153,3 @@ async def group_message(message: types.Message):
 def is_reply(message: types.Message):
     if message.reply_to_message and message.reply_to_message.from_user.id == tg_bot.id:
         return True
-
-
-async def get_message_text(message: types.Message):
-    user_text = message.md_text
-    if message.content_type == enums.ContentType.PHOTO and message.photo:
-        photo = message.photo[-1]
-        file = await tg_bot.get_file(photo.file_id)
-        file_path = file.file_path
-        photo_file: BinaryIO = await tg_bot.download_file(file_path)
-        # file_path = photo_file.file_path
-        url = await publish_image_file(photo_file, photo.file_unique_id)
-        logging.info(f"published image: {url}")
-
-        user_text = f"{user_text} {url}"
-    elif message.content_type == enums.ContentType.TEXT and message.text:
-        return message.text
-    return user_text

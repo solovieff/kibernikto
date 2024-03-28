@@ -2,10 +2,10 @@ aiogram==3.1.1
 certifi==2023.7.22
 python-dotenv==1.0.0
 openai==1.3.0
-#aioschedule==0.5.2
 youtube_transcript_api==0.6.1
 pytube==15.0
 beautifulsoup4==4.12.2
 emoji-country-flag==1.3.2
 pyyaml==6.0.1
 pydantic-settings
+pydub
