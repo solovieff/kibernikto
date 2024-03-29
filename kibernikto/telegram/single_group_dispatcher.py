@@ -126,7 +126,7 @@ async def private_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_ID, f"{message.from_user.username}: {message.md_text}")
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await get_message_text(message)
+        user_text = await get_message_text(message, tg_bot)
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await PRIVATE_BOT.heed_and_reply(message=user_text)
     chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
@@ -138,14 +138,15 @@ async def private_message(message: types.Message):
 async def group_message(message: types.Message):
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await get_message_text(message)
+        user_text = await get_message_text(message, tg_bot)
         logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
 
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         # not using author not to send usernames to openai :)
         reply_text = await FRIEND_GROUP_BOT.heed_and_reply(user_text)  # author=message.from_user.full_name
         await asyncio.sleep(random.uniform(0, 2))
-        chunks = split_text_into_chunks_by_sentences(reply_text, sentences_per_chunk=TELEGRAM_SETTINGS.TG_CHUNK_SENTENCES)
+        chunks = split_text_into_chunks_by_sentences(reply_text,
+                                                     sentences_per_chunk=TELEGRAM_SETTINGS.TG_CHUNK_SENTENCES)
         for chunk in chunks:
             await tg_bot.send_chat_action(message.chat.id, 'typing')
             await asyncio.sleep(random.uniform(0.5, 3))
@@ -184,6 +185,3 @@ def _apply_plugins(bots: List[TelegramBot]):
                 logging.error("PLUGINS WERE NOT LOADED!")
         else:
             print_plugin_off(plugin_class)
-
-
-

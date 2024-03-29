@@ -7,7 +7,8 @@ from kibernikto.utils import text as text_utils
 from kibernikto.utils.psycopg import db_settings
 from kibernikto.utils.psycopg import enrich_url, create_async_pool
 
-class AsyncSignetPgConnector:
+
+class AsyncKiberniktoPgConnector:
     def __init__(self, url, key, title):
         self.app_name = db_settings.KNKT_APP_NAME
         self.key = key
@@ -23,7 +24,8 @@ class AsyncSignetPgConnector:
         return self._initialized
 
     async def init(self):
-        pg_url = text_utils.enrich_url(self._url, self.app_name)
+        # pg_url = text_utils.enrich_url(self._url, self.app_name)
+        pg_url = self._url
         self.__pool = await create_async_pool(db_url=pg_url, db_label=self.title)
         self._initialized = True
 

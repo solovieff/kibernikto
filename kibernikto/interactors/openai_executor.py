@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS
 from kibernikto.plugins import KiberniktoPlugin
-from kibernikto.utils.ai_tools import execute_tool_call_function, get_tool_call_serving_messages
+from kibernikto.utils.ai_tools import execute_tool_call_function, get_tool_call_serving_messages, is_function_call
 
 
 class OpenAiExecutorConfig(BaseModel):
@@ -160,7 +160,7 @@ class OpenAIExecutor:
         choice: Choice = await self._run_for_messages(prompt, author)
         response_message: ChatCompletionMessage = choice.message
 
-        if self.is_function_call(choice):
+        if is_function_call(choice=choice, model=self.model):
             return await self.process_tool_calls(choice, user_message)
 
         if save_to_history:

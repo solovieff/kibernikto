@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from openai import PermissionDeniedError
 from openai._types import NOT_GIVEN
@@ -32,6 +33,7 @@ class Kibernikto(TelegramBot):
             logging.warning(f"Что-то грубое и недопустимое! {str(pde)}")
             return "Что-то грубое и недопустимое в ваших словах!"
         except Exception as e:
+            print(traceback.format_exc())
             return f"Я не справился! Горе мне! {str(e)}"
 
     async def ask_pure(self, prompt):

@@ -1,24 +1,32 @@
 # kibernikto
 
-Kibernikto is an app/lib to easily run telegram bots connected to AI models.
+Kibernikto is an app/lib to easily run telegram bots connected to AI models with additional features.
 
-Having a link, Kibernikto based bots can summarize most of
-
-- youtube videos
-- webpages
-- images
+- voice messages recognition
+- youtube video summary
+- webpage summary
+- image recognition
+- openai tools easy integration
 
 Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
 
 By default `single_group_dispatcher` is used with a following rules:
 
-- One Kibernikto instance can be connected to one Telegram bot and work with one group chat. Privately it talks to
-  master
-  only and denies other users.
-- Kibernikto can be added to any group chat (`TG_FRIEND_GROUP_ID`). The bot will need chat messages access set in group
-  to
-  operate.
-  Private chat is only available for one master user (`TG_MASTER_ID`).
+- One Kibernikto instance **can privately talk only to one** (`TG_MASTER_ID`) user and work with **one group chat** (`TG_FRIEND_GROUP_ID`).
+
+If you want your bot to be able to work with **any user or group**, use `comprehensive_dispatcher`. You will need the
+following `additional` env parameters if you want to restrict user/group ids. 
+Do not add it to your env if you want anyone
+to
+be able to use yr Kibernikto instance:
+
+```dotenv
+TG_MASTER_IDS=[199720543]
+TG_FRIEND_GROUP_IDS=[-813228576]
+```
+or
+
+``kibernikto --env_file_path=local.env --bot_type=kibernikto --dispatcher=multiuser``
 
 Kibernikto can post-process messages returned by one AI using another AI (for now it's a hardcoded 2 step chain).
 
@@ -106,6 +114,17 @@ IMAGE_SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1
 IMAGE_STORAGE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 ```
 
+Voice messages processing
+
+```dotenv
+# If no key is provided, images will not be processed.
+VOICE_OPENAI_API_KEY=yr-key
+VOICE_OPENAI_API_MODEL=whisper-1
+VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
+VOICE_PROCESSOR=openai
+VOICE_FILE_LOCATION=/tmp/tg_voices
+```
+
 Telegram
 
 ```dotenv
@@ -158,6 +177,29 @@ Free image hosting: https://imgbb.com
 You can write yr own bots extending `TelegramBot` class from `kibernikto.telegram` package.  
 See `bots` package for more details.
 
+You can use `OpenAIExecutor` directly to create non-telegram ai-connected bots.
+For example:
+
+```python
+from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
+
+
+class AnyBot(OpenAIExecutor):
+    def __init__(self, config: OpenAiExecutorConfig, master_id, username):
+        self.master_id = master_id
+        self.username = username
+        super().__init__(config=config)
+
+    def should_react(self, message_text):
+        if not message_text:
+            return False
+        parent_should = super().should_react(message_text)
+        return parent_should or self.username in message_text
+
+    def check_master(self, user_id, message):
+        return self.master_call in message or user_id == self.master_id
+```
+
 Plugins are entities that pre-process user input text before sending it to ai. Currently 3 plugins are available (
 see `plugins` package):
 
@@ -187,6 +229,7 @@ class YoutubePlugin(KiberniktoPlugin):
     @staticmethod
     def applicable():
         return DEFAULT_SETTINGS.OPENAI_API_KEY is not None
+
     ...
 ```
 
