@@ -6,10 +6,12 @@ from typing import List
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.edit import Choice
 from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS
 from kibernikto.plugins import KiberniktoPlugin
+from kibernikto.utils.ai_tools import execute_tool_call_function, get_tool_call_serving_messages
 
 
 class OpenAiExecutorConfig(BaseModel):
@@ -46,13 +48,13 @@ class OpenAIExecutor:
 
     def __init__(self,
                  bored_after=0,
-                 config=DEFAULT_CONFIG):
+                 config=DEFAULT_CONFIG, tools=[]):
         self.max_messages = config.max_messages
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
         self.summarize = config.summarize_request is not None
-
+        self.tools = tools
         self.client = AsyncOpenAI(base_url=config.url, api_key=config.key)
 
         self.model = config.model
@@ -116,7 +118,21 @@ class OpenAIExecutor:
 
         return response_message
 
-    async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
+    async def _run_for_messages(self, full_prompt, author=NOT_GIVEN):
+
+        completion: ChatCompletion = await self.client.chat.completions.create(
+            model=self.model,
+            messages=full_prompt,
+            max_tokens=AI_SETTINGS.OPENAI_MAX_TOKENS,
+            temperature=AI_SETTINGS.OPENAI_TEMPERATURE,
+            user=author,
+            tools=self.tools
+        )
+        choice: Choice = completion.choices[0]
+
+        return choice
+
+    async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True):
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param message: received message
@@ -141,16 +157,11 @@ class OpenAIExecutor:
 
         logging.debug(f"sending {prompt}")
 
-        client: AsyncOpenAI = self.client
+        choice: Choice = await self._run_for_messages(prompt, author)
+        response_message: ChatCompletionMessage = choice.message
 
-        completion: ChatCompletion = await client.chat.completions.create(
-            model=self.model,
-            messages=prompt,
-            max_tokens=AI_SETTINGS.OPENAI_MAX_TOKENS,
-            temperature=AI_SETTINGS.OPENAI_TEMPERATURE,
-            user=author
-        )
-        response_message: ChatCompletionMessage = completion.choices[0].message
+        if self.is_function_call(choice):
+            return await self.process_tool_calls(choice, user_message)
 
         if save_to_history:
             self.messages.append(this_message)
@@ -163,17 +174,32 @@ class OpenAIExecutor:
             self._reset()
 
     def _reset(self):
-        # never gets full
-        self.messages = deque(maxlen=self.max_messages)
+        # never gets full, +1 for system
+        self.messages = deque(maxlen=self.max_messages + 1)
 
         wai = self.full_config.who_am_i.format(self.full_config.name)
         self.about_me = dict(role=OpenAIRoles.system.value, content=wai)
 
-        # self.messages.append(self.about_me)
-
     async def needs_attention(self, message):
-        """checks if the reaction needed for the given messages"""
+        """checks if the reaction needed for the given message"""
         return self.should_react(message)
+
+    async def process_tool_calls(self, choice: Choice, original_request_text: str, save_to_history=True):
+        prompt = list(self.messages)
+        if not choice.message.tool_calls:
+            raise ValueError("No tools provided!")
+        for tool_call in choice.message.tool_calls:
+            tool_call_result = await execute_tool_call_function(tool_call)
+            message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
+            prompt.append(message_dict)
+            tool_call_messages = get_tool_call_serving_messages(tool_call, tool_call_result)
+
+        choice: Choice = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
+        response_message: ChatCompletionMessage = choice.message
+        if save_to_history:
+            self.messages.append(message_dict)
+            self.messages.append(call_item for call_item in tool_call_messages)
+        return response_message.content
 
     async def _run_plugins_for_message(self, message_text):
         plugins_result = None

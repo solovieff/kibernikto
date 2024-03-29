@@ -1,3 +1,4 @@
+import json
 import logging
 import typing
 import re
@@ -83,3 +84,11 @@ async def get_website_as_text(url: str):
         }) as response:
             html = await response.text(encoding=response.charset)
     return html
+
+
+def parse_json_garbage(s, start="{"):
+    s = s[next(idx for idx, c in enumerate(s) if c in start):]
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError as e:
+        return json.loads(s[:e.pos])

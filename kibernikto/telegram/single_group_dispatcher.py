@@ -5,19 +5,18 @@ import random
 import sys
 import traceback
 from random import choice
-from typing import List, BinaryIO
+from typing import List
+
 from aiogram import Bot, Dispatcher, types, enums, F
 from aiogram.types import User
 from pydantic_settings import BaseSettings
 
-from .telegram_bot import TelegramBot
-from ._message_preprocessors import get_message_text
 from kibernikto.interactors import OpenAiExecutorConfig
-
-from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
 from kibernikto.plugins import KiberniktoPlugin
-from kibernikto.utils.image import publish_image_file
 from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
+from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
+from ._message_preprocessors import get_message_text
+from .telegram_bot import TelegramBot
 
 
 class TelegramSettings(BaseSettings):
