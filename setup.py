@@ -13,7 +13,7 @@ with open(path.join(HERE, "requirements.txt")) as f:
 
 setup(
     name="kibernikto",
-    version="1.3.4",
+    version="1.3.5",
     packages=find_packages(),
     install_requires=required,
     url='https://github.com/solovieff/kibernikto',

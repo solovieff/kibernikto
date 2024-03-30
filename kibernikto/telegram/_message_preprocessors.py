@@ -27,7 +27,7 @@ async def get_message_text(message: types.Message, tg_bot: AIOGramBot):
         if SETTINGS.IMAGE_SUMMARIZATION_OPENAI_API_KEY is not None:
             logging.debug(f"processing photo from {message.from_user.full_name}")
             photo: types.PhotoSize = message.photo[-1]
-            url = _process_photo(photo, tg_bot)
+            url = await _process_photo(photo, tg_bot)
             user_text = f"{user_text} {url}"
     elif message.content_type == enums.ContentType.VOICE and message.voice:
         if SETTINGS.VOICE_PROCESSOR is not None:
@@ -37,7 +37,7 @@ async def get_message_text(message: types.Message, tg_bot: AIOGramBot):
     elif message.content_type == enums.ContentType.DOCUMENT and message.document:
         logging.debug(f"processing document from {message.from_user.full_name}")
         document = message.document
-        file_path = _process_document(document, tg_bot)
+        file_path = await _process_document(document, tg_bot)
     elif message.content_type == enums.ContentType.TEXT and message.text:
         logging.debug(f"processing text from {message.from_user.full_name}")
         return message.text

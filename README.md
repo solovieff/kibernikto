@@ -1,12 +1,13 @@
 # kibernikto
 
-Kibernikto is an app/lib to easily run telegram bots connected to AI models with additional features.
+Kibernikto is an app/lib to easily run telegram bots connected to AI models with additional features.  
+Kibernikto bots can be easily extended to be used outised telegram.
 
 - voice messages recognition
 - youtube video summary
 - webpage summary
 - image recognition
-- openai tools easy integration
+- function tools easy integration (anthropic xml format supported!)
 
 Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
 
@@ -119,7 +120,7 @@ IMAGE_STORAGE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 Voice messages processing
 
 ```dotenv
-# If no key is provided, images will not be processed.
+# If no key is provided, voice messages will not be processed.
 VOICE_OPENAI_API_KEY=yr-key
 VOICE_OPENAI_API_MODEL=whisper-1
 VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
@@ -283,3 +284,6 @@ your_bot = Kibernikto(username="kiberniktomiks",
 
 Now you can use your_bot `heed_and_reply` method.
 Please note that in this case you will have to apply the plugins yourself. 
+
+- I want to know how to make Kibernikto use my tools! Please!
+Implemented, pls wait for the docs to be updated.
