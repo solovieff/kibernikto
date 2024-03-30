@@ -12,13 +12,12 @@ from aiogram.types import User
 from pydantic_settings import BaseSettings
 
 from kibernikto.interactors import OpenAiExecutorConfig
+from kibernikto.interactors.tools import Toolbox
 from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
 from ._message_preprocessors import get_message_text
 from .telegram_bot import TelegramBot
-from ..interactors.tools import Toolbox
-
 
 class TelegramSettings(BaseSettings):
     TG_BOT_KEY: str
@@ -140,7 +139,7 @@ async def private_message(message: types.Message):
 
 @dp.message(F.chat.id == TELEGRAM_SETTINGS.TG_FRIEND_GROUP_ID)
 async def group_message(message: types.Message):
-    if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.text):
+    if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.md_text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await get_message_text(message, tg_bot)
         logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")

@@ -22,6 +22,13 @@ SETTINGS = PreprocessorSettings()
 
 
 async def get_message_text(message: types.Message, tg_bot: AIOGramBot):
+    """
+    returns text to be processed by AI and it's plugins
+
+    :param message:
+    :param tg_bot:
+    :return:
+    """
     user_text = message.md_text
     if message.content_type == enums.ContentType.PHOTO and message.photo:
         if SETTINGS.IMAGE_SUMMARIZATION_OPENAI_API_KEY is not None:

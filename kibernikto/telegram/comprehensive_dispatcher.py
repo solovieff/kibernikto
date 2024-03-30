@@ -11,6 +11,7 @@ from aiogram.types import User
 from pydantic_settings import BaseSettings
 
 from kibernikto.interactors import OpenAiExecutorConfig
+from kibernikto.interactors.tools import Toolbox
 from kibernikto.utils.text import split_text_by_sentences
 from ._executor_corral import init as init_ai_bot_corral, get_ai_executor, kill as kill_animals
 from ._message_preprocessors import get_message_text
@@ -32,6 +33,7 @@ class TelegramSettings(BaseSettings):
 TELEGRAM_SETTINGS = TelegramSettings()
 
 smart_bot_class = None
+TOOLS: List[Toolbox] = []
 
 # Telegram bot
 tg_bot: Bot = None
@@ -41,7 +43,7 @@ dp = Dispatcher()
 commands = {}
 
 
-def start(bot_class):
+def start(bot_class, tools=[]):
     """
     runs the executor polling the dispatcher for incoming messages
 
@@ -50,6 +52,8 @@ def start(bot_class):
     """
     global smart_bot_class
     global tg_bot
+    global TOOLS
+    TOOLS = tools
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
     tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY)
@@ -64,7 +68,8 @@ async def on_startup(bot: Bot):
             bot_me = await bot.get_me()
 
         executor_config = OpenAiExecutorConfig(name=bot_me.first_name,
-                                               reaction_calls=TELEGRAM_SETTINGS.TG_REACTION_CALLS)
+                                               reaction_calls=TELEGRAM_SETTINGS.TG_REACTION_CALLS,
+                                               tools=TOOLS)
 
         bot_cfg = {
             "config": executor_config,
@@ -141,7 +146,7 @@ async def group_message(message: types.Message):
     user_text = await get_message_text(message)
     group_ai = get_ai_executor(user_id)
 
-    if is_reply(message) or group_ai.should_react(message.text):
+    if is_reply(message) or group_ai.should_react(message.md_text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await group_ai.heed_and_reply(message=user_text)
 

@@ -11,7 +11,10 @@ class TelegramBot(OpenAIExecutor):
         if not message_text:
             return False
         parent_should = super().should_react(message_text)
-        return parent_should or self.username in message_text
+        mt_lower = message_text.lower()
+        if self.full_config.name.lower() in mt_lower:
+            return True
+        return parent_should or self.username.lower() in mt_lower
 
     def check_master(self, user_id, message):
         return self.master_call in message or user_id == self.master_id
