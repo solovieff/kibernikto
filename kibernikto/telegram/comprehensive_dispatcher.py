@@ -47,7 +47,10 @@ def start(bot_class, tools=[]):
     """
     runs the executor polling the dispatcher for incoming messages
 
+    :param tools: tools available for bots created by this dispatcher
+    :type tools: List[Toolbox]
     :param bot_class: the bot class to use
+    :type bot_class: Type[TelegramBot]
     :return:
     """
     global smart_bot_class
@@ -71,16 +74,10 @@ async def on_startup(bot: Bot):
                                                reaction_calls=TELEGRAM_SETTINGS.TG_REACTION_CALLS,
                                                tools=TOOLS)
 
-        bot_cfg = {
-            "config": executor_config,
-            "master_id": TELEGRAM_SETTINGS.TG_MASTER_IDS,
-            "username": bot_me.username
-        }
-
         init_ai_bot_corral(smart_bot_class=smart_bot_class,
                            master_id=TELEGRAM_SETTINGS.TG_MASTER_ID,
                            username=bot_me.username,
-                           config=bot_cfg)
+                           config=executor_config)
 
         if TELEGRAM_SETTINGS.TG_SAY_HI and TELEGRAM_SETTINGS.TG_MASTER_IDS:
             master_id = TELEGRAM_SETTINGS.TG_MASTER_IDS[0]

@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 import pprint
@@ -18,13 +19,14 @@ def tool_to_claude_dict(tool: Toolbox):
     tool_dict = tool.definition
     tool_func = tool_dict['function']
     parameters = []
-    for prop in tool_func['parameters']['properties'].items():
-        name, prop_params = prop
-        parameters.append({
-            'name': name,
-            'description': prop_params.get('description', name),
-            'type': prop_params['type']
-        })
+    if 'parameters' in tool_func and 'properties' in tool_func['parameters']:
+        for prop in tool_func['parameters']['properties'].items():
+            name, prop_params = prop
+            parameters.append({
+                'name': name,
+                'description': prop_params.get('description', name),
+                'type': prop_params['type']
+            })
     claude_dict = {"tool_name": tool_func['name'],
                    "description": tool_func['description'],
                    "parameters": {"parameter": parameters}
@@ -37,7 +39,7 @@ def is_function_call(choice: Choice, xml=False):
     if not xml:
         return choice.finish_reason == "tool_calls"
     else:
-        if 'function_name' in choice.message.content and 'parameters' in choice.message.content:
+        if 'function_name' in choice.message.content and 'call_id' in choice.message.content:
             try:
                 logging.warning(choice.message.content)
                 function_string = choice.message.content.replace('\n', ' ').replace('\r', '')
@@ -48,7 +50,7 @@ def is_function_call(choice: Choice, xml=False):
                 logging.error(str(err))
                 return False
             new_ai_tool_call = ChatCompletionMessageToolCall(
-                id=str(uuid.uuid4()),
+                id=str(call_dict['call_id']),
                 type="function",
                 function=Function(name=call_dict['function_name'],
                                   arguments=json.dumps(call_dict['parameters'])
@@ -59,14 +61,19 @@ def is_function_call(choice: Choice, xml=False):
 
 
 async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
-                                     function_impl: Callable):
+                                     function_impl: Callable, additional_params: dict = {}):
     tool_call_function: Function = tool_call.function
     fn_name = tool_call_function.name
     arguments: str = tool_call_function.arguments
 
     dict_args = json.loads(arguments)
-    logging.info(f"running {fn_name}")
-    pprint.pprint(dict_args)
+
+    impl_params = inspect.getfullargspec(function_impl)[0]
+
+    for key in additional_params:
+        if key in impl_params:
+            dict_args[key] = additional_params[key]
+    logging.info(f"running {fn_name} with params {dict_args}")
     try:
         result = await function_impl(**dict_args)
     except Exception as e:
@@ -143,6 +150,7 @@ def get_claude_tools_info(xml_string):
                         "$PARAM_NAME": $PARAM_VALUE
                         ...
                     },
+                    "call_id": $RANDOM
                 }
             """
     tools_content = f"""

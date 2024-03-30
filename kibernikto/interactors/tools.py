@@ -17,6 +17,7 @@ def get_tools_from_module(python_module, permitted_names=[]):
         if permitted_names and not tool_name in permitted_names:
             continue
         for function_name, function in getmembers(tool_module, isfunction):
+
             if tool_name in function_name:
                 if function_name.endswith("_tool"):
                     definition = function()
