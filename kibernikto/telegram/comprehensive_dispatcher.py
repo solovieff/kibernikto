@@ -63,6 +63,26 @@ def start(bot_class, tools=[]):
     dp.run_polling(tg_bot, skip_updates=True)
 
 
+async def async_start(bot_class, tools=[]):
+    """
+    runs the executor polling the dispatcher for incoming messages
+
+    :param tools: tools available for bots created by this dispatcher
+    :type tools: List[Toolbox]
+    :param bot_class: the bot class to use
+    :type bot_class: Type[TelegramBot]
+    :return:
+    """
+    global smart_bot_class
+    global tg_bot
+    global TOOLS
+    TOOLS = tools
+    smart_bot_class = bot_class
+    dp.startup.register(on_startup)
+    tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY)
+    await dp.start_polling(tg_bot, skip_updates=True)
+
+
 async def on_startup(bot: Bot):
     try:
         global bot_me
