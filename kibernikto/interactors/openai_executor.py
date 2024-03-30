@@ -174,7 +174,7 @@ class OpenAIExecutor:
 
         await self._aware_overflow()
 
-        prompt = [self.about_me] + list(self.messages) + [this_message]
+        prompt = [self.get_cur_system_message()] + list(self.messages) + [this_message]
 
         logging.debug(f"sending {prompt}")
 
@@ -193,6 +193,9 @@ class OpenAIExecutor:
     def reset_if_usercall(self, message):
         if self.reset_call in message:
             self._reset()
+
+    def get_cur_system_message(self):
+        return self.about_me
 
     def _reset(self):
         # never gets full, +1 for system
