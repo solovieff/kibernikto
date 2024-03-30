@@ -69,7 +69,10 @@ async def _process_voice(voice: types.Voice, tg_bot: AIOGramBot):
         transcription = await audio_client.create(language="ru", model=SETTINGS.VOICE_OPENAI_API_MODEL,
                                                   file=converted_to_feasible_file,
                                                   response_format="text")
-    return transcription.text
+    if hasattr(transcription, 'text'):
+        return transcription.text
+    else:
+        return transcription
 
 
 async def _process_document(document: types.Document, tg_bot: AIOGramBot):

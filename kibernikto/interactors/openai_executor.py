@@ -10,8 +10,9 @@ from openai.types.edit import Choice
 from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS
+from kibernikto.interactors.tools import Toolbox
 from kibernikto.plugins import KiberniktoPlugin
-from kibernikto.utils.ai_tools import execute_tool_call_function, get_tool_call_serving_messages, is_function_call
+from kibernikto.utils import ai_tools
 
 
 class OpenAiExecutorConfig(BaseModel):
@@ -27,6 +28,7 @@ class OpenAiExecutorConfig(BaseModel):
     master_call: str = "Величайший Кибеникто!"
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     reaction_calls: list = ('никто', 'хонда', 'урод')
+    tools: List[Toolbox] = []
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
@@ -48,25 +50,44 @@ class OpenAIExecutor:
 
     def __init__(self,
                  bored_after=0,
-                 config=DEFAULT_CONFIG, tools=[]):
+                 config=DEFAULT_CONFIG):
         self.max_messages = config.max_messages
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
         self.summarize = config.summarize_request is not None
-        self.tools = tools
         self.client = AsyncOpenAI(base_url=config.url, api_key=config.key)
 
         self.model = config.model
         self.full_config = config
 
-        # user messages preprocessing entities to go here
+        # user string messages preprocessing entities to go here
         self.plugins: List[KiberniktoPlugin] = []
+
+        # additional tools in Toolbox formats
+        self.tools: List[Toolbox] = config.tools
+
         if self.max_messages < 2:
             self.max_messages = 2  # hahaha
 
         # default configuration. TODO: rework
         self._reset()
+
+    @property
+    def tools_definitions(self):
+        if self.xml_tools:
+            return []
+        else:
+            return [toolbox.definition for toolbox in self.tools]
+
+    @property
+    def xml_tools(self):
+        return "claude" in self.model
+
+    def _get_tool_implementation(self, name):
+        for x in self.tools:
+            if x.function_name == name:
+                return x.implementation
 
     @property
     def word_overflow(self):
@@ -126,7 +147,7 @@ class OpenAIExecutor:
             max_tokens=AI_SETTINGS.OPENAI_MAX_TOKENS,
             temperature=AI_SETTINGS.OPENAI_TEMPERATURE,
             user=author,
-            tools=self.tools
+            tools=self.tools_definitions
         )
         choice: Choice = completion.choices[0]
 
@@ -160,7 +181,7 @@ class OpenAIExecutor:
         choice: Choice = await self._run_for_messages(prompt, author)
         response_message: ChatCompletionMessage = choice.message
 
-        if is_function_call(choice=choice, model=self.model):
+        if ai_tools.is_function_call(choice=choice, xml=self.xml_tools):
             return await self.process_tool_calls(choice, user_message)
 
         if save_to_history:
@@ -178,7 +199,13 @@ class OpenAIExecutor:
         self.messages = deque(maxlen=self.max_messages + 1)
 
         wai = self.full_config.who_am_i.format(self.full_config.name)
-        self.about_me = dict(role=OpenAIRoles.system.value, content=wai)
+
+        # weirdo
+        if self.xml_tools and self.tools:
+            xml_string = ai_tools.get_tools_xml(self.tools)
+            string_tool_info = ai_tools.get_claude_tools_info(xml_string)
+            wai += f"\n\n{string_tool_info}"
+        self.about_me = dict(role=OpenAIRoles.system.value, content=f"{wai}")
 
     async def needs_attention(self, message):
         """checks if the reaction needed for the given message"""
@@ -189,16 +216,20 @@ class OpenAIExecutor:
         if not choice.message.tool_calls:
             raise ValueError("No tools provided!")
         for tool_call in choice.message.tool_calls:
-            tool_call_result = await execute_tool_call_function(tool_call)
+            fn_name = tool_call.function.name
+            function_impl = self._get_tool_implementation(fn_name)
+            tool_call_result = await ai_tools.execute_tool_call_function(tool_call, function_impl=function_impl)
             message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
             prompt.append(message_dict)
-            tool_call_messages = get_tool_call_serving_messages(tool_call, tool_call_result)
+            tool_call_messages = ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result,
+                                                                         xml=self.xml_tools)
 
         choice: Choice = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
         if save_to_history:
             self.messages.append(message_dict)
-            self.messages.append(call_item for call_item in tool_call_messages)
+            for tool_call_message in tool_call_messages:
+                self.messages.append(tool_call_message)
         return response_message.content
 
     async def _run_plugins_for_message(self, message_text):
@@ -238,7 +269,7 @@ class OpenAIExecutor:
         :return:
         """
         total_word_count = sum(
-            len(obj["content"].split()) for obj in self.messages if
+            len(obj["content"].split()) for obj in list(self.messages) if
             obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None)
         return total_word_count > self.MAX_WORD_COUNT or len(self.messages) > self.max_messages
 

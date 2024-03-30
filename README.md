@@ -12,10 +12,11 @@ Given an image Kibernikto will publish it to a free image hosting service and th
 
 By default `single_group_dispatcher` is used with a following rules:
 
-- One Kibernikto instance **can privately talk only to one** (`TG_MASTER_ID`) user and work with **one group chat** (`TG_FRIEND_GROUP_ID`).
+- One Kibernikto instance **can privately talk only to one** (`TG_MASTER_ID`) user and work with **one group chat
+  ** (`TG_FRIEND_GROUP_ID`).
 
 If you want your bot to be able to work with **any user or group**, use `comprehensive_dispatcher`. You will need the
-following `additional` env parameters if you want to restrict user/group ids. 
+following `additional` env parameters if you want to restrict user/group ids.
 Do not add it to your env if you want anyone
 to
 be able to use yr Kibernikto instance:
@@ -24,6 +25,7 @@ be able to use yr Kibernikto instance:
 TG_MASTER_IDS=[199720543]
 TG_FRIEND_GROUP_IDS=[-813228576]
 ```
+
 or
 
 ``kibernikto --env_file_path=local.env --bot_type=kibernikto --dispatcher=multiuser``
@@ -233,3 +235,51 @@ class YoutubePlugin(KiberniktoPlugin):
     ...
 ```
 
+# FAQ
+
+- How do I run Kibernikto Instance from my code?
+
+```python
+    # choose your bot
+if args.bot_type == 'kibernikto':
+    from kibernikto.bots.cybernoone import Kibernikto
+
+    bot_class = Kibernikto
+elif args.bot_type == 'vertihvostka':
+    from kibernikto.bots.vertihvostka import Vertihvostka
+
+    bot_class = Vertihvostka
+else:
+    raise RuntimeError("Wrong bot_type, should be in ('kibernikto','vertihvostka')")
+
+# choose dispatcher type
+if args.dispatcher == 'default':
+    from kibernikto.telegram import single_group_dispatcher
+
+    single_group_dispatcher.start(bot_class=bot_class)
+elif args.dispatcher == 'multiuser':
+    from kibernikto.telegram import comprehensive_dispatcher
+
+    comprehensive_dispatcher.start(bot_class=bot_class)
+else:
+    raise RuntimeError("Wrong dispatcher!")
+```
+
+You can create your own bots and dispatchers and use it live above.
+
+- I want to run an ai bot without your telegram dispatcher!
+
+```python
+from kibernikto.interactors import OpenAiExecutorConfig
+from kibernikto.utils.text import split_text_by_sentences
+
+executor_config = OpenAiExecutorConfig(name="Kibernikto",
+                                       reaction_calls=["Hello", "Kiberman"])
+
+your_bot = Kibernikto(username="kiberniktomiks",
+                      master_id="some_master_user_id_or_any",
+                      config=executor_config)
+```
+
+Now you can use your_bot `heed_and_reply` method.
+Please note that in this case you will have to apply the plugins yourself. 

@@ -3,15 +3,19 @@ import logging
 import pprint
 import uuid
 from json import JSONDecodeError
+from typing import Callable, List
 
+from dict2xml import dict2xml
 from openai.types.chat import ChatCompletionMessageToolCall
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_message_tool_call import Function
 
 from .text import parse_json_garbage
+from ..interactors.tools import Toolbox
 
 
-def tool_to_claude_xml(tool_dict):
+def tool_to_claude_dict(tool: Toolbox):
+    tool_dict = tool.definition
     tool_func = tool_dict['function']
     parameters = []
     for prop in tool_func['parameters']['properties'].items():
@@ -29,10 +33,10 @@ def tool_to_claude_xml(tool_dict):
     return claude_dict
 
 
-def is_function_call(choice: Choice, model: str):
-    if "gpt" in model:
+def is_function_call(choice: Choice, xml=False):
+    if not xml:
         return choice.finish_reason == "tool_calls"
-    if "claude" in model:
+    else:
         if 'function_name' in choice.message.content and 'parameters' in choice.message.content:
             try:
                 logging.warning(choice.message.content)
@@ -54,23 +58,24 @@ def is_function_call(choice: Choice, model: str):
     return False
 
 
-async def execute_tool_call_function(available_functions, tool_call: ChatCompletionMessageToolCall):
+async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
+                                     function_impl: Callable):
     tool_call_function: Function = tool_call.function
     fn_name = tool_call_function.name
     arguments: str = tool_call_function.arguments
 
     dict_args = json.loads(arguments)
-
-    function = getattr(available_functions, fn_name)
+    logging.info(f"running {fn_name}")
+    pprint.pprint(dict_args)
     try:
-        result = await function(**dict_args)
+        result = await function_impl(**dict_args)
     except Exception as e:
         result = str(e)
     return result
 
 
-def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, tool_call_result, model: str):
-    if "gpt" in model:
+def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, tool_call_result, xml=False):
+    if not xml:
         call_message = {
             "role": "assistant",
             "tool_call_id": tool_call.id,
@@ -86,7 +91,7 @@ def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, too
             "name": tool_call.function.name,
             "content": f'{{"result": {str(tool_call_result)} }}'}
         return [call_message, result_message]
-    elif "claude" in model:
+    elif xml:
         call_message = f"""
             <function_calls>
                 <invoke>
@@ -115,3 +120,37 @@ def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, too
             "content": result_xml_string
         }
         return [result_message]
+
+
+def get_tools_xml(tools: List[Toolbox]):
+    function_xml_descriptions = []
+    for tool in tools:
+        claude_tool_dict = tool_to_claude_dict(tool)
+        function_xml_descriptions.append(claude_tool_dict)
+    all_tools = {
+        "tools": {"tool_description": function_xml_descriptions}
+    }
+    xml = dict2xml(all_tools)
+    print(xml)
+    return xml
+
+
+def get_claude_tools_info(xml_string):
+    call_example = """
+                {
+                    "function_name": $TOOL_NAME,
+                    "parameters": {
+                        "$PARAM_NAME": $PARAM_VALUE
+                        ...
+                    },
+                }
+            """
+    tools_content = f"""
+    In this environment you have access to a set of tools you can use to answer the user's question. 
+    To let me know you want to call a tool return only tool call description JSON without any comments.
+    Like this:
+    {call_example}\n
+    Call the tools only if you need to!
+    Here are the tools available:\n{xml_string}
+            """
+    return tools_content

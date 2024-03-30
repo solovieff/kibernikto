@@ -125,12 +125,6 @@ async def _async_apply_adapter(async_connection):
     # print('applying adapters to ' + str(connection) + '...')
     pass
 
-
-# https://www.psycopg.org/psycopg3/docs/advanced/adapt.html#adaptation
-def _apply_adapter(connection):
-    connection.adapters.register_dumper(float, NaN2None)
-
-
 def _pool_test(pool, db_label):
     r"""Check if connection pool is alive
 

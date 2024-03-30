@@ -17,6 +17,7 @@ from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
 from ._message_preprocessors import get_message_text
 from .telegram_bot import TelegramBot
+from ..interactors.tools import Toolbox
 
 
 class TelegramSettings(BaseSettings):
@@ -44,12 +45,13 @@ dp = Dispatcher()
 FRIEND_GROUP_BOT: TelegramBot | None = None
 PRIVATE_BOT: TelegramBot | None = None
 
+TOOLS: List[Toolbox] = []
 MAX_TG_MESSAGE_LEN = 4096
 
 commands = {}
 
 
-def start(bot_class):
+def start(bot_class, tools=[]):
     """
     runs the executor polling the dispatcher for incoming messages
 
@@ -58,6 +60,8 @@ def start(bot_class):
     """
     global smart_bot_class
     global tg_bot
+    global TOOLS
+    TOOLS = tools
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
     tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY)
@@ -74,7 +78,7 @@ async def on_startup(bot: Bot):
             bot_me = await bot.get_me()
 
         executor_config = OpenAiExecutorConfig(name=bot_me.first_name,
-                                               reaction_calls=TELEGRAM_SETTINGS.TG_REACTION_CALLS)
+                                               reaction_calls=TELEGRAM_SETTINGS.TG_REACTION_CALLS, tools=TOOLS)
 
         bot_cfg = {
             "config": executor_config,
