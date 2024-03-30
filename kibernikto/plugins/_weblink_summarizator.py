@@ -28,7 +28,7 @@ DEFAULT_SETTINGS = WeblinkPluginSettings()
 
 
 class WeblinkSummaryPlugin(KiberniktoPlugin):
-    index = 100
+    index = 10000
     """
     This plugin is used to get weblink transcript and then get text summary from it.
     It uses toolsyep to get text repr of the website

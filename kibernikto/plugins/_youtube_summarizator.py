@@ -28,7 +28,7 @@ DEFAULT_SETTINGS = YoutubePluginSettings()
 
 
 class YoutubePlugin(KiberniktoPlugin):
-    index = 0
+    index = 1000
 
     @staticmethod
     def applicable():

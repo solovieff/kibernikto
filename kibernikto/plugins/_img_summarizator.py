@@ -26,7 +26,7 @@ DEFAULT_SETTINGS = ImagePluginSettings()
 
 
 class ImageSummaryPlugin(KiberniktoPlugin):
-    index = 1
+    index = 100
     """
     This plugin is used to get information about the given image.
     """
