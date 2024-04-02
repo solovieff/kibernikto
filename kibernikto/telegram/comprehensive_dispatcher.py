@@ -142,6 +142,9 @@ async def private_message(message: types.Message):
     await tg_bot.send_chat_action(message.chat.id, 'typing')
     reply_text = await user_ai.heed_and_reply(message=user_text)
 
+    if reply_text is None:
+        reply_text = "Ok!"
+
     chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
     for chunk in chunks:
         await message.reply(text=chunk)

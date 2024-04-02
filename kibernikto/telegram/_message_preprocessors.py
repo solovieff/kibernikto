@@ -15,7 +15,7 @@ class PreprocessorSettings(BaseSettings):
     VOICE_OPENAI_API_KEY: str | None = None
     VOICE_OPENAI_API_MODEL: str = "whisper-1"
     VOICE_OPENAI_API_BASE_URL: str | None = None
-    VOICE_FILE_LOCATION: str = "/tmp/tg_voices"
+    VOICE_FILE_LOCATION: str = "/tmp"
 
 
 SETTINGS = PreprocessorSettings()

@@ -51,6 +51,9 @@ def configure_logger():
     logger = logging.getLogger('openai')
     logger.setLevel(logging.INFO)
 
+    logger = logging.getLogger('aiosqlite')
+    logger.setLevel(logging.ERROR)
+
     logger = logging.getLogger('httpcore')
     logger.setLevel(logging.INFO)
 
