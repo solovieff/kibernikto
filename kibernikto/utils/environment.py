@@ -19,11 +19,6 @@ def print_banner():
     else:
         print('\t%-15s%-15s' % ("redactor:", 'disabled'))
 
-    from kibernikto.telegram.single_group_dispatcher import TELEGRAM_SETTINGS
-    print("\t")
-    print('\t%-15s%-15s' % ("tg master:", TELEGRAM_SETTINGS.TG_MASTER_ID))
-    print('\t%-15s%-15s' % ("tg group:", TELEGRAM_SETTINGS.TG_FRIEND_GROUP_ID))
-
 
 def print_plugin_banner(kbnktp_plgn: KiberniktoPlugin):
     print("\t")

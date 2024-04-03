@@ -19,6 +19,7 @@ from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunk
 from ._message_preprocessors import get_message_text
 from .telegram_bot import TelegramBot
 
+
 class TelegramSettings(BaseSettings):
     TG_BOT_KEY: str
     TG_MASTER_ID: int
@@ -61,6 +62,12 @@ def start(bot_class, tools=[]):
     global tg_bot
     global TOOLS
     TOOLS = tools
+
+    print("\t")
+    print('\t%-15s%-15s' % ("tg master:", TELEGRAM_SETTINGS.TG_MASTER_ID))
+    print('\t%-15s%-15s' % ("tg group:", TELEGRAM_SETTINGS.TG_FRIEND_GROUP_ID))
+    print('\t%-15s%-15s' % ("dispatcher:", 'single-user-and-group'))
+
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
     tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY)

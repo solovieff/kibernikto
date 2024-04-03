@@ -57,6 +57,13 @@ def start(bot_class, tools=[]):
     global tg_bot
     global TOOLS
     TOOLS = tools
+
+    print("\t")
+    print('\t%-15s%-15s' % ("tg master:", TELEGRAM_SETTINGS.TG_MASTER_ID))
+    print('\t%-15s%-15s' % ("tg masters:", TELEGRAM_SETTINGS.TG_MASTER_IDS))
+    print('\t%-15s%-15s' % ("tg groups:", TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS))
+    print('\t%-15s%-15s' % ("dispatcher:", 'multi-user-and-group'))
+
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
     tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY)
