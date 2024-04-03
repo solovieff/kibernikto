@@ -23,8 +23,8 @@ to
 be able to use yr Kibernikto instance:
 
 ```dotenv
-TG_MASTER_IDS=[199720543]
-TG_FRIEND_GROUP_IDS=[-813228576]
+TG_MASTER_IDS=[XXXXXXXXX]
+TG_FRIEND_GROUP_IDS=[-XXXXXXXXX]
 ```
 
 or
