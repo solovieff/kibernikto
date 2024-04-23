@@ -14,7 +14,7 @@ from kibernikto.interactors import OpenAiExecutorConfig
 from kibernikto.interactors.tools import Toolbox
 from kibernikto.utils.text import split_text_by_sentences
 from ._executor_corral import init as init_ai_bot_corral, get_ai_executor, kill as kill_animals
-from ._message_preprocessors import get_message_text
+from kibernikto.telegram.pre_processors import preprocessor
 from .telegram_bot import TelegramBot
 
 
@@ -27,7 +27,7 @@ class TelegramSettings(BaseSettings):
     TG_CHUNK_SENTENCES: int = 7
     TG_REACTION_CALLS: List[str] = ['honda', 'киберникто']
     TG_SAY_HI: bool = False
-    TG_STICKER_LIST: List[str] = ()
+    TG_STICKER_LIST = ["CAACAgIAAxkBAAELx29l_2OsQzpRWhmXTIMBM4yekypTOwACdgkAAgi3GQI1Wnpqru6xgTQE"]
 
 
 TELEGRAM_SETTINGS = TelegramSettings()
@@ -142,7 +142,7 @@ async def private_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
 
-    user_text = await get_message_text(message, tg_bot=tg_bot)
+    user_text = await preprocessor.get_message_text(message, tg_bot=tg_bot)
 
     user_ai = get_ai_executor(user_id)
 
@@ -170,7 +170,7 @@ async def group_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
 
-    user_text = await get_message_text(message)
+    user_text = await preprocessor.get_message_text(message)
     group_ai = get_ai_executor(user_id)
 
     if is_reply(message) or group_ai.should_react(message.md_text):

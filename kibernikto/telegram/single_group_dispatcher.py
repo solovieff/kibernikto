@@ -16,7 +16,7 @@ from kibernikto.interactors.tools import Toolbox
 from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
-from ._message_preprocessors import get_message_text
+from kibernikto.telegram.pre_processors import preprocessor
 from .telegram_bot import TelegramBot
 
 
@@ -27,8 +27,8 @@ class TelegramSettings(BaseSettings):
     TG_MAX_MESSAGE_LENGTH: int = 4096
     TG_CHUNK_SENTENCES: int = 7
     TG_REACTION_CALLS: List[str] = ['honda', 'киберникто']
+    TG_STICKER_LIST: List[str] = ["CAACAgIAAxkBAAELx29l_2OsQzpRWhmXTIMBM4yekypTOwACdgkAAgi3GQI1Wnpqru6xgTQE"]
     TG_SAY_HI: bool = False
-    TG_STICKER_LIST: List[str] = ()
 
 
 TELEGRAM_SETTINGS = TelegramSettings()
@@ -136,7 +136,7 @@ async def private_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_ID, f"{message.from_user.username}: {message.md_text}")
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await get_message_text(message, tg_bot)
+        user_text = await preprocessor.get_message_text(message, tg_bot)
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await PRIVATE_BOT.heed_and_reply(message=user_text)
     chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
@@ -148,7 +148,7 @@ async def private_message(message: types.Message):
 async def group_message(message: types.Message):
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.md_text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await get_message_text(message, tg_bot)
+        user_text = await preprocessor.get_message_text(message, tg_bot)
         logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
 
         await tg_bot.send_chat_action(message.chat.id, 'typing')
