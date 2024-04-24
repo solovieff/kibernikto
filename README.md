@@ -115,7 +115,7 @@ TG_STICKER_LIST=["CAACAgIAAxkBAAEKqsplQ8BRyPbGj_B_K4ujCLsDAe-l7wAC8AIAAs-71A7mCr
 ```
 
 
-**WeblinkSummaryPlugin and YoutubePlugin**
+- **WeblinkSummaryPlugin and YoutubePlugin**
 
 ```dotenv
 # If no key is provided, youtube videos and webpages will be ignored.
@@ -124,7 +124,7 @@ SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1
 SUMMARIZATION_OPENAI_API_MODEL=gpt-4-turbo-preview
 ```
 
-**ImageSummaryPlugin to process images.**
+- **ImageSummaryPlugin to process images.**
 
 ```dotenv
 # If no key is provided, images will not be processed.
@@ -137,7 +137,7 @@ IMAGE_SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1
 IMAGE_STORAGE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 ```
 
-**Voice messages** processing using **OpenAI**:
+- **Voice messages** processing using **OpenAI**:
 
 ```dotenv
 # If no key is provided, voice messages will not be processed.
@@ -147,8 +147,8 @@ VOICE_OPENAI_API_MODEL=whisper-1
 VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
 VOICE_FILE_LOCATION=/tmp
 ```
-
-**Voice messages** processing using [gladia.io](https://gladia.io):  
+    
+- **Voice messages** processing using [gladia.io](https://gladia.io):  
 **Gladia** Audio Intelligence API, is designed to enable any company to easily 
 embed top-quality Audio AI into their applications, whatever the tech stack.  
     
@@ -167,8 +167,8 @@ VOICE_GLADIA_API_KEY=yr-gladia-key
 VOICE_GLADIA_SUMMARIZATION_TYPE=concise
 VOICE_MIN_COMPLEX_SECONDS=300
 ```    
-
-Smart voice messages processing using both [gladia.io](https://gladia.io) and OpenAI:  
+   
+- **Smart voice messages** processing using both [gladia.io](https://gladia.io) and OpenAI:  
 
 Whisper api is a bit faster and looks better to use just for talking with your bot.
 ```dotenv
