@@ -183,6 +183,7 @@ VOICE_FILE_LOCATION=/tmp
 VOICE_MIN_COMPLEX_SECONDS=300
 VOICE_GLADIA_API_KEY=yr-gladia-key
 VOICE_GLADIA_SUMMARIZATION_TYPE=concise
+VOICE_GLADIA_CONTEXT=We have before us an interview for the position of office manager
 ```
 
 For the full list of variables, see `env_examples` folder.

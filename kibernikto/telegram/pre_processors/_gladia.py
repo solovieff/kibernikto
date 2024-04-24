@@ -19,7 +19,7 @@ class GladiaSettings(BaseSettings):
     GLADIA_API_KEY: str | None = None
     GLADIA_POLLING_INTERVAL_SECONDS: int = 13
     GLADIA_SUMMARIZATION_TYPE: Literal["general", "bullet_points", "concise"] = "general"
-    UPLOAD_URL: str = "https://api.gladia.io/v2/upload/"
+    GLADIA_UPLOAD_URL: str = "https://api.gladia.io/v2/upload/"
     TRANSCRIPT_URL: str = "https://api.gladia.io/v2/transcription/"
     FILE_LOCATION: str = "/tmp"
 
@@ -177,7 +177,7 @@ async def _upload_file(session: ClientSession, file_path):
                             filename=f"{file_name}",
                             content_type=f"audio/{file_extension}")
 
-        async with session.post(url=DEFAULT_SETTINGS.UPLOAD_URL,
+        async with session.post(url=DEFAULT_SETTINGS.GLADIA_UPLOAD_URL,
                                 headers=upload_headers,
                                 data=form_data) as upload_response:
             resp_json = await upload_response.json()
@@ -232,11 +232,8 @@ async def __pure_callback(result, is_error=False):
 
 
 if __name__ == '__main__':
-    # asyncio.run(_process_audio(file_path="interview_test.ogg", callback=fake_callback))
-    # asyncio.run(_process_audio(file_path="anna-and-sasha-16000.wav", callback=fake_callback,
-    # audio_url="https://api.gladia.io/file/1c3b9cbb-61cc-455a-a2d3-5e2c6735fdd4"))
     asyncio.run(
-        process_audio(file_path="fox1.ogg", callback=__pure_callback,
+        process_audio(file_path="fox1.ogg",
                       context_prompt="Перед нами интервью",
                       user_message="Как бы ты оценил результаты интервью? Какие проблемы были озвучены?")
     )
