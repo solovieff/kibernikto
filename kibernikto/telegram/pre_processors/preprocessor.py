@@ -1,6 +1,11 @@
+"""
+Pre-processing telegram message. In contrast to Plugins (which process the message text), this module does actions with
+rich raw tg message
+"""
 import logging
 import os
-from typing import BinaryIO, Literal
+import pprint
+from typing import BinaryIO, Literal, Callable
 
 from aiogram import types, enums, Bot as AIOGramBot
 from openai import AsyncOpenAI
@@ -20,7 +25,7 @@ class PreprocessorSettings(BaseSettings):
     VOICE_FILE_LOCATION: str = "/tmp"
     PRE_FILE_LOCATION: str = "/tmp"
     VOICE_GLADIA_API_KEY: str | None = None
-    VOICE_GLADIA_MIN_SIZE_BYTES: int = 1_000_000
+    VOICE_MIN_COMPLEX_SECONDS: int = 300 # more than 5 minutes seems to be a dialogue or smth.
     VOICE_GLADIA_CONTEXT: str | None = None
 
 
@@ -36,7 +41,7 @@ async def get_message_text(message: types.Message, tg_bot: AIOGramBot):
     :return:
     """
     user_text = message.md_text
-    files = None
+    file_info = None
 
     who = f"{message.from_user.username}:{message.from_user.id}"
     logging.debug(f"processing {message.content_type} from {who}")
@@ -48,9 +53,11 @@ async def get_message_text(message: types.Message, tg_bot: AIOGramBot):
     elif message.content_type == enums.ContentType.VOICE and message.voice:
         if SETTINGS.VOICE_PROCESSOR is not None:
             voice: types.Voice = message.voice
-            user_text = await _process_voice(voice, tg_bot=tg_bot)
+            user_text, file_info = await _process_voice(voice, tg_bot=tg_bot)
+            pprint.pprint(file_info)
+            #await message.reply()
         else:
-            pass
+            logging.warning(f"No voice processor configured for {message.voice.file_id}")
     elif message.content_type == enums.ContentType.DOCUMENT and message.document:
         logging.debug(f"processing document from {who}")
         document = message.document
@@ -71,35 +78,48 @@ async def _process_photo(photo: types.PhotoSize, tg_bot: AIOGramBot):
     return url
 
 
-async def _process_voice(voice: types.Voice, tg_bot: AIOGramBot, user_text: str = "", delayed_callback = None):
+async def _process_voice(voice: types.Voice, tg_bot: AIOGramBot, user_text: str = ""):
+    """
+    :param voice: The `types.Voice` object containing the voice file information.
+    :type voice: `types.Voice`
+    :param tg_bot: The `AIOGramBot` instance
+    :type tg_bot: `AIOGramBot`
+    :param user_text: The optional text accompanying the voice message.
+    :type user_text: `str`
+    :param delayed_callback: The optional callback function to be called after processing the voice message.
+    :type delayed_callback: `Callable`
+    :return: The resulting text after processing the voice message.
+    :rtype: `str`
+    """
     file: types.File = await tg_bot.get_file(voice.file_id)
     file_path = file.file_path
+
     local_file_path = f"{SETTINGS.VOICE_FILE_LOCATION}/{file.file_unique_id}.ogg"
     await tg_bot.download_file(file_path, local_file_path)
 
     resulting_text = None
-    file_is_big = os.path.getsize(local_file_path) > SETTINGS.VOICE_GLADIA_MIN_SIZE_BYTES
+    file_info = None
 
-    logging.info(f"processing big file: {local_file_path}")
+    comlex_analysis = voice.duration > SETTINGS.VOICE_MIN_COMPLEX_SECONDS
+
+    logging.info(f"Is {local_file_path} big and does it need comlex_analysis? {comlex_analysis}!")
 
     if SETTINGS.VOICE_PROCESSOR == "openai":
         resulting_text = await _process_voice_openai(local_file_path)
     elif SETTINGS.VOICE_PROCESSOR == "gladia":
-        await _process_voice_gladia(local_file_path=local_file_path,
-                                    user_message=user_text,
-                                    call_on_finish=None,
-                                    is_user_request=not file_is_big,
-                                    )
+        resulting_text, file_info = await _process_voice_gladia(local_file_path=local_file_path,
+                                                                user_message=user_text,
+                                                                comlex_analysis=comlex_analysis,
+                                                                )
     elif SETTINGS.VOICE_PROCESSOR == "auto":
-        if file_is_big and SETTINGS.VOICE_GLADIA_API_KEY is not None:
-            await _process_voice_gladia(local_file_path=local_file_path,
-                                        user_message=user_text,
-                                        call_on_finish=delayed_callback,
-                                        is_user_request=False,
-                                        )
+        if comlex_analysis is True and SETTINGS.VOICE_GLADIA_API_KEY is not None:
+            resulting_text, file_info = await _process_voice_gladia(local_file_path=local_file_path,
+                                                                    user_message=user_text,
+                                                                    comlex_analysis=comlex_analysis,
+                                                                    )
         else:
             resulting_text = await _process_voice_openai(local_file_path)
-    return resulting_text
+    return resulting_text, file_info
 
 
 async def _process_voice_openai(local_file_path):
@@ -126,28 +146,25 @@ async def _process_voice_openai(local_file_path):
         return transcription
 
 
-async def _process_voice_gladia(local_file_path, user_message, call_on_finish, is_user_request=False):
+async def _process_voice_gladia(local_file_path, user_message, comlex_analysis=False):
     """
     :param local_file_path: The local file path of the voice input file.
     :type local_file_path: str
     :param user_message: The user's message corresponding to the voice input.
     :type user_message: str
-    :param call_on_finish: The callback function to be called when processing finishes.
-    :type call_on_finish: callable
-    :param is_user_request: Optional parameter to indicate if the voice input is a user request and should not be processed as dialogue or summarized. Defaults to False.
-    :type is_user_request: bool
+    :param comlex_analysis: Optional parameter to indicate if the voice input is a user request and should not be processed as dialogue or summarized. Defaults to False.
+    :type comlex_analysis: bool
     :return: None
     :rtype: None
 
-    This method processes the voice input using Gladia's audio processing functionality. It takes the local file path of the voice input file, the user's message, the callback function to
-    * be called when processing finishes, and an optional parameter to indicate if the voice input is a user request. The default value for is_user_request is False.
+    This method processes the voice input using Gladia's audio processing functionality. It takes the local file path of the voice input file, the user's message,
+    * The default value for comlex_analysis is False.
 
     Example usage:
-        await _process_voice_gladia('/path/to/voice/input.wav', 'Hello', callback_func, True)
+        await _process_voice_gladia('/path/to/voice/input.wav', 'Hello', True)
     """
-    await _gladia.process_audio(file_path=local_file_path, callback=call_on_finish, user_message=user_message,
-                                context_prompt=SETTINGS.VOICE_GLADIA_CONTEXT, basic=is_user_request)
-    return None
+    return await _gladia.process_audio(file_path=local_file_path, user_message=user_message,
+                                       context_prompt=SETTINGS.VOICE_GLADIA_CONTEXT, basic=not comlex_analysis)
 
 
 async def _process_document(document: types.Document, tg_bot: AIOGramBot):

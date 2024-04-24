@@ -27,7 +27,7 @@ class TelegramSettings(BaseSettings):
     TG_CHUNK_SENTENCES: int = 7
     TG_REACTION_CALLS: List[str] = ['honda', 'киберникто']
     TG_SAY_HI: bool = False
-    TG_STICKER_LIST = ["CAACAgIAAxkBAAELx29l_2OsQzpRWhmXTIMBM4yekypTOwACdgkAAgi3GQI1Wnpqru6xgTQE"]
+    TG_STICKER_LIST: List[str] = ["CAACAgIAAxkBAAELx29l_2OsQzpRWhmXTIMBM4yekypTOwACdgkAAgi3GQI1Wnpqru6xgTQE"]
 
 
 TELEGRAM_SETTINGS = TelegramSettings()
@@ -106,8 +106,8 @@ async def on_startup(bot: Bot):
                            username=bot_me.username,
                            config=executor_config)
 
-        if TELEGRAM_SETTINGS.TG_SAY_HI and TELEGRAM_SETTINGS.TG_MASTER_IDS:
-            master_id = TELEGRAM_SETTINGS.TG_MASTER_IDS[0]
+        if TELEGRAM_SETTINGS.TG_SAY_HI and TELEGRAM_SETTINGS.TG_MASTER_ID:
+            master_id = TELEGRAM_SETTINGS.TG_MASTER_ID
             await send_random_sticker(chat_id=master_id)
             bot: TelegramBot = get_ai_executor(master_id)
             hi_message = await bot.heed_and_reply("Поприветствуй своего хозяина!",
@@ -142,6 +142,7 @@ async def private_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
 
+    # TODO: plugins should be reworked and combined with preprocessor
     user_text = await preprocessor.get_message_text(message, tg_bot=tg_bot)
 
     user_ai = get_ai_executor(user_id)

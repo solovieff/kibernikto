@@ -6,7 +6,7 @@ import os
 import pprint
 from asyncio import sleep
 from http.client import HTTPException
-from typing import Callable
+from typing import Callable, Literal
 
 import aiofiles
 import aiohttp
@@ -17,6 +17,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class GladiaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='VOICE_')
     GLADIA_API_KEY: str | None = None
+    GLADIA_POLLING_INTERVAL_SECONDS: int = 13
+    GLADIA_SUMMARIZATION_TYPE: Literal["general", "bullet_points", "concise"] = "general"
     UPLOAD_URL: str = "https://api.gladia.io/v2/upload/"
     TRANSCRIPT_URL: str = "https://api.gladia.io/v2/transcription/"
     FILE_LOCATION: str = "/tmp"
@@ -30,35 +32,23 @@ HEADERS = {
 }
 
 
-async def process_audio(file_path, callback, audio_url=None, user_message=None, context_prompt=None, basic=True):
+async def process_audio(file_path, audio_url=None, user_message=None, context_prompt=None, basic=True):
     """
     :param file_path: The path to the audio file to be processed. The file should be in a supported audio format.
     :type file_path: str
-    :param callback: The callback function that will be called when the processing is done. The function should accept two arguments - the processed data and a flag indicating if there was
-    * an error.
-    :type callback: callable
     :param audio_url: The URL of the audio file to be processed. If not provided, the file will be uploaded using the file_path.
     :type audio_url: str, optional
     :param user_message: The user message to be used as the default prompt for audio to text and summarization services. If not provided, a default prompt will be used.
     :type user_message: str, optional
     :param context_prompt: The context prompt to be used for summarization service. If not provided, no context prompt will be used.
     :type context_prompt: str, optional
-    :param basic: Flag indicating if the basic transcription service should be used. Default is True.
+    :param basic: Flag indicating if it is a usual user message or something more complicated. If basic is false callback is required.
     :type basic: bool, optional
-    :return: None
+    :return: transcript for basic, None for not basic (to use callback)
     :rtype: None
 
     """
     default_prompt = user_message if user_message else "Extract the key points from the transcription"
-
-    async def callback_preprocessor(result, is_error):
-        if is_error:
-            await callback(result, True)
-        if basic:
-            data = await _basic_transcript_ready(result)
-        else:
-            data = await _full_transcript_ready(result)
-        await callback(data, False)
 
     async with aiohttp.ClientSession() as session:
         if not audio_url:
@@ -79,7 +69,7 @@ async def process_audio(file_path, callback, audio_url=None, user_message=None, 
                 "diarization": True,
                 "summarization": True,
                 "summarization_config": {
-                    "type": "bullet_points"
+                    "type": DEFAULT_SETTINGS.GLADIA_SUMMARIZATION_TYPE
                 },
                 "audio_to_llm": True,
                 "audio_to_llm_config": {
@@ -95,31 +85,37 @@ async def process_audio(file_path, callback, audio_url=None, user_message=None, 
         transcript_response = await _retrieve_transcript_info(session=session,
                                                               transcript_data=transcript_request_data)
         result_poll_url = transcript_response["result_url"]
-        polling_task = asyncio.get_event_loop().create_task(
-            _poll_transcript_ready(result_url=result_poll_url, callback=callback_preprocessor))
-        await polling_task
+        # let async do the job! polling inside!
+        transcript_results = await _poll_transcript_ready(result_url=result_poll_url, session=session)
+
+        if basic:
+            return transcript_results['transcription']['full_transcript']
+        else:
+            data = await _full_transcript_ready(transcript_results)
+            return data["summarization"], data
+            # polling_task = asyncio.get_event_loop().create_task(
+            #    _poll_transcript_ready(result_url=result_poll_url, callback=callback_preprocessor))
+            # await polling_task
+            # return None
 
 
-async def _poll_transcript_ready(result_url: str, callback: Callable):
+async def _poll_transcript_ready(result_url: str, session: ClientSession):
     transcript_headers = HEADERS
     transcript_headers["Content-Type"] = "application/json"
-    if result_url:
-        async with aiohttp.ClientSession() as session:
-            while True:
-                print("Polling for results...")
-                async with session.get(url=result_url, headers=transcript_headers) as poll_response:
-                    json = await poll_response.json()
-                    if json["status"] == "done":
-                        print("+ Transcription done: \n")
-                        await callback(json["result"])
-                        break
-                    elif json["status"] == "error":
-                        print("- Transcription failed")
-                        pprint.pprint(json)
-                        await callback(json, True)
-                    else:
-                        print("Transcription status:", json["status"])
-                    await sleep(5)
+    while True:
+        async with session.get(url=result_url, headers=transcript_headers) as poll_response:
+            json = await poll_response.json()
+            # pprint.pprint(json)
+            if json["status"] == "done":
+                print("+ Transcription done: \n")
+                return json['result']
+            elif json["status"] == "error":
+                print("- Transcription failed")
+                pprint.pprint(json)
+                raise RuntimeError(f"Failed to get the transcript: {json['result']}")
+            else:
+                print("Transcription status:", json["status"])
+            await sleep(DEFAULT_SETTINGS.GLADIA_POLLING_INTERVAL_SECONDS)
 
 
 async def _retrieve_transcript_info(session: ClientSession, transcript_data):
@@ -165,16 +161,10 @@ def make_normal_dialogue(transcription_utterances: []):
 
 
 async def _upload_file(session: ClientSession, file_path):
-    file_name, file_extension = os.path.splitext(
-        file_path
-    )
+    head, file_name = os.path.split(file_path)
+    path_name, file_extension = os.path.splitext('/path/to/somefile.ext')
 
-    logging.info(f"{file_name}.{file_extension} is being processed by Gladia")
-
-    if os.path.exists(file_path):  # This is here to check if the file exists
-        print("- File exists")
-    else:
-        print("- File does not exist")
+    logging.info(f"{file_path} is being processed by Gladia")
 
     async with aiofiles.open(file_path, mode='rb') as f:
         form_data = aiohttp.FormData()
@@ -184,8 +174,8 @@ async def _upload_file(session: ClientSession, file_path):
 
         form_data.add_field('audio',
                             file_content,
-                            filename=f"{file_name}{file_extension}",
-                            content_type=f"audio/{file_extension[1:]}")
+                            filename=f"{file_name}",
+                            content_type=f"audio/{file_extension}")
 
         async with session.post(url=DEFAULT_SETTINGS.UPLOAD_URL,
                                 headers=upload_headers,
@@ -202,12 +192,11 @@ async def _upload_file(session: ClientSession, file_path):
 
 
 async def _basic_transcript_ready(result):
-    pprint.pprint(result)
-    return json.dumps(result, indent=4, ensure_ascii=False)
+    return result
 
 
 async def _full_transcript_ready(result):
-    pprint.pprint(result)
+    logging.debug(f"{result}")
     summary_location = f'{DEFAULT_SETTINGS.FILE_LOCATION}/summary.txt'
     dialogue_location = f'{DEFAULT_SETTINGS.FILE_LOCATION}/dialogue.json'
     full_location = f"{DEFAULT_SETTINGS.FILE_LOCATION}/full_data.json"
@@ -229,7 +218,7 @@ async def _full_transcript_ready(result):
             await file.write(json.dumps(summarization, indent=4, ensure_ascii=False))
 
     return {
-        "summary_location": summary_location,
+        "summarization": summarization,
         "dialogue_location": dialogue_location,
         "full_location": full_location,
     }
