@@ -1,13 +1,16 @@
 # kibernikto
 
 Kibernikto is an app/lib to easily run telegram bots connected to AI models with additional features.  
-Kibernikto bots can be easily extended to be used outised telegram.
+Kibernikto bots can be easily extended to be used outside telegram.  
+Core and bots can be used as a core libs for creating ai-bot based apps.  
 
-- voice messages recognition
-- youtube video summary
-- webpage summary
-- image recognition
-- function tools easy integration (anthropic xml format supported!)
+- ✍️ telegram conversations with different AIs in groups or privately (including hidden second-level AI-redactors)
+- 🔉 voice messages recognition
+- 👂 interviews and meetings (up to 2 hours) analysis right in Telegram using Gladia.io 
+- 🎞 youtube video summarization
+- 🔗 webpage summarization
+- 📸 image recognition
+- 🫡 openai function tools easy [integration](https://github.com/solovieff/kibernikto-planner). No more pain. ~~(anthropic xml format supported, too! looks like they changed it again)~~
 
 Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
 
@@ -95,40 +98,7 @@ OPENAI_MAX_TOKENS=800
 OPENAI_WHO_AM_I=Answer all questions as {0}, the majestic lord of the universes with all the knowledge of our small planet.  
 ```
 
-WeblinkSummaryPlugin and YoutubePlugin.
-
-```dotenv
-# If no key is provided, youtube videos and webpages will be ignored.
-SUMMARIZATION_OPENAI_API_KEY=yr-key
-SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1  
-SUMMARIZATION_OPENAI_API_MODEL=gpt-4-turbo-preview
-```
-
-ImageSummaryPlugin to process images.
-
-```dotenv
-# If no key is provided, images will not be processed.
-IMAGE_SUMMARIZATION_OPENAI_API_KEY=yr-key
-IMAGE_SUMMARIZATION_OPENAI_API_MODEL=gpt-4-vision-preview
-IMAGE_SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1
-
-# You can get your key here: https://imgbb.com. If you do no set up this variable, default one will be used.  
-# This is needed to store images send to the bot.  
-IMAGE_STORAGE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-```
-
-Voice messages processing
-
-```dotenv
-# If no key is provided, voice messages will not be processed.
-VOICE_OPENAI_API_KEY=yr-key
-VOICE_OPENAI_API_MODEL=whisper-1
-VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
-VOICE_PROCESSOR=openai
-VOICE_FILE_LOCATION=/tmp/tg_voices
-```
-
-Telegram
+**Telegram**
 
 ```dotenv
 # Telegram configuration
@@ -142,6 +112,77 @@ TG_MASTER_ID=XXXXXXXXX
 TG_REACTION_CALLS=["киберникто","государь"]  
 # sometimes Kibernikto sends stickers for fun together with his answers  
 TG_STICKER_LIST=["CAACAgIAAxkBAAEKqsplQ8BRyPbGj_B_K4ujCLsDAe-l7wAC8AIAAs-71A7mCrGe-zzi0DME","CAACAgIAAxkBAAEIgoxkMaHv1maOeEne8CYAAY5s4kJ1e4wAAo4JAAIItxkCXSMuZ6bo59gvBA"]
+```
+
+
+**WeblinkSummaryPlugin and YoutubePlugin**
+
+```dotenv
+# If no key is provided, youtube videos and webpages will be ignored.
+SUMMARIZATION_OPENAI_API_KEY=yr-key
+SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1  
+SUMMARIZATION_OPENAI_API_MODEL=gpt-4-turbo-preview
+```
+
+**ImageSummaryPlugin to process images.**
+
+```dotenv
+# If no key is provided, images will not be processed.
+IMAGE_SUMMARIZATION_OPENAI_API_KEY=yr-key
+IMAGE_SUMMARIZATION_OPENAI_API_MODEL=gpt-4-vision-preview
+IMAGE_SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1
+
+# You can get your key here: https://imgbb.com. If you do no set up this variable, default one will be used.  
+# This is needed to store images send to the bot.  
+IMAGE_STORAGE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+```
+
+**Voice messages** processing using **OpenAI**:
+
+```dotenv
+# If no key is provided, voice messages will not be processed.
+VOICE_PROCESSOR=openai
+VOICE_OPENAI_API_KEY=yr-key
+VOICE_OPENAI_API_MODEL=whisper-1
+VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
+VOICE_FILE_LOCATION=/tmp
+```
+
+**Voice messages** processing using [gladia.io](https://gladia.io):  
+**Gladia** Audio Intelligence API, is designed to enable any company to easily 
+embed top-quality Audio AI into their applications, whatever the tech stack.  
+    
+As whisper api is limited to 25 megs, [gladia.io](https://glaudia.io) helps to process bigger files.    
+
+Kibernikto treats voice messages with duration less than `VOICE_MIN_COMPLEX_SECONDS` as usual AI interaction ones.
+For longer durations Kibernikto will return detailed audio 
+analysis including summary etc.  
+
+Perfect solution for analyzing interviews and meeting.  
+Gladia price policies are also very affordable.
+
+```dotenv
+VOICE_PROCESSOR=gladia
+VOICE_GLADIA_API_KEY=yr-gladia-key
+VOICE_GLADIA_SUMMARIZATION_TYPE=concise
+VOICE_MIN_COMPLEX_SECONDS=300
+```    
+
+Smart voice messages processing using both [gladia.io](https://gladia.io) and OpenAI:  
+
+Whisper api is a bit faster and looks better to use just for talking with your bot.
+```dotenv
+VOICE_PROCESSOR=**auto**
+
+VOICE_OPENAI_API_KEY=yr-key
+VOICE_OPENAI_API_MODEL=whisper-1
+VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
+VOICE_FILE_LOCATION=/tmp
+
+#starting this audio length Kibernikto will start using Gladia and deeper analysis
+VOICE_MIN_COMPLEX_SECONDS=300
+VOICE_GLADIA_API_KEY=yr-gladia-key
+VOICE_GLADIA_SUMMARIZATION_TYPE=concise
 ```
 
 For the full list of variables, see `env_examples` folder.
@@ -170,6 +211,7 @@ To obtain sticker ids: https://t.me/idstickerbot
 To get familiar with basic OpenAI principles: https://openai.com  
 Basics on Gpt-4 vision: https://gptpluginz.com/gpt-4-vision-api  
 To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models  
+Audio analysis: https://gladia.io  
 Website to text and other helpful tools https://toolsyep.com  
 Free image hosting: https://imgbb.com
 
