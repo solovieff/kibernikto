@@ -140,6 +140,7 @@ class OpenAIExecutor:
         return response_message
 
     async def _run_for_messages(self, full_prompt, author=NOT_GIVEN):
+        tools_to_use = self.tools_definitions if self.tools_definitions else NOT_GIVEN
 
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
@@ -147,7 +148,7 @@ class OpenAIExecutor:
             max_tokens=AI_SETTINGS.OPENAI_MAX_TOKENS,
             temperature=AI_SETTINGS.OPENAI_TEMPERATURE,
             user=author,
-            tools=self.tools_definitions
+            tools=tools_to_use
         )
         choice: Choice = completion.choices[0]
 
