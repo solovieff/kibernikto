@@ -8,6 +8,7 @@ from random import choice
 from typing import List
 
 from aiogram import Bot, Dispatcher, types, enums, F
+from aiogram.filters import and_f
 from aiogram.types import User
 from pydantic_settings import BaseSettings
 
@@ -128,7 +129,7 @@ async def send_random_sticker(chat_id):
         chat_id=chat_id)
 
 
-@dp.message(F.chat.type == enums.ChatType.PRIVATE)
+@dp.message(and_f(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/')))
 async def private_message(message: types.Message):
     if not PRIVATE_BOT.check_master(message.from_user.id, message.md_text):
         reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не мой Господин " \

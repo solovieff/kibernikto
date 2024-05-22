@@ -5,9 +5,9 @@ import traceback
 from random import choice
 from typing import List
 
-from aiogram import Bot, Dispatcher, types, enums, F
-from aiogram.filters import or_f
-from aiogram.types import User
+from aiogram import Bot, Dispatcher, types, enums, F, filters
+from aiogram.filters import or_f, and_f
+from aiogram.types import User, BotCommand
 from pydantic_settings import BaseSettings
 
 from kibernikto.interactors import OpenAiExecutorConfig
@@ -70,7 +70,7 @@ def start(bot_class, tools=[]):
     dp.run_polling(tg_bot, skip_updates=True)
 
 
-async def async_start(bot_class, tools=[]):
+async def async_start(bot_class, tools=[], commands=[]):
     """
     runs the executor polling the dispatcher for incoming messages
 
@@ -86,6 +86,11 @@ async def async_start(bot_class, tools=[]):
     TOOLS = tools
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
+
+    async def hello_handler(message: types.Message):
+        await message.reply("Привет, бот здесь!")
+
+    dp.message.register(hello_handler, filters.Command("hello"))
     tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY)
     await dp.start_polling(tg_bot, skip_updates=True)
 
@@ -130,7 +135,7 @@ async def send_random_sticker(chat_id):
         chat_id=chat_id)
 
 
-@dp.message(F.chat.type == enums.ChatType.PRIVATE)
+@dp.message(and_f(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/')))
 async def private_message(message: types.Message):
     user_id = message.from_user.id
 
