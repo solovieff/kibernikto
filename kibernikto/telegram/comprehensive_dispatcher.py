@@ -87,10 +87,6 @@ async def async_start(bot_class, tools=[], commands=[]):
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
 
-    async def hello_handler(message: types.Message):
-        await message.reply("Привет, бот здесь!")
-
-    dp.message.register(hello_handler, filters.Command("hello"))
     tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY)
     await dp.start_polling(tg_bot, skip_updates=True)
 
