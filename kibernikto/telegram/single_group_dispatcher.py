@@ -17,7 +17,7 @@ from kibernikto.interactors.tools import Toolbox
 from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 from kibernikto.utils.text import split_text_by_sentences, split_text_into_chunks_by_sentences
-from kibernikto.telegram.pre_processors import preprocessor
+from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from .telegram_bot import TelegramBot
 
 
@@ -40,7 +40,7 @@ smart_bot_class = None
 tg_bot: Bot = None
 bot_me: User = None
 dp = Dispatcher()
-
+preprocessor = TelegramMessagePreprocessor()
 # Open AI bot instances.
 # TODO: upper level class to create
 FRIEND_GROUP_BOT: TelegramBot | None = None
@@ -52,16 +52,25 @@ MAX_TG_MESSAGE_LEN = 4096
 commands = {}
 
 
-def start(bot_class, tools=[]):
+def start(bot_class, tools=[], msg_preprocessor=None):
     """
     runs the executor polling the dispatcher for incoming messages
 
+    :param tools: tools available for bots created by this dispatcher
+    :type tools: List[Toolbox]
     :param bot_class: the bot class to use
+    :type bot_class: Type[TelegramBot]
+    :param msg_preprocessor: if we want to use custom message preprocessor
+    :type msg_preprocessor: Type[TelegramMessagePreprocessor]
+
     :return:
     """
     global smart_bot_class
     global tg_bot
     global TOOLS
+    global preprocessor
+    if msg_preprocessor:
+        preprocessor = msg_preprocessor
     TOOLS = tools
 
     print("\t")
@@ -137,7 +146,7 @@ async def private_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_ID, f"{message.from_user.username}: {message.md_text}")
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await preprocessor.get_message_text(message, tg_bot)
+        user_text = await preprocessor.process_tg_message(message, tg_bot)
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await PRIVATE_BOT.heed_and_reply(message=user_text)
     chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
@@ -149,7 +158,7 @@ async def private_message(message: types.Message):
 async def group_message(message: types.Message):
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.md_text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
-        user_text = await preprocessor.get_message_text(message, tg_bot)
+        user_text = await preprocessor.process_tg_message(message, tg_bot)
         logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
 
         await tg_bot.send_chat_action(message.chat.id, 'typing')

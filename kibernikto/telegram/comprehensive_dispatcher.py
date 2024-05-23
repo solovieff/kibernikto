@@ -14,7 +14,7 @@ from kibernikto.interactors import OpenAiExecutorConfig
 from kibernikto.interactors.tools import Toolbox
 from kibernikto.utils.text import split_text_by_sentences
 from ._executor_corral import init as init_ai_bot_corral, get_ai_executor, kill as kill_animals
-from kibernikto.telegram.pre_processors import preprocessor
+from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from .telegram_bot import TelegramBot
 
 
@@ -39,11 +39,11 @@ TOOLS: List[Toolbox] = []
 tg_bot: Bot = None
 bot_me: User = None
 dp = Dispatcher()
-
+preprocessor = TelegramMessagePreprocessor()
 commands = {}
 
 
-def start(bot_class, tools=[]):
+def start(bot_class, tools=[], msg_preprocessor: TelegramMessagePreprocessor = None):
     """
     runs the executor polling the dispatcher for incoming messages
 
@@ -51,12 +51,18 @@ def start(bot_class, tools=[]):
     :type tools: List[Toolbox]
     :param bot_class: the bot class to use
     :type bot_class: Type[TelegramBot]
+    :param msg_preprocessor: if we want to use custom message preprocessor
+    :type msg_preprocessor: Type[TelegramMessagePreprocessor]
     :return:
     """
     global smart_bot_class
     global tg_bot
     global TOOLS
     TOOLS = tools
+
+    global preprocessor
+    if msg_preprocessor:
+        preprocessor = msg_preprocessor
 
     print("\t")
     print('\t%-15s%-15s' % ("tg master:", TELEGRAM_SETTINGS.TG_MASTER_ID))
@@ -70,7 +76,7 @@ def start(bot_class, tools=[]):
     dp.run_polling(tg_bot, skip_updates=True)
 
 
-async def async_start(bot_class, tools=[], commands=[]):
+async def async_start(bot_class, tools=[], msg_preprocessor=None):
     """
     runs the executor polling the dispatcher for incoming messages
 
@@ -84,6 +90,11 @@ async def async_start(bot_class, tools=[], commands=[]):
     global tg_bot
     global TOOLS
     TOOLS = tools
+
+    global preprocessor
+    if msg_preprocessor:
+        preprocessor = msg_preprocessor
+
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
 
@@ -144,7 +155,7 @@ async def private_message(message: types.Message):
                                   f"{message.from_user.username}: {message.md_text}")
 
     # TODO: plugins should be reworked and combined with preprocessor
-    user_text = await preprocessor.get_message_text(message, tg_bot=tg_bot)
+    user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
 
     user_ai = get_ai_executor(user_id)
 
@@ -172,7 +183,7 @@ async def group_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
 
-    user_text = await preprocessor.get_message_text(message)
+    user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
     group_ai = get_ai_executor(user_id)
 
     if is_reply(message) or group_ai.should_react(message.md_text):
