@@ -147,6 +147,8 @@ async def private_message(message: types.Message):
     else:
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await preprocessor.process_tg_message(message, tg_bot)
+        if user_text is None:
+            return None  # do not reply
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await PRIVATE_BOT.heed_and_reply(message=user_text)
     chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
@@ -159,6 +161,8 @@ async def group_message(message: types.Message):
     if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.md_text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await preprocessor.process_tg_message(message, tg_bot)
+        if user_text is None:
+            return None  # do not reply
         logging.getLogger().info(f"group_message: from {message.from_user.full_name} in {message.chat.title} processed")
 
         await tg_bot.send_chat_action(message.chat.id, 'typing')
