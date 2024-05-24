@@ -58,7 +58,7 @@ class TelegramMessagePreprocessor():
         elif message.content_type == enums.ContentType.DOCUMENT and message.document:
             logging.debug(f"processing document from {who}")
             document = message.document
-            file_path = await self._process_document(document, tg_bot)
+            user_text = await self._process_document(document, tg_bot, message)
         elif message.content_type == enums.ContentType.TEXT and message.text:
             logging.debug(f"processing text from {who}")
             return message.text
@@ -159,7 +159,7 @@ class TelegramMessagePreprocessor():
         return await _gladia.process_audio(file_path=local_file_path, user_message=user_message,
                                            context_prompt=SETTINGS.VOICE_GLADIA_CONTEXT, basic=not comlex_analysis)
 
-    async def _process_document(self, document: types.Document, tg_bot: AIOGramBot):
+    async def _process_document(self, document: types.Document, tg_bot: AIOGramBot, message: types.Message):
         file: types.File = await tg_bot.get_file(document.file_id)
         file_path = file.file_path
         photo_file: BinaryIO = await tg_bot.download_file(file_path)

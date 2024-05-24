@@ -6,7 +6,8 @@ from typing import List
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
-from openai.types.edit import Choice
+from openai.types.chat.chat_completion import Choice
+
 from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS

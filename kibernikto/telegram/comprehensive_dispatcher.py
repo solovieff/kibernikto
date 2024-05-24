@@ -156,7 +156,8 @@ async def private_message(message: types.Message):
 
     # TODO: plugins should be reworked and combined with preprocessor
     user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
-
+    if user_text is None:
+        return None # do not reply
     user_ai = get_ai_executor(user_id)
 
     await tg_bot.send_chat_action(message.chat.id, 'typing')
