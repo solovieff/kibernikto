@@ -122,7 +122,7 @@ def _is_youtube_url(url):
 def _get_video_from_text(text) -> YouTube:
     any_link, other_text = _extract_link(text)
     if any_link is None or not _is_youtube_url(any_link):
-        return None
+        return None, None
 
     other_text = text.replace(any_link, "").strip()
     youtube_video = YouTube(f'{any_link}')

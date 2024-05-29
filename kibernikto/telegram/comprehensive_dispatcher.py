@@ -3,7 +3,7 @@ import os
 import sys
 import traceback
 from random import choice
-from typing import List
+from typing import List, Callable
 
 from aiogram import Bot, Dispatcher, types, enums, F, filters
 from aiogram.filters import or_f, and_f
@@ -40,10 +40,11 @@ tg_bot: Bot = None
 bot_me: User = None
 dp = Dispatcher()
 preprocessor = TelegramMessagePreprocessor()
-commands = {}
+
+COMMANDS: List[BotCommand] = []
 
 
-def start(bot_class, tools=[], msg_preprocessor: TelegramMessagePreprocessor = None):
+def start(bot_class, tools=[], msg_preprocessor: TelegramMessagePreprocessor = None, commands=[]):
     """
     runs the executor polling the dispatcher for incoming messages
 
@@ -58,7 +59,9 @@ def start(bot_class, tools=[], msg_preprocessor: TelegramMessagePreprocessor = N
     global smart_bot_class
     global tg_bot
     global TOOLS
+    global COMMANDS
     TOOLS = tools
+    COMMANDS = commands
 
     global preprocessor
     if msg_preprocessor:
@@ -76,7 +79,7 @@ def start(bot_class, tools=[], msg_preprocessor: TelegramMessagePreprocessor = N
     dp.run_polling(tg_bot, skip_updates=True)
 
 
-async def async_start(bot_class, tools=[], msg_preprocessor=None):
+async def async_start(bot_class, tools=[], msg_preprocessor=None, on_finish: Callable = None):
     """
     runs the executor polling the dispatcher for incoming messages
 
@@ -105,9 +108,12 @@ async def async_start(bot_class, tools=[], msg_preprocessor=None):
 async def on_startup(bot: Bot):
     try:
         global bot_me
+        global COMMANDS
 
         if bot_me is None:
             bot_me = await bot.get_me()
+            if COMMANDS:
+                await bot.set_my_commands(COMMANDS)
 
         executor_config = OpenAiExecutorConfig(name=bot_me.first_name,
                                                reaction_calls=TELEGRAM_SETTINGS.TG_REACTION_CALLS,
@@ -157,7 +163,7 @@ async def private_message(message: types.Message):
     # TODO: plugins should be reworked and combined with preprocessor
     user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
     if user_text is None:
-        return None # do not reply
+        return None  # do not reply
     user_ai = get_ai_executor(user_id)
 
     await tg_bot.send_chat_action(message.chat.id, 'typing')
@@ -186,7 +192,7 @@ async def group_message(message: types.Message):
 
     user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
     if user_text is None:
-        return None # do not reply
+        return None  # do not reply
     group_ai = get_ai_executor(chat_id)
 
     if is_reply(message) or group_ai.should_react(message.md_text):
