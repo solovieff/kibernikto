@@ -1,8 +1,11 @@
+from openai import NOT_GIVEN
+
 from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
 
 
 class TelegramBot(OpenAIExecutor):
-    def __init__(self, config: OpenAiExecutorConfig, master_id, username):
+    def __init__(self, config: OpenAiExecutorConfig, master_id, username, key=NOT_GIVEN):
+        self.key = key
         self.master_id = master_id
         self.username = username
         super().__init__(config=config)

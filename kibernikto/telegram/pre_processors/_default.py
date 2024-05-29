@@ -45,12 +45,12 @@ class TelegramMessagePreprocessor():
         if message.content_type == enums.ContentType.PHOTO and message.photo:
             if SETTINGS.IMAGE_SUMMARIZATION_OPENAI_API_KEY is not None:
                 photo: types.PhotoSize = message.photo[-1]
-                url = await self._process_photo(photo, tg_bot)
+                url = await self._process_photo(photo, tg_bot, message=message)
                 user_text = f"{user_text} {url}"
         elif message.content_type == enums.ContentType.VOICE and message.voice:
             if SETTINGS.VOICE_PROCESSOR is not None:
                 voice: types.Voice = message.voice
-                user_text, file_info = await self._process_voice(voice, tg_bot=tg_bot)
+                user_text, file_info = await self._process_voice(voice, tg_bot=tg_bot, message=message)
                 pprint.pprint(file_info)
                 # await message.reply()
             else:
@@ -61,10 +61,13 @@ class TelegramMessagePreprocessor():
             user_text = await self._process_document(document, tg_bot, message)
         elif message.content_type == enums.ContentType.TEXT and message.text:
             logging.debug(f"processing text from {who}")
-            return message.text
+            user_text = await self._process_text(message)
         return user_text
 
-    async def _process_photo(self, photo: types.PhotoSize, tg_bot: AIOGramBot):
+    async def _process_text(self, message: types.Message):
+        return message.text
+
+    async def _process_photo(self, photo: types.PhotoSize, tg_bot: AIOGramBot, message: types.Message = None):
         file: types.File = await tg_bot.get_file(photo.file_id)
         file_path = file.file_path
         photo_file: BinaryIO = await tg_bot.download_file(file_path)
@@ -73,7 +76,8 @@ class TelegramMessagePreprocessor():
         logging.info(f"published image: {url}")
         return url
 
-    async def _process_voice(self, voice: types.Voice, tg_bot: AIOGramBot, user_text: str = ""):
+    async def _process_voice(self, voice: types.Voice, tg_bot: AIOGramBot, user_text: str = "",
+                             message: types.Message = None):
         """
         :param voice: The `types.Voice` object containing the voice file information.
         :type voice: `types.Voice`

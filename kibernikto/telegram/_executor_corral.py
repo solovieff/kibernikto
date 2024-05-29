@@ -3,6 +3,8 @@ import sys
 import traceback
 from typing import Dict, Type, List
 
+from openai import NOT_GIVEN
+
 from kibernikto.plugins import KiberniktoPlugin
 
 from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
@@ -49,7 +51,7 @@ def get_ai_executor(key_id: int):
     bot = __BOTS.get(key_id)
 
     if not bot:
-        bot = _new_executor()
+        bot = _new_executor(str(key_id))
         _apply_plugins(bot)
         __BOTS[key_id] = bot
     return bot
@@ -76,7 +78,7 @@ def _apply_plugins(bot: TelegramBot):
             print_plugin_off(plugin_class)
 
 
-def _new_executor():
+def _new_executor(key_id: str = NOT_GIVEN):
     """
     creates new ai bot executor connected to AI API
     :return:
@@ -85,5 +87,6 @@ def _new_executor():
     _configuration = __EXECUTOR_CONFIG.model_copy(deep=True)
     bot = __BOT_CLASS(username=_configuration.username,
                       master_id=_configuration.master_id,
-                      config=_configuration.config)
+                      config=_configuration.config,
+                      key=key_id)
     return bot

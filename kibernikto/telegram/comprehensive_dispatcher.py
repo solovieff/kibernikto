@@ -187,7 +187,7 @@ async def group_message(message: types.Message):
     user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
     if user_text is None:
         return None # do not reply
-    group_ai = get_ai_executor(user_id)
+    group_ai = get_ai_executor(chat_id)
 
     if is_reply(message) or group_ai.should_react(message.md_text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')

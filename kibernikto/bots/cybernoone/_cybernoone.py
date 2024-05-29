@@ -16,12 +16,13 @@ class Kibernikto(TelegramBot):
     Basic implementation of Telegram bot can be used as an example.
     """
 
-    def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig):
+    def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN):
         """
         :param master_id: telegram admin id
         :param username: telegram username
         :param config: ai bot config
         """
+        self.key = key
         super().__init__(config=config, username=username, master_id=master_id)
 
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
