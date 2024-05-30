@@ -3,7 +3,7 @@ import sys
 import traceback
 from typing import Dict, Type, List
 
-from openai import NOT_GIVEN
+from openai._types import NOT_GIVEN
 
 from kibernikto.plugins import KiberniktoPlugin
 
