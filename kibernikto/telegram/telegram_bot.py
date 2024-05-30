@@ -1,4 +1,4 @@
-from openai import NOT_GIVEN
+from openai._types import NOT_GIVEN
 
 from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
 
