@@ -120,7 +120,7 @@ class TelegramMessagePreprocessor():
                 resulting_text = await self._process_voice_openai(local_file_path)
         return resulting_text, file_info
 
-    async def _process_voice_openai(local_file_path):
+    async def _process_voice_openai(self, local_file_path):
         """
         Process voice using OpenAI API.
 
