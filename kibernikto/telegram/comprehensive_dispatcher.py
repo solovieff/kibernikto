@@ -148,7 +148,7 @@ async def send_random_sticker(chat_id):
         chat_id=chat_id)
 
 
-@dp.message(and_f(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/')))
+@dp.message(and_f(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/'), ~F.caption.startswith('/')))
 async def private_message(message: types.Message):
     user_id = message.from_user.id
 

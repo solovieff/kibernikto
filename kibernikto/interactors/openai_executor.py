@@ -187,8 +187,8 @@ class OpenAIExecutor:
             return await self.process_tool_calls(choice, user_message)
 
         if save_to_history:
-            self.messages.append(this_message)
-            self.messages.append(dict(role=response_message.role, content=response_message.content))
+            self.save_to_history(this_message)
+            self.save_to_history(dict(role=response_message.role, content=response_message.content))
 
         return response_message.content
 
@@ -198,6 +198,9 @@ class OpenAIExecutor:
 
     def get_cur_system_message(self):
         return self.about_me
+
+    def save_to_history(self, this_message: dict):
+        self.messages.append(this_message)
 
     def _reset(self):
         # never gets full, +1 for system
@@ -234,7 +237,7 @@ class OpenAIExecutor:
         if save_to_history:
             self.messages.append(message_dict)
             for tool_call_message in tool_call_messages:
-                self.messages.append(tool_call_message)
+                self.save_to_history(tool_call_message)
         return response_message.content
 
     async def _run_plugins_for_message(self, message_text):
@@ -244,8 +247,8 @@ class OpenAIExecutor:
             if plugin_result is not None:
                 if not plugin.post_process_reply:
                     if plugin.store_reply:
-                        self.messages.append(dict(content=f"{message_text}", role=OpenAIRoles.user.value))
-                        self.messages.append(dict(role=OpenAIRoles.assistant.value, content=plugin_result))
+                        self.save_to_history(dict(content=f"{message_text}", role=OpenAIRoles.user.value))
+                        self.save_to_history(dict(role=OpenAIRoles.assistant.value, content=plugin_result))
                     return plugin_result, False
                 else:
                     plugins_result = plugin_result
