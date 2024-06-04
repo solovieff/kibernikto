@@ -1,6 +1,6 @@
 aiogram==3.5.0
 aiofiles==23.2.1
-certifi==2023.7.22
+certifi==2024.6.2
 python-dotenv==1.0.0
 openai>=1.26.0
 youtube_transcript_api==0.6.1

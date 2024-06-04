@@ -42,7 +42,7 @@ class OpenAIRoles(str, Enum):
 
 
 class OpenAIExecutor:
-    MAX_WORD_COUNT = 3000
+    MAX_WORD_COUNT = 13000
     """
     Basic Entity on the OpenAI library level.
     Sends requests and receives responses. Can store chat summary.
