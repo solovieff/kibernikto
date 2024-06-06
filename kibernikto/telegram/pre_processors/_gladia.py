@@ -203,7 +203,7 @@ async def _full_transcript_ready(result):
 
     dialogue = make_normal_dialogue(result['transcription']['utterances'])
 
-    if "summarization" in result:
+    if "summarization" in result and 'success' in result['summarization'] and result['summarization']['success'] is True:
         summarization = result["summarization"]["results"]
     else:
         summarization = None

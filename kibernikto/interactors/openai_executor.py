@@ -235,7 +235,7 @@ class OpenAIExecutor:
         choice: Choice = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
         if save_to_history:
-            self.messages.append(message_dict)
+            self.save_to_history(message_dict)
             for tool_call_message in tool_call_messages:
                 self.save_to_history(tool_call_message)
         return response_message.content

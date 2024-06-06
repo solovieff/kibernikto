@@ -17,6 +17,9 @@ class TelegramBot(OpenAIExecutor):
         mt_lower = message_text.lower()
         if self.full_config.name.lower() in mt_lower:
             return True
+
+        if self.username.lower() in mt_lower:
+            return True
         return parent_should or self.username.lower() in mt_lower
 
     def check_master(self, user_id, message):

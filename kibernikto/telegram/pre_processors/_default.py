@@ -4,15 +4,20 @@ import pprint
 from typing import BinaryIO, Literal, Callable
 
 from aiogram import types, enums, Bot as AIOGramBot
+from aiogram.types import FSInputFile
 from openai import AsyncOpenAI
 from openai.resources.audio import AsyncTranscriptions
 from pydantic_settings import BaseSettings
 
 from kibernikto.utils.image import publish_image_file
 from . import _gladia
+from kibernikto.utils import permissions
 
 
 class PreprocessorSettings(BaseSettings):
+    TG_MASTER_ID: int
+    TG_MASTER_IDS: list = []
+    TG_PUBLIC: bool = False
     VOICE_PROCESSOR: Literal["openai", "gladia", "auto"] | None = None
     IMAGE_SUMMARIZATION_OPENAI_API_KEY: str | None = None
     VOICE_OPENAI_API_KEY: str | None = None
@@ -52,7 +57,10 @@ class TelegramMessagePreprocessor():
                 voice: types.Voice = message.voice
                 user_text, file_info = await self._process_voice(voice, tg_bot=tg_bot, message=message)
                 pprint.pprint(file_info)
-                # await message.reply()
+                if file_info and "dialogue_location" in file_info:
+                    summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
+                    await message.reply_document(document=summary, caption=file_info['summarization'])
+                    return None
             else:
                 logging.warning(f"No voice processor configured for {message.voice.file_id}")
         elif message.content_type == enums.ContentType.DOCUMENT and message.document:
@@ -99,22 +107,27 @@ class TelegramMessagePreprocessor():
         resulting_text = None
         file_info = None
 
-        comlex_analysis = voice.duration > SETTINGS.VOICE_MIN_COMPLEX_SECONDS
+        complex_analysis = voice.duration > SETTINGS.VOICE_MIN_COMPLEX_SECONDS
 
-        logging.info(f"Is {local_file_path} big and does it need comlex_analysis? {comlex_analysis}!")
+        if complex_analysis and not permissions.is_from_admin(message):
+            await message.answer("⏳comlex_analysis disabled for non-admin users")
+            return None, None
+        elif complex_analysis:
+            await message.answer(f"⏳performing comlex_analysis for {SETTINGS.VOICE_MIN_COMPLEX_SECONDS} second audio")
+        logging.info(f"Is {local_file_path} big and does it need comlex_analysis? {complex_analysis}!")
 
         if SETTINGS.VOICE_PROCESSOR == "openai":
             resulting_text = await self._process_voice_openai(local_file_path)
         elif SETTINGS.VOICE_PROCESSOR == "gladia":
             resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
                                                                          user_message=user_text,
-                                                                         comlex_analysis=comlex_analysis,
+                                                                         comlex_analysis=complex_analysis,
                                                                          )
         elif SETTINGS.VOICE_PROCESSOR == "auto":
-            if comlex_analysis is True and SETTINGS.VOICE_GLADIA_API_KEY is not None:
+            if complex_analysis is True and SETTINGS.VOICE_GLADIA_API_KEY is not None:
                 resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
                                                                              user_message=user_text,
-                                                                             comlex_analysis=comlex_analysis,
+                                                                             comlex_analysis=complex_analysis,
                                                                              )
             else:
                 resulting_text = await self._process_voice_openai(local_file_path)

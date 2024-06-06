@@ -16,6 +16,7 @@ from kibernikto.utils.text import split_text_by_sentences
 from ._executor_corral import init as init_ai_bot_corral, get_ai_executor, kill as kill_animals
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from .telegram_bot import TelegramBot
+from kibernikto.utils.permissions import is_from_admin
 
 
 class TelegramSettings(BaseSettings):
@@ -152,29 +153,29 @@ async def send_random_sticker(chat_id):
 async def private_message(message: types.Message):
     user_id = message.from_user.id
 
-    if TELEGRAM_SETTINGS.TG_MASTER_IDS and user_id not in TELEGRAM_SETTINGS.TG_MASTER_IDS:
+    if not is_from_admin(message):
         negative_reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не один из моиз Повелителей " \
                               f"снизошёл до меня). Я передам ваше соообщение мастеру."
         await tg_bot.send_message(user_id,
                                   negative_reply_text)
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
+    else:
+        # TODO: plugins should be reworked and combined with preprocessor
+        user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
+        if user_text is None:
+            return None  # do not reply
+        user_ai = get_ai_executor(user_id)
 
-    # TODO: plugins should be reworked and combined with preprocessor
-    user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
-    if user_text is None:
-        return None  # do not reply
-    user_ai = get_ai_executor(user_id)
+        await tg_bot.send_chat_action(message.chat.id, 'typing')
+        reply_text = await user_ai.heed_and_reply(message=user_text)
 
-    await tg_bot.send_chat_action(message.chat.id, 'typing')
-    reply_text = await user_ai.heed_and_reply(message=user_text)
+        if reply_text is None:
+            reply_text = "My iron brain did not generate anything!"
 
-    if reply_text is None:
-        reply_text = "Ok!"
-
-    chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
-    for chunk in chunks:
-        await message.reply(text=chunk)
+        chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
+        for chunk in chunks:
+            await message.reply(text=chunk)
 
 
 @dp.message(or_f(F.chat.type == enums.ChatType.GROUP, F.chat.type == enums.ChatType.SUPERGROUP))
@@ -189,19 +190,19 @@ async def group_message(message: types.Message):
                                   negative_reply_text)
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
+    else:
+        user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
+        if user_text is None:
+            return None  # do not reply
+        group_ai = get_ai_executor(chat_id)
 
-    user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
-    if user_text is None:
-        return None  # do not reply
-    group_ai = get_ai_executor(chat_id)
+        if is_reply(message) or group_ai.should_react(message.md_text):
+            await tg_bot.send_chat_action(message.chat.id, 'typing')
+            reply_text = await group_ai.heed_and_reply(message=user_text)
 
-    if is_reply(message) or group_ai.should_react(message.md_text):
-        await tg_bot.send_chat_action(message.chat.id, 'typing')
-        reply_text = await group_ai.heed_and_reply(message=user_text)
-
-        chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
-        for chunk in chunks:
-            await message.reply(text=chunk)
+            chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
+            for chunk in chunks:
+                await message.reply(text=chunk)# TODO: plugins should be reworked and combined with preprocessor.
 
 
 def is_reply(message: types.Message):
