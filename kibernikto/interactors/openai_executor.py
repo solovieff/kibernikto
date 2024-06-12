@@ -5,6 +5,7 @@ from typing import List
 
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
+from openai.types import CompletionUsage
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 
@@ -23,6 +24,8 @@ class OpenAiExecutorConfig(BaseModel):
     key: str = AI_SETTINGS.OPENAI_API_KEY
     temperature: float = AI_SETTINGS.OPENAI_TEMPERATURE
     max_tokens: int = AI_SETTINGS.OPENAI_MAX_TOKENS
+    input_price: float | None = AI_SETTINGS.OPENAI_INPUT_PRICE
+    output_price: float | None = AI_SETTINGS.OPENAI_OUTPUT_PRICE
     max_messages: int = AI_SETTINGS.OPENAI_MAX_MESSAGES
     who_am_i: str = AI_SETTINGS.OPENAI_WHO_AM_I
     reset_call: str = AI_SETTINGS.OPENAI_RESET_CALL
@@ -90,6 +93,35 @@ class OpenAIExecutor:
             if x.function_name == name:
                 return x.implementation
 
+    def process_usage(self, usage: CompletionUsage) -> dict | None:
+        """
+        Calculates usage costs if possible
+        :param usage:
+        :return: usage dict updated with costs
+        """
+        logging.warning(f"usage is {usage}")
+        if not usage:
+            logging.debug("usage unknown!")
+            return None
+
+        usage_dict = usage.model_dump()
+
+        if self.full_config.input_price and self.full_config.output_price:
+            total = 0
+            if usage.completion_tokens:
+                completion_cost = usage.completion_tokens * self.full_config.output_price
+                total += completion_cost
+                usage_dict['completion_cost'] = completion_cost
+            if usage.prompt_tokens:
+                prompt_cost = usage.prompt_tokens * self.full_config.input_price
+                total += prompt_cost
+                usage_dict['prompt_cost'] = prompt_cost
+            usage_dict['total_cost'] = total
+        else:
+            logging.debug("no OPENAI_INPUT_PRICE (input_price) and OPENAI_OUTPUT_PRICE (output_price) provided")
+        logging.debug(f"process_usage: {usage_dict}")
+        return usage_dict
+
     @property
     def word_overflow(self):
         """
@@ -152,8 +184,8 @@ class OpenAIExecutor:
             tools=tools_to_use
         )
         choice: Choice = completion.choices[0]
-
-        return choice
+        usage_dict = self.process_usage(completion.usage)
+        return choice, usage_dict
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True):
         """
@@ -180,14 +212,14 @@ class OpenAIExecutor:
 
         logging.debug(f"sending {prompt}")
 
-        choice: Choice = await self._run_for_messages(prompt, author)
+        choice, usage = await self._run_for_messages(prompt, author)
         response_message: ChatCompletionMessage = choice.message
 
         if ai_tools.is_function_call(choice=choice, xml=self.xml_tools):
             return await self.process_tool_calls(choice, user_message)
 
         if save_to_history:
-            self.save_to_history(this_message)
+            self.save_to_history(this_message, usage_dict=usage)
             self.save_to_history(dict(role=response_message.role, content=response_message.content))
 
         return response_message.content
@@ -199,7 +231,7 @@ class OpenAIExecutor:
     def get_cur_system_message(self):
         return self.about_me
 
-    def save_to_history(self, this_message: dict):
+    def save_to_history(self, this_message: dict, usage_dict: dict = None):
         self.messages.append(this_message)
 
     def _reset(self):
@@ -232,7 +264,7 @@ class OpenAIExecutor:
             tool_call_messages = ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result,
                                                                          xml=self.xml_tools)
 
-        choice: Choice = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
+        choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
         if save_to_history:
             self.save_to_history(message_dict)
