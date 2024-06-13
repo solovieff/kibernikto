@@ -220,7 +220,7 @@ class OpenAIExecutor:
 
         if save_to_history:
             self.save_to_history(this_message, usage_dict=usage)
-            self.save_to_history(dict(role=response_message.role, content=response_message.content))
+            self.save_to_history(dict(role=response_message.role, content=response_message.content), usage_dict=usage)
 
         return response_message.content
 
