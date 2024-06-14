@@ -219,8 +219,9 @@ class OpenAIExecutor:
             return await self.process_tool_calls(choice, user_message)
 
         if save_to_history:
-            self.save_to_history(this_message, usage_dict=usage)
-            self.save_to_history(dict(role=response_message.role, content=response_message.content))
+            self.save_to_history(this_message, usage_dict=usage, author=author)
+            self.save_to_history(dict(role=response_message.role, content=response_message.content), usage_dict=usage,
+                                 author=author)
 
         return response_message.content
 
@@ -231,7 +232,7 @@ class OpenAIExecutor:
     def get_cur_system_message(self):
         return self.about_me
 
-    def save_to_history(self, this_message: dict, usage_dict: dict = None):
+    def save_to_history(self, this_message: dict, usage_dict: dict = None, author=NOT_GIVEN):
         self.messages.append(this_message)
 
     def _reset(self):
