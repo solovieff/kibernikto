@@ -23,7 +23,7 @@ class Kibernikto(TelegramBot):
         :param config: ai bot config
         """
         self.key = key
-        super().__init__(config=config, username=username, master_id=master_id)
+        super().__init__(config=config, username=username, master_id=master_id, key=key)
 
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         try:

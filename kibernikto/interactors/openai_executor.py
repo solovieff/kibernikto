@@ -105,6 +105,9 @@ class OpenAIExecutor:
             return None
 
         usage_dict = usage.model_dump()
+        usage_dict['completion_cost'] = 0
+        usage_dict['prompt_cost'] = 0
+        usage_dict['total_cost'] = 0
 
         if self.full_config.input_price and self.full_config.output_price:
             total = 0
@@ -118,7 +121,7 @@ class OpenAIExecutor:
                 usage_dict['prompt_cost'] = prompt_cost
             usage_dict['total_cost'] = total
         else:
-            logging.debug("no OPENAI_INPUT_PRICE (input_price) and OPENAI_OUTPUT_PRICE (output_price) provided")
+            logging.warning("no OPENAI_INPUT_PRICE (input_price) and OPENAI_OUTPUT_PRICE (output_price) provided")
         logging.debug(f"process_usage: {usage_dict}")
         return usage_dict
 
@@ -313,7 +316,9 @@ class OpenAIExecutor:
         total_word_count = sum(
             len(obj["content"].split()) for obj in list(self.messages) if
             obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None)
-        return total_word_count > self.MAX_WORD_COUNT or len(self.messages) > self.max_messages
+        return ((
+                        self.full_config.max_words_before_summary and total_word_count > self.full_config.max_words_before_summary) or
+                len(self.messages) > self.max_messages)
 
     async def _aware_overflow(self):
         """
