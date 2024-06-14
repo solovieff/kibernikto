@@ -198,7 +198,8 @@ async def group_message(message: types.Message):
 
         if is_reply(message) or group_ai.should_react(message.md_text):
             await tg_bot.send_chat_action(message.chat.id, 'typing')
-            reply_text = await group_ai.heed_and_reply(message=user_text, author=message.from_user.username)
+            reply_text = await group_ai.heed_and_reply(message=user_text,
+                                                       author=f"{chat_id}_{message.from_user.username}")
 
             chunks = split_text_by_sentences(reply_text, TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
             for chunk in chunks:
