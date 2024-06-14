@@ -191,12 +191,13 @@ async def group_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
     else:
-        user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
-        if user_text is None:
-            return None  # do not reply
         group_ai = get_ai_executor(chat_id)
 
         if is_reply(message) or group_ai.should_react(message.md_text):
+            user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
+            if user_text is None:
+                return None  # do not reply
+
             await tg_bot.send_chat_action(message.chat.id, 'typing')
             reply_text = await group_ai.heed_and_reply(message=user_text,
                                                        author=f"{chat_id}_{message.from_user.username}")
