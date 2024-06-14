@@ -39,7 +39,11 @@ def split_text_by_sentences(text, max_length):
 
     # Add the last chunk if it's not empty, trimming the extra space and period added at the end
     if current_chunk:
-        chunks.append(current_chunk.strip())
+        current_chunk = current_chunk.strip()
+        if current_chunk.endswith('.'):
+            current_chunk = current_chunk[:-1]
+
+        chunks.append(current_chunk)
 
     return chunks
 
