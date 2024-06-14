@@ -17,6 +17,7 @@ class AiSettings(BaseSettings):
     OPENAI_SUMMARY: str = """
     Give a short summary of the previous conversation in russian from the point of view of a pirate.
     """
+    OPENAI_MAX_WORDS: int = 5800
     OPENAI_INPUT_PRICE: float | None = None
     OPENAI_OUTPUT_PRICE: float | None = None
 

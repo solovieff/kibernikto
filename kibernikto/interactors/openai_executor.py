@@ -31,8 +31,9 @@ class OpenAiExecutorConfig(BaseModel):
     reset_call: str = AI_SETTINGS.OPENAI_RESET_CALL
     master_call: str = "Величайший Кибеникто!"
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
+    max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
     reaction_calls: list = ('никто', 'хонда', 'урод')
-    tools: List[Toolbox] = []
+    tools: List[Toolbox] = [],
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
@@ -45,7 +46,6 @@ class OpenAIRoles(str, Enum):
 
 
 class OpenAIExecutor:
-    MAX_WORD_COUNT = 13000
     """
     Basic Entity on the OpenAI library level.
     Sends requests and receives responses. Can store chat summary.
@@ -300,8 +300,9 @@ class OpenAIExecutor:
             temperature=self.full_config.temperature,
         )
         response_text = response.choices[0].message.content.strip()
+        usage_dict = self.process_usage(response.usage)
         logging.info(response_text)
-        return response_text
+        return response_text, usage_dict
 
     @property
     def word_overflow(self):
@@ -319,7 +320,7 @@ class OpenAIExecutor:
         Checking if additional actions like cutting the message stack or summarization needed.
         We use words not tokens here, so all numbers are very approximate
         """
-        if not self.summarize:
+        if self.full_config.max_words_before_summary == 0:
             while self.word_overflow:
                 for i in range(int(len(self.messages) / 3)):
                     self.messages.popleft()
@@ -327,7 +328,8 @@ class OpenAIExecutor:
         else:
             # summarizing previous discussion if needed
             if self.word_overflow:
-                summary_text = await self._get_summary()
+                logging.warning("You speak too much! Performing summarization!")
+                summary_text, usage_dict = await self._get_summary()
                 summary = dict(role=OpenAIRoles.system.value, content=summary_text)
                 self._reset()
-                self.messages.append(summary)
+                self.save_to_history(summary, usage_dict=usage_dict)
