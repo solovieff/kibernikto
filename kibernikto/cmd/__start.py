@@ -37,11 +37,7 @@ def start(outer_env=False):
     else:
         raise RuntimeError("Wrong bot_type, should be in ('kibernikto','vertihvostka')")
 
-    if args.dispatcher == 'default':
-        from kibernikto.telegram import single_group_dispatcher
-
-        single_group_dispatcher.start(bot_class=bot_class)
-    elif args.dispatcher == 'multiuser':
+    if args.dispatcher == 'multiuser' or args.dispatcher == 'default':
         from kibernikto.telegram import comprehensive_dispatcher
 
         comprehensive_dispatcher.start(bot_class=bot_class)

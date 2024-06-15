@@ -158,7 +158,7 @@ async def private_message(message: types.Message):
 
 @dp.message(F.chat.id == TELEGRAM_SETTINGS.TG_FRIEND_GROUP_ID)
 async def group_message(message: types.Message):
-    if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.md_text):
+    if is_reply(message) or FRIEND_GROUP_BOT.should_react(message.html_text):
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         user_text = await preprocessor.process_tg_message(message, tg_bot)
         if user_text is None:

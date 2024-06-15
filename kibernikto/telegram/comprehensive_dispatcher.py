@@ -193,7 +193,7 @@ async def group_message(message: types.Message):
     else:
         group_ai = get_ai_executor(chat_id)
 
-        if is_reply(message) or group_ai.should_react(message.md_text):
+        if is_reply(message) or group_ai.should_react(message.html_text):
             user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
             if user_text is None:
                 return None  # do not reply

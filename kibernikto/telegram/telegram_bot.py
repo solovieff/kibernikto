@@ -9,7 +9,7 @@ class TelegramBot(OpenAIExecutor):
         self.key = key
         self.master_id = master_id
         self.username = username
-        super().__init__(config=config)
+        super().__init__(config=config, unique_id=key)
 
     def should_react(self, message_text):
         if not message_text:

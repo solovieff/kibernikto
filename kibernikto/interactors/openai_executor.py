@@ -54,11 +54,12 @@ class OpenAIExecutor:
 
     def __init__(self,
                  bored_after=0,
-                 config=DEFAULT_CONFIG):
+                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN):
         self.max_messages = config.max_messages
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
+        self.unique_id = unique_id
         self.summarize = config.max_words_before_summary != 0
         self.client = AsyncOpenAI(base_url=config.url, api_key=config.key)
 
@@ -223,7 +224,8 @@ class OpenAIExecutor:
 
         if save_to_history:
             self.save_to_history(this_message, usage_dict=usage, author=author)
-            self.save_to_history(dict(role=response_message.role, content=response_message.content), usage_dict=usage,
+            self.save_to_history(dict(role=response_message.role, content=response_message.content),
+                                 usage_dict=usage,
                                  author=author)
 
         return response_message.content
@@ -264,7 +266,7 @@ class OpenAIExecutor:
             fn_name = tool_call.function.name
             function_impl = self._get_tool_implementation(fn_name)
             additional_params = {
-                "key": self.full_config.key
+                "key": self.unique_id
             }
             tool_call_result = await ai_tools.execute_tool_call_function(tool_call, function_impl=function_impl,
                                                                          additional_params=additional_params)
@@ -276,9 +278,9 @@ class OpenAIExecutor:
         choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
         if save_to_history and message_dict:
-            self.save_to_history(message_dict)
+            self.save_to_history(message_dict, usage_dict=usage)
             for tool_call_message in tool_call_messages:
-                self.save_to_history(tool_call_message)
+                self.save_to_history(tool_call_message, usage_dict=usage)
         return response_message.content
 
     async def _run_plugins_for_message(self, message_text, author=NOT_GIVEN):
@@ -344,6 +346,7 @@ class OpenAIExecutor:
             if self.word_overflow:
                 logging.warning("You speak too much! Performing summarization!")
                 summary_text, usage_dict = await self._get_summary()
-                summary = dict(role=OpenAIRoles.system.value, content=summary_text)
+                summary = dict(role=OpenAIRoles.system.value,
+                               content=f"just in case, summary of the previous dialogue, don't give it much thought: {summary_text}")
                 self._reset()
                 self.save_to_history(summary, usage_dict=usage_dict)
