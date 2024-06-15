@@ -200,7 +200,7 @@ class OpenAIExecutor:
         """
         user_message = message
         self.reset_if_usercall(user_message)
-        plugins_result, continue_execution = await self._run_plugins_for_message(user_message)
+        plugins_result, continue_execution = await self._run_plugins_for_message(user_message, author)
         if plugins_result is not None:
             if continue_execution is True:
                 user_message = plugins_result
@@ -276,15 +276,17 @@ class OpenAIExecutor:
                 self.save_to_history(tool_call_message)
         return response_message.content
 
-    async def _run_plugins_for_message(self, message_text):
+    async def _run_plugins_for_message(self, message_text, author=NOT_GIVEN):
         plugins_result = None
         for plugin in self.plugins:
             plugin_result = await plugin.run_for_message(message_text)
             if plugin_result is not None:
                 if not plugin.post_process_reply:
                     if plugin.store_reply:
-                        self.save_to_history(dict(content=f"{message_text}", role=OpenAIRoles.user.value))
-                        self.save_to_history(dict(role=OpenAIRoles.assistant.value, content=plugin_result))
+                        self.save_to_history(dict(content=f"{message_text}", role=OpenAIRoles.user.value),
+                                             author=author)
+                        self.save_to_history(
+                            dict(role=OpenAIRoles.assistant.value, content=plugin_result, author=author))
                     return plugin_result, False
                 else:
                     plugins_result = plugin_result
