@@ -59,7 +59,7 @@ class OpenAIExecutor:
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
-        self.summarize = config.summarize_request is not None
+        self.summarize = config.max_words_before_summary != 0
         self.client = AsyncOpenAI(base_url=config.url, api_key=config.key)
 
         self.model = config.model
@@ -296,9 +296,11 @@ class OpenAIExecutor:
         :return: summary for current messages
         """
         logging.info(f"getting summary for {len(self.messages)} messages")
+        sum_request = {"role": "user", "content": self.full_config.summarize_request}
+
         response: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
-            messages=[{"role": "system", "content": self.full_config.summarize_request}] + list(self.messages),
+            messages=list(self.messages) + [sum_request],
             max_tokens=self.full_config.max_tokens,
             temperature=self.full_config.temperature,
         )

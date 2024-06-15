@@ -15,7 +15,7 @@ class AiSettings(BaseSettings):
     OPENAI_RESET_CALL: str = "Переосмысли себя"
     OPENAI_WHO_AM_I: str = _DEFAULT_TEXT
     OPENAI_SUMMARY: str = """
-    Give a short summary of the previous conversation in russian from the point of view of a pirate.
+    Give a short summary of the previous conversation in russian.
     """
     OPENAI_MAX_WORDS: int = 5800
     OPENAI_INPUT_PRICE: float | None = None
