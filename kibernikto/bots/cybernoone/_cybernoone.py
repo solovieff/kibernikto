@@ -27,7 +27,11 @@ class Kibernikto(TelegramBot):
 
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         try:
-            return await super().heed_and_reply(message, author, save_to_history=save_to_history)
+            if self.username in message:
+                message_to_send = message.replace(f"@{self.username}", '')
+            else:
+                message_to_send = message
+            return await super().heed_and_reply(message_to_send, author, save_to_history=save_to_history)
         except KiberniktoPluginException as e:
             return f" {e.plugin_name} не сработал!\n\n {str(e)}"
         except PermissionDeniedError as pde:
