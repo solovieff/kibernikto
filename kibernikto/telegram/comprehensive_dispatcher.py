@@ -16,7 +16,7 @@ from kibernikto.utils.text import split_text_by_sentences
 from ._executor_corral import init as init_ai_bot_corral, get_ai_executor, kill as kill_animals
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from .telegram_bot import TelegramBot
-from kibernikto.utils.permissions import is_from_admin
+from kibernikto.utils.permissions import is_from_admin, admin_or_public
 
 
 class TelegramSettings(BaseSettings):
@@ -153,7 +153,7 @@ async def send_random_sticker(chat_id):
 async def private_message(message: types.Message):
     user_id = message.from_user.id
 
-    if not is_from_admin(message):
+    if not admin_or_public(message):
         negative_reply_text = f"Я не отвечаю на вопросы в личных беседах с незакомыми людьми (если это конечно не один из моиз Повелителей " \
                               f"снизошёл до меня). Я передам ваше соообщение мастеру."
         await tg_bot.send_message(user_id,

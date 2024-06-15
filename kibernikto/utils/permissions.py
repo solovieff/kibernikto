@@ -22,7 +22,7 @@ def is_from_admin(message: types.Message):
 
 
 def admin_or_public(message: types.Message):
-    return is_from_admin(message) or PERMISSIONS_SETTINGS.TG_PUBLIC
+    return is_from_admin(message) or is_public()
 
 
 def is_public() -> bool:
