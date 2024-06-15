@@ -77,6 +77,7 @@ async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
     try:
         result = await function_impl(**dict_args)
     except Exception as e:
+        logging.error(f"{e}")
         result = str(e)
     return result
 

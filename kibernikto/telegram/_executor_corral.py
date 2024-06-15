@@ -47,7 +47,7 @@ async def kill():
         await bot.client.close()
 
 
-def get_ai_executor(key_id: int):
+def get_ai_executor(key_id: int) -> TelegramBot:
     bot = __BOTS.get(key_id)
 
     if not bot:

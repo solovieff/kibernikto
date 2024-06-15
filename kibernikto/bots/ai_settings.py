@@ -13,6 +13,7 @@ class AiSettings(BaseSettings):
     OPENAI_MAX_MESSAGES: int = 7
     OPENAI_TEMPERATURE: float = 0.7
     OPENAI_RESET_CALL: str = "Переосмысли себя"
+    OPENAI_TOOLS_ENABLED: bool = True
     OPENAI_WHO_AM_I: str = _DEFAULT_TEXT
     OPENAI_SUMMARY: str = """
     Give a short summary of the previous conversation in russian.

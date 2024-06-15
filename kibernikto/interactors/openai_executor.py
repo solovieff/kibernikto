@@ -86,7 +86,7 @@ class OpenAIExecutor:
 
     @property
     def xml_tools(self):
-        return "claude" in self.model
+        return "claude" in self.model and 1 == 2
 
     def _get_tool_implementation(self, name):
         for x in self.tools:
@@ -259,10 +259,15 @@ class OpenAIExecutor:
         prompt = list(self.messages)
         if not choice.message.tool_calls:
             raise ValueError("No tools provided!")
+        message_dict = None
         for tool_call in choice.message.tool_calls:
             fn_name = tool_call.function.name
             function_impl = self._get_tool_implementation(fn_name)
-            tool_call_result = await ai_tools.execute_tool_call_function(tool_call, function_impl=function_impl)
+            additional_params = {
+                "key": self.full_config.key
+            }
+            tool_call_result = await ai_tools.execute_tool_call_function(tool_call, function_impl=function_impl,
+                                                                         additional_params=additional_params)
             message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
             prompt.append(message_dict)
             tool_call_messages = ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result,
@@ -270,7 +275,7 @@ class OpenAIExecutor:
 
         choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
-        if save_to_history:
+        if save_to_history and message_dict:
             self.save_to_history(message_dict)
             for tool_call_message in tool_call_messages:
                 self.save_to_history(tool_call_message)

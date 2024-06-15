@@ -1,3 +1,4 @@
+from aiogram.types import Chat
 from openai._types import NOT_GIVEN
 
 from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
