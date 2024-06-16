@@ -63,6 +63,10 @@ async def get_temp_executor(key_id: int) -> TelegramBot:
             await bot.client.close()
 
 
+def executor_exists(key_id: int) -> bool:
+    return str(key_id) in __BOTS
+
+
 def get_ai_executor_full(chat: Chat, user: User = None) -> TelegramBot:
     chat_key = chat.id
     bot = __BOTS.get(chat_key)

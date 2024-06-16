@@ -7,7 +7,7 @@ from typing import List, Callable
 
 from aiogram import Bot, Dispatcher, types, enums, F
 from aiogram.filters import or_f, and_f
-from aiogram.types import User, BotCommand
+from aiogram.types import User, BotCommand, Chat
 from pydantic_settings import BaseSettings
 
 from kibernikto.interactors import OpenAiExecutorConfig
@@ -15,7 +15,8 @@ from kibernikto.interactors.tools import Toolbox
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.utils.permissions import admin_or_public
 from kibernikto.utils.text import split_text_by_sentences
-from ._executor_corral import init as init_ai_bot_corral, get_ai_executor_full, kill as kill_animals, get_temp_executor
+from ._executor_corral import init as init_ai_bot_corral, get_ai_executor_full, kill as kill_animals, get_temp_executor, \
+    executor_exists
 
 
 class TelegramSettings(BaseSettings):
@@ -164,7 +165,11 @@ async def private_message(message: types.Message):
         user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
         if user_text is None:
             return None  # do not reply
-        user_ai = get_ai_executor_full(chat=message.chat, user=message.from_user)
+        if not executor_exists(user_id):
+            chat_info: Chat = await tg_bot.get_chat(user_id)
+        else:
+            chat_info = message.chat
+        user_ai = get_ai_executor_full(chat=chat_info, user=message.from_user)
 
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await user_ai.heed_and_reply(message=user_text, author=message.from_user.username)
@@ -190,7 +195,12 @@ async def group_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
     else:
-        group_ai = get_ai_executor_full(chat=message.chat)
+        if not executor_exists(user_id):
+            # loading full chat info for the first time
+            chat_info: Chat = await tg_bot.get_chat(chat_id)
+        else:
+            chat_info = message.chat
+        group_ai = get_ai_executor_full(chat=chat_info)
 
         if is_reply(message) or group_ai.should_react(message.html_text):
             user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)

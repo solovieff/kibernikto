@@ -7,8 +7,11 @@ from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
 
 class KiberniktoChatInfo():
     def __init__(self, aiogram_chat: Chat, aiogram_user: User = None):
-        self.title = aiogram_chat.title
+        self.full_name = aiogram_chat.full_name
         self.bio = aiogram_chat.bio
+        self.description = aiogram_chat.description
+        self.business_intro = aiogram_chat.business_intro
+        self.birthday = aiogram_chat.birthdate
         self.is_personal = aiogram_chat.type == ChatType.PRIVATE
         if self.is_personal and not aiogram_user:
             raise ValueError("Failed to create kibernikto chat with private chat: no user info provided")
