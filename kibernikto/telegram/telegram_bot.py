@@ -1,14 +1,27 @@
-from aiogram.types import Chat
+from aiogram.types import Chat, User
+from aiogram.enums import ChatType
 from openai._types import NOT_GIVEN
-
+from pydantic import BaseModel
 from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
 
 
+class KiberniktoChatInfo():
+    def __init__(self, aiogram_chat: Chat, aiogram_user: User = None):
+        self.title = aiogram_chat.title
+        self.bio = aiogram_chat.bio
+        self.is_personal = aiogram_chat.type == ChatType.PRIVATE
+        if self.is_personal and not aiogram_user:
+            raise ValueError("Failed to create kibernikto chat with private chat: no user info provided")
+        self.aiogram_user = aiogram_user
+
+
 class TelegramBot(OpenAIExecutor):
-    def __init__(self, config: OpenAiExecutorConfig, master_id, username, key=NOT_GIVEN):
+    def __init__(self, config: OpenAiExecutorConfig, master_id, username, key=NOT_GIVEN,
+                 chat_info: KiberniktoChatInfo = None):
         self.key = key
         self.master_id = master_id
         self.username = username
+        self.chat_info = chat_info
         super().__init__(config=config, unique_id=key)
 
     def should_react(self, message_text):

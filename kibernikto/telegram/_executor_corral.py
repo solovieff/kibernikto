@@ -1,16 +1,17 @@
 import logging
 import sys
 import traceback
+from contextlib import contextmanager, asynccontextmanager
 from typing import Dict, Type, List
 
 from openai._types import NOT_GIVEN
-
+from aiogram.types import User, Chat
 from kibernikto.plugins import KiberniktoPlugin
 
 from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 from pydantic import BaseModel
 
-from .telegram_bot import TelegramBot
+from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
 from kibernikto.interactors import OpenAiExecutorConfig
 
 
@@ -49,11 +50,28 @@ async def kill():
 
 def get_ai_executor(key_id: int) -> TelegramBot:
     bot = __BOTS.get(key_id)
+    return bot
+
+
+@asynccontextmanager
+async def get_temp_executor(key_id: int) -> TelegramBot:
+    bot = _new_executor(key_id=key_id)
+    try:
+        yield bot
+    finally:
+        if bot:
+            await bot.client.close()
+
+
+def get_ai_executor_full(chat: Chat, user: User = None) -> TelegramBot:
+    chat_key = chat.id
+    bot = __BOTS.get(chat_key)
 
     if not bot:
-        bot = _new_executor(str(key_id))
+        chat_info = KiberniktoChatInfo(chat, user)
+        bot = _new_executor(key_id=chat_key, chat_info=chat_info)
         _apply_plugins(bot)
-        __BOTS[key_id] = bot
+        __BOTS[chat_key] = bot
     return bot
 
 
@@ -78,7 +96,7 @@ def _apply_plugins(bot: TelegramBot):
             print_plugin_off(plugin_class)
 
 
-def _new_executor(key_id: str = NOT_GIVEN):
+def _new_executor(key_id: str = NOT_GIVEN, chat_info: KiberniktoChatInfo = None):
     """
     creates new ai bot executor connected to AI API
     :return:
@@ -88,5 +106,5 @@ def _new_executor(key_id: str = NOT_GIVEN):
     bot = __BOT_CLASS(username=_configuration.username,
                       master_id=_configuration.master_id,
                       config=_configuration.config,
-                      key=key_id)
+                      key=key_id, chat_info=chat_info)
     return bot

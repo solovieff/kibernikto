@@ -5,18 +5,17 @@ import traceback
 from random import choice
 from typing import List, Callable
 
-from aiogram import Bot, Dispatcher, types, enums, F, filters
+from aiogram import Bot, Dispatcher, types, enums, F
 from aiogram.filters import or_f, and_f
 from aiogram.types import User, BotCommand
 from pydantic_settings import BaseSettings
 
 from kibernikto.interactors import OpenAiExecutorConfig
 from kibernikto.interactors.tools import Toolbox
-from kibernikto.utils.text import split_text_by_sentences
-from ._executor_corral import init as init_ai_bot_corral, get_ai_executor, kill as kill_animals
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
-from .telegram_bot import TelegramBot
-from kibernikto.utils.permissions import is_from_admin, admin_or_public
+from kibernikto.utils.permissions import admin_or_public
+from kibernikto.utils.text import split_text_by_sentences
+from ._executor_corral import init as init_ai_bot_corral, get_ai_executor_full, kill as kill_animals, get_temp_executor
 
 
 class TelegramSettings(BaseSettings):
@@ -125,13 +124,13 @@ async def on_startup(bot: Bot):
                            username=bot_me.username,
                            config=executor_config)
 
-        if TELEGRAM_SETTINGS.TG_SAY_HI and TELEGRAM_SETTINGS.TG_MASTER_ID:
+        if TELEGRAM_SETTINGS.TG_SAY_HI:
             master_id = TELEGRAM_SETTINGS.TG_MASTER_ID
             await send_random_sticker(chat_id=master_id)
-            bot: TelegramBot = get_ai_executor(master_id)
-            hi_message = await bot.heed_and_reply("Поприветствуй своего хозяина!",
-                                                  save_to_history=False)
-            await tg_bot.send_message(chat_id=master_id, text=hi_message)
+            async with get_temp_executor(key_id=master_id) as hi_bot:
+                hi_message = await hi_bot.heed_and_reply("Поприветствуй своего хозяина!",
+                                                         save_to_history=False)
+                await tg_bot.send_message(chat_id=master_id, text=hi_message)
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
         logging.error(f"failed to start! \n{str(e)}")
@@ -165,7 +164,7 @@ async def private_message(message: types.Message):
         user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)
         if user_text is None:
             return None  # do not reply
-        user_ai = get_ai_executor(user_id)
+        user_ai = get_ai_executor_full(chat=message.chat, user=message.from_user)
 
         await tg_bot.send_chat_action(message.chat.id, 'typing')
         reply_text = await user_ai.heed_and_reply(message=user_text, author=message.from_user.username)
@@ -191,7 +190,7 @@ async def group_message(message: types.Message):
         await tg_bot.send_message(TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                   f"{message.from_user.username}: {message.md_text}")
     else:
-        group_ai = get_ai_executor(chat_id)
+        group_ai = get_ai_executor_full(chat=message.chat)
 
         if is_reply(message) or group_ai.should_react(message.html_text):
             user_text = await preprocessor.process_tg_message(message, tg_bot=tg_bot)

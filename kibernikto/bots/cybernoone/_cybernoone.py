@@ -4,7 +4,7 @@ import traceback
 from openai import PermissionDeniedError
 from openai._types import NOT_GIVEN
 
-from kibernikto.telegram.telegram_bot import TelegramBot
+from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
 from kibernikto.interactors import OpenAiExecutorConfig
 import openai
 
@@ -13,17 +13,18 @@ from kibernikto.plugins import KiberniktoPluginException
 
 class Kibernikto(TelegramBot):
     """
-    Basic implementation of Telegram bot can be used as an example.
+    Basic implementation of Telegram bot.
     """
 
-    def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN):
+    def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN,
+                 chat_info: KiberniktoChatInfo = None):
         """
         :param master_id: telegram admin id
         :param username: telegram username
         :param config: ai bot config
         """
         self.key = key
-        super().__init__(config=config, username=username, master_id=master_id, key=key)
+        super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info)
 
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
         try:
@@ -41,6 +42,7 @@ class Kibernikto(TelegramBot):
             print(traceback.format_exc())
             return f"Я не справился! Горе мне! {str(e)}"
 
+    # FIXME: not working properly
     async def ask_pure(self, prompt):
         response = await openai.ChatCompletion.acreate(
             model=self.model,
