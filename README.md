@@ -103,10 +103,11 @@ TG_SERVICE_GROUP_ID=-XXXXXXXXXX
 TG_STICKER_LIST=["CAACAgIAAxkBAAEKqsplQ8BRyPbGj_B_K4ujCLsDAe-l7wAC8AIAAs-71A7mCrGe-zzi0DME","CAACAgIAAxkBAAEIgoxkMaHv1maOeEne8CYAAY5s4kJ1e4wAAo4JAAIItxkCXSMuZ6bo59gvBA"]
 ```
 
-**run cmd**   
-*(assuming local.env file is located in the same folder)*
+**run cmd**
 
-``kibernikto --env_file_path=local.env``
+```shell
+kibernikto --env_file_path=/path/to/your/env/local.env
+```
 
 **run code**  
 *(assuming you set the environment yrself)*
