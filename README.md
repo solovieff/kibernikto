@@ -281,6 +281,8 @@ from kibernikto.bots.cybernoone import Kibernikto
 bot_class = Kibernikto
 
 from kibernikto.telegram import comprehensive_dispatcher
+from kibernikto.telegram import commands
+from kibernikto.telegram import service
 
 comprehensive_dispatcher.start(bot_class=bot_class)
 ```
@@ -291,7 +293,6 @@ You can create your own bots and dispatchers and use it like above.
 
 ```python
 from kibernikto.interactors import OpenAiExecutorConfig
-from kibernikto.utils.text import split_text_by_sentences
 
 executor_config = OpenAiExecutorConfig(name="Kibernikto",
                                        reaction_calls=["Hello", "Kiberman"], model="gpt-4")
