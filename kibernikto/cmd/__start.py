@@ -14,10 +14,10 @@ def start(outer_env=False):
     parser.add_argument('--env_file_path', metavar='env_file_path', required=False,
                         help='env file location', default='.env')
     parser.add_argument('--bot_type', metavar='bot_type', required=False,
-                        help='kibernikto, vertihvostka', default='kibernikto')
+                        help='kibernikto', default='kibernikto')
 
     parser.add_argument('--dispatcher', metavar='dispatcher', required=False,
-                        help='default, multiuser, open', default='default')
+                        help='default', default='default')
     args = parser.parse_args()
 
     if not outer_env:
@@ -31,15 +31,11 @@ def start(outer_env=False):
     if args.bot_type == 'kibernikto':
         from kibernikto.bots.cybernoone import Kibernikto
         bot_class = Kibernikto
-    elif args.bot_type == 'vertihvostka':
-        from kibernikto.bots.vertihvostka import Vertihvostka
-        bot_class = Vertihvostka
     else:
-        raise RuntimeError("Wrong bot_type, should be in ('kibernikto','vertihvostka')")
+        raise RuntimeError("Wrong bot_type, should be in ('kibernikto')")
 
-    if args.dispatcher == 'multiuser' or args.dispatcher == 'default':
+    if args.dispatcher == 'default' or args.dispatcher == 'default':
         from kibernikto.telegram import comprehensive_dispatcher
-
         comprehensive_dispatcher.start(bot_class=bot_class)
     else:
         raise RuntimeError("Wrong dispatcher!")

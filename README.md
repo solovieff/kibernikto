@@ -1,40 +1,23 @@
 # kibernikto
 
 Kibernikto is an app/lib to easily run telegram bots connected to AI models with additional features.  
-Kibernikto bots can be easily extended to be used outside telegram.  
-Core and bots can be used as a core libs for creating ai-bot based apps.  
+Core and bots can be used as a core libs for creating ai-bot based apps.
+Kibernikto base `OpenAiExecutorConfig` class can be easily extended to be used outside telegram.
 
-- ✍️ telegram conversations with different AIs in groups or privately (including hidden second-level AI-redactors)
+- ✍️ telegram conversations with different AIs in groups or privately
 - 🔉 voice messages recognition
-- 👂 interviews and meetings (up to 2 hours) analysis right in Telegram using Gladia.io 
+- 👂 interviews and meetings (up to 2 hours) analysis right in Telegram using Gladia.io
 - 🎞 youtube video summarization
 - 🔗 webpage summarization
 - 📸 image recognition
-- 🫡 openai function tools easy [integration](https://github.com/solovieff/kibernikto-planner). No more pain. ~~(anthropic xml format supported, too! looks like they changed it again)~~
+- 🫡 openai function tools easy [integration](https://github.com/solovieff/kibernikto-planner). No more pain.~~(anthropic
+  xml format supported, too! looks like they changed it again, disabled)~~
 
 Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
 
-By default `single_group_dispatcher` is used with a following rules:
-
-- One Kibernikto instance **can privately talk only to one** (`TG_MASTER_ID`) user and work with **one group chat
-  ** (`TG_FRIEND_GROUP_ID`).
-
-If you want your bot to be able to work with **any user or group**, use `comprehensive_dispatcher`. You will need the
-following `additional` env parameters if you want to restrict user/group ids.
-Do not add it to your env if you want anyone
-to
-be able to use yr Kibernikto instance:
-
-```dotenv
-TG_MASTER_IDS=[XXXXXXXXX]
-TG_FRIEND_GROUP_IDS=[-XXXXXXXXX]
-```
-
-or
-
-``kibernikto --env_file_path=local.env --bot_type=kibernikto --dispatcher=multiuser``
-
-Kibernikto can post-process messages returned by one AI using another AI (for now it's a hardcoded 2 step chain).
+- One Kibernikto instance can privately talk to one (`TG_MASTER_ID`) or several (`TG_MASTER_IDS`) users and be added to
+  several (`TG_FRIEND_GROUP_IDS`) groups.
+- Set `TG_PUBLIC` env to true to open your bot to everyone.
 
 # install from pip
 
@@ -51,29 +34,10 @@ Kibernikto can post-process messages returned by one AI using another AI (for no
   <br>
   <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/bf1ac575-ad1a-464c-8535-2cf7f5ebb162">  
 
-- Add your bot to the group you want. Set env `TG_FRIEND_GROUP_ID`. You can get the group ID using @getidsbot in
-  telegram.
-- Configure other env variables.
+- Setup minimal env    
+  First of all, all examples are in the [examples](/env_examples/) folder. See default ones for minimal config and fulls for more complicated cases.
 
-**run cmd**   
-*(assuming local.env file is located in the same folder)*
-
-``kibernikto --env_file_path=local.env``
-
-**run code**  
-*(assuming you set the environment yrself)*
-
-- Install the requirements   
-  `pip install -r requirements.txt`
-- Run `main.py` file using the environment provided.
-
-# environment:
-
-First of all, full examples are in the [examples](/env_examples/) folder.
-
-In general, you can use one Ai provider API for all available Kibernikto actions, in that case all the AI related
-variables values will be the same.  
-However it is strongly recommended to use cheaper models for summarization tasks.
+**AI ENV**
 
 - Default [OpenAI](https://openai.com)
 
@@ -91,29 +55,65 @@ OPENAI_API_KEY=sk-yr-key
 OPENAI_API_MODEL=openai/gpt-4  
 ```
 
-Other AI behaviour options:
+Other AI behaviour options, _not required_:
 
 ```dotenv
-OPENAI_MAX_TOKENS=800  
-OPENAI_WHO_AM_I=Answer all questions as {0}, the majestic lord of the universes with all the knowledge of our small planet.  
+# system prompt
+OPENAI_WHO_AM_I=Answer all questions as {0}, the majestic lord of the universes.
+# chat history size
+OPENAI_MAX_MESSAGES=5
+# LLM temp param
+OPENAI_TEMPERATURE=0.7
+# LLM answer size
+OPENAI_MAX_TOKENS=450
+# summarize the dialog using same model after it contains more than OPENAI_MAX_WORDS words 
+OPENAI_MAX_WORDS=8500
+# if you want to use tools.
+OPENAI_TOOLS_ENABLED=true
+# if kibernikto knows the prices he can track the usage
+OPENAI_OUTPUT_PRICE=0.000015
+OPENAI_INPUT_PRICE=0.000005  
 ```
 
-**Telegram**
+**Telegram ENV**
 
 ```dotenv
 # Telegram configuration
 TG_BOT_KEY=XXXXXXXXXX:XXXxxxXXXxxxxXXXxxx  
-TG_BOT_MAX_HISTORY=8  
-TG_FRIEND_GROUP_ID=-XXXXXXXXXX  
-# Your telegram ID. For example 122349243. Forward your message to @idstickerbot to get it.  
+TG_PUBLIC=true
 TG_MASTER_ID=XXXXXXXXX
+```
+
+Other TG related options, _not required_:
+
+```dotenv
+# Until TG_PUBLIC=true can talk only in the given groups
+TG_FRIEND_GROUP_IDS=[-XXXXXXXXXX,-XXXXXXXXXX]  
+# Other master accounts. Until TG_PUBLIC=true can talk only with these.
+TG_MASTER_IDS=[XXXXXXXXX,XXXXXXXXX]
 # Kibernikto reacts to direct replies or when sees the following words. 
-# Preserving pydantic-settings list format.  
 TG_REACTION_CALLS=["киберникто","государь"]  
 # sometimes Kibernikto sends stickers for fun together with his answers  
 TG_STICKER_LIST=["CAACAgIAAxkBAAEKqsplQ8BRyPbGj_B_K4ujCLsDAe-l7wAC8AIAAs-71A7mCrGe-zzi0DME","CAACAgIAAxkBAAEIgoxkMaHv1maOeEne8CYAAY5s4kJ1e4wAAo4JAAIItxkCXSMuZ6bo59gvBA"]
 ```
 
+**run cmd**   
+*(assuming local.env file is located in the same folder)*
+
+``kibernikto --env_file_path=local.env``
+
+**run code**  
+*(assuming you set the environment yrself)*
+
+- Install the requirements   
+  `pip install -r requirements.txt`
+- Run `main.py` file using the environment provided.
+
+# plugins:
+
+In general, you can use one Ai provider API for all available Kibernikto actions, in that case all the AI related
+variables values will be the same.  
+However it is strongly recommended to use cheaper models for summarization tasks.
 
 - **WeblinkSummaryPlugin and YoutubePlugin**
 
@@ -147,16 +147,16 @@ VOICE_OPENAI_API_MODEL=whisper-1
 VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
 VOICE_FILE_LOCATION=/tmp
 ```
-    
+
 - **Voice messages** processing using [gladia.io](https://gladia.io):  
-**Gladia** Audio Intelligence API, is designed to enable any company to easily 
-embed top-quality Audio AI into their applications, whatever the tech stack.  
-    
-As whisper api is limited to 25 megs, [gladia.io](https://glaudia.io) helps to process bigger files.    
+  **Gladia** Audio Intelligence API, is designed to enable any company to easily
+  embed top-quality Audio AI into their applications, whatever the tech stack.
+
+As whisper api is limited to 25 megs, [gladia.io](https://glaudia.io) helps to process bigger files.
 
 Kibernikto treats voice messages with duration less than `VOICE_MIN_COMPLEX_SECONDS` as usual AI interaction ones.
-For longer durations Kibernikto will return detailed audio 
-analysis including summary etc.  
+For longer durations Kibernikto will return detailed audio
+analysis including summary etc.
 
 Perfect solution for analyzing interviews and meeting.  
 Gladia price policies are also very affordable.
@@ -167,12 +167,13 @@ VOICE_GLADIA_API_KEY=yr-gladia-key
 VOICE_GLADIA_SUMMARIZATION_TYPE=concise
 VOICE_MIN_COMPLEX_SECONDS=300
 ```    
-   
-- **Smart voice messages** processing using both [gladia.io](https://gladia.io) and OpenAI:  
+
+- **Smart voice messages** processing using both [gladia.io](https://gladia.io) and OpenAI:
 
 Whisper api is a bit faster and looks better to use just for talking with your bot.
+
 ```dotenv
-VOICE_PROCESSOR=**auto**
+VOICE_PROCESSOR=auto
 
 VOICE_OPENAI_API_KEY=yr-key
 VOICE_OPENAI_API_MODEL=whisper-1
@@ -187,22 +188,6 @@ VOICE_GLADIA_CONTEXT=We have before us an interview for the position of office m
 ```
 
 For the full list of variables, see `env_examples` folder.
-
-# redactor mode
-
-To run Kibernikto with additional redactor for each response change the `bot_type` to "vertihvostka":    
-``kibernikto --env_file_path=local.env --bot_type=vertihvostka``  
-And set the following env variables for a redactor network.
-
-```dotenv
-REDACTOR_OPENAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-REDACTOR_OPENAI_BASE_URL=https://api.openai.com/v1
-REDACTOR_OPENAI_API_MODEL=gpt-4-turbo-preview
-#REDACTOR_OPENAI_WHO_AM_I=""
-REDACTOR_MESSAGE="
-    Replace several words in the text with their feminine equivalents; do not change the other words. In your response, return only the result without your comments:\n{message}
-"
-```
 
 # useful links
 
@@ -284,32 +269,17 @@ class YoutubePlugin(KiberniktoPlugin):
 - How do I run Kibernikto Instance from my code?
 
 ```python
-    # choose your bot
-if args.bot_type == 'kibernikto':
-    from kibernikto.bots.cybernoone import Kibernikto
+# import bot
+from kibernikto.bots.cybernoone import Kibernikto
 
-    bot_class = Kibernikto
-elif args.bot_type == 'vertihvostka':
-    from kibernikto.bots.vertihvostka import Vertihvostka
+bot_class = Kibernikto
 
-    bot_class = Vertihvostka
-else:
-    raise RuntimeError("Wrong bot_type, should be in ('kibernikto','vertihvostka')")
+from kibernikto.telegram import comprehensive_dispatcher
 
-# choose dispatcher type
-if args.dispatcher == 'default':
-    from kibernikto.telegram import single_group_dispatcher
-
-    single_group_dispatcher.start(bot_class=bot_class)
-elif args.dispatcher == 'multiuser':
-    from kibernikto.telegram import comprehensive_dispatcher
-
-    comprehensive_dispatcher.start(bot_class=bot_class)
-else:
-    raise RuntimeError("Wrong dispatcher!")
+comprehensive_dispatcher.start(bot_class=bot_class)
 ```
 
-You can create your own bots and dispatchers and use it live above.
+You can create your own bots and dispatchers and use it like above.
 
 - I want to run an ai bot without your telegram dispatcher!
 
@@ -318,7 +288,7 @@ from kibernikto.interactors import OpenAiExecutorConfig
 from kibernikto.utils.text import split_text_by_sentences
 
 executor_config = OpenAiExecutorConfig(name="Kibernikto",
-                                       reaction_calls=["Hello", "Kiberman"])
+                                       reaction_calls=["Hello", "Kiberman"], model="gpt-4")
 
 your_bot = Kibernikto(username="kiberniktomiks",
                       master_id="some_master_user_id_or_any",
@@ -326,7 +296,8 @@ your_bot = Kibernikto(username="kiberniktomiks",
 ```
 
 Now you can use your_bot `heed_and_reply` method.
-Please note that in this case you will have to apply the plugins yourself. 
+Please note that in this case you will have to apply the plugins yourself.
 
 - I want to know how to make Kibernikto use my tools! Please!
-Implemented, pls wait for the docs to be updated.
+  Implemented, pls wait for the docs to be updated. For now look at
+  the [planner](https://github.com/solovieff/kibernikto-planner) example.
