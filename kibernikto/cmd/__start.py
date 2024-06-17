@@ -1,7 +1,6 @@
 import logging
 import argparse
 from dotenv import load_dotenv
-from kibernikto.telegram import comprehensive_dispatcher
 
 
 def start(outer_env=False):
@@ -29,7 +28,7 @@ def start(outer_env=False):
         load_dotenv(dotenv_path=args.env_file_path)
 
     from kibernikto.utils.environment import configure_logger, print_banner
-
+    from kibernikto.telegram import comprehensive_dispatcher
     configure_logger()
     print_banner()
 
