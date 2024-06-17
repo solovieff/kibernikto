@@ -1,6 +1,7 @@
 import logging
 import argparse
 from dotenv import load_dotenv
+from kibernikto.telegram import comprehensive_dispatcher
 
 
 def start(outer_env=False):
@@ -9,6 +10,10 @@ def start(outer_env=False):
 
     :return:
     """
+    # for service messages
+    from kibernikto.telegram import service
+    # for default commands
+    from kibernikto.telegram import commands
 
     parser = argparse.ArgumentParser(description='Run Kibernikto')
     parser.add_argument('--env_file_path', metavar='env_file_path', required=False,
@@ -35,7 +40,10 @@ def start(outer_env=False):
         raise RuntimeError("Wrong bot_type, should be in ('kibernikto')")
 
     if args.dispatcher == 'default' or args.dispatcher == 'default':
-        from kibernikto.telegram import comprehensive_dispatcher
+        # for service messages
+        from kibernikto.telegram import service
+        # for default commands
+        from kibernikto.telegram import commands
         comprehensive_dispatcher.start(bot_class=bot_class)
     else:
         raise RuntimeError("Wrong dispatcher!")
