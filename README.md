@@ -10,6 +10,7 @@ Kibernikto base `OpenAiExecutorConfig` class can be easily extended to be used o
 - 👂 interviews and meetings (up to 2 hours) analysis right in Telegram using Gladia.io
 - 🎞 youtube video summarization
 - 🔗 webpage summarization
+- 🧐 user messages logging to service group
 - 📸 image recognition
 - 🫡 openai function tools easy [integration](https://github.com/solovieff/kibernikto-planner). No more pain.~~(anthropic
   xml format supported, too! looks like they changed it again, disabled)~~
@@ -93,7 +94,11 @@ TG_FRIEND_GROUP_IDS=[-XXXXXXXXXX,-XXXXXXXXXX]
 # Other master accounts. Until TG_PUBLIC=true can talk only with these.
 TG_MASTER_IDS=[XXXXXXXXX,XXXXXXXXX]
 # Kibernikto reacts to direct replies or when sees the following words. 
-TG_REACTION_CALLS=["киберникто","государь"]  
+TG_REACTION_CALLS=["киберникто","государь"]
+# Allows /system_message command to be run by masters
+TG_ADMIN_COMMANDS_ALLOWED=true
+# Set this group ID with your bot added, to log all user messages to this service group
+TG_SERVICE_GROUP_ID=-XXXXXXXXXX  
 # sometimes Kibernikto sends stickers for fun together with his answers  
 TG_STICKER_LIST=["CAACAgIAAxkBAAEKqsplQ8BRyPbGj_B_K4ujCLsDAe-l7wAC8AIAAs-71A7mCrGe-zzi0DME","CAACAgIAAxkBAAEIgoxkMaHv1maOeEne8CYAAY5s4kJ1e4wAAo4JAAIItxkCXSMuZ6bo59gvBA"]
 ```
