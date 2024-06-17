@@ -9,19 +9,13 @@ def start(outer_env=False):
 
     :return:
     """
-    # for service messages
-    from kibernikto.telegram import service
-    # for default commands
-    from kibernikto.telegram import commands
-
     parser = argparse.ArgumentParser(description='Run Kibernikto')
     parser.add_argument('--env_file_path', metavar='env_file_path', required=False,
                         help='env file location', default='.env')
+
     parser.add_argument('--bot_type', metavar='bot_type', required=False,
                         help='kibernikto', default='kibernikto')
 
-    parser.add_argument('--dispatcher', metavar='dispatcher', required=False,
-                        help='default', default='default')
     args = parser.parse_args()
 
     if not outer_env:
@@ -38,14 +32,11 @@ def start(outer_env=False):
     else:
         raise RuntimeError("Wrong bot_type, should be in ('kibernikto')")
 
-    if args.dispatcher == 'default' or args.dispatcher == 'default':
-        # for service messages
-        from kibernikto.telegram import service
-        # for default commands
-        from kibernikto.telegram import commands
-        comprehensive_dispatcher.start(bot_class=bot_class)
-    else:
-        raise RuntimeError("Wrong dispatcher!")
+    # for service messages
+    from kibernikto.telegram import service
+    # for default commands
+    from kibernikto.telegram import commands
+    comprehensive_dispatcher.start(bot_class=bot_class)
 
 
 # Initialize bot and dispatcher
