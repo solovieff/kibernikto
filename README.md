@@ -1,7 +1,8 @@
 # kibernikto
 
 Kibernikto is an app/lib to easily run telegram bots connected to AI models with additional features.  
-Core and bots can be used as a core libs for creating ai-bot based apps.
+You can run Kibernikto with your params or use it as a core in your own app.
+
 Kibernikto base `OpenAiExecutorConfig` class can be easily extended to be used outside telegram.
 
 - ✍️ telegram conversations with different AIs in groups or privately

@@ -1,5 +1,4 @@
 from kibernikto.bots.ai_settings import AI_SETTINGS
-from kibernikto.bots.redactor_settings import REDACTOR_SETTINGS
 
 import logging
 
@@ -8,34 +7,27 @@ from kibernikto.plugins import KiberniktoPlugin
 
 def print_banner():
     print("\t")
-    print('\t%-15s%-15s' % ("avatar model:", AI_SETTINGS.OPENAI_API_MODEL))
-    print('\t%-15s%-15s' % ("avatar host:", AI_SETTINGS.OPENAI_BASE_URL))
-    print('\t%-15s%-15s' % ("avatar temp:", AI_SETTINGS.OPENAI_TEMPERATURE))
-
-    if REDACTOR_SETTINGS.OPENAI_API_KEY is not None:
-        print("\t")
-        print('\t%-15s%-15s' % ("redact model:", REDACTOR_SETTINGS.OPENAI_API_MODEL))
-        print('\t%-15s%-15s' % ("redact host:", REDACTOR_SETTINGS.OPENAI_BASE_URL))
-    else:
-        print('\t%-15s%-15s' % ("redactor:", 'disabled'))
+    print('\t%-20s%-20s' % ("avatar model:", AI_SETTINGS.OPENAI_API_MODEL))
+    print('\t%-20s%-20s' % ("avatar host:", AI_SETTINGS.OPENAI_BASE_URL))
+    print('\t%-20s%-20s' % ("avatar temp:", AI_SETTINGS.OPENAI_TEMPERATURE))
 
 
 def print_plugin_banner(kbnktp_plgn: KiberniktoPlugin):
     print("\t")
     plgn_name = kbnktp_plgn.__class__.__name__
-    print('\t%-15s%-15s' % (f"{plgn_name} model: ", kbnktp_plgn.model))
-    print('\t%-15s%-15s' % (f"{plgn_name} host: ", kbnktp_plgn.base_url))
+    print('\t%-20s%-20s' % (f"{plgn_name} model: ", kbnktp_plgn.model))
+    print('\t%-20s%-20s' % (f"{plgn_name} host: ", kbnktp_plgn.base_url))
 
 
 def print_plugin_off(kbnktp_plgn_cls):
     print("\t")
     plgn_name = kbnktp_plgn_cls.__name__
-    print('\t%-15s%-15s' % (f"{plgn_name}:", "off"))
+    print('\t%-20s%-20s' % (f"{plgn_name}:", "off"))
 
 
 def feature_not_configured(feature_name):
     print("\t")
-    print('\t%-15s%-15s' % (f"{feature_name}:", "off"))
+    print('\t%-20s%-20s' % (f"{feature_name}:", "off"))
 
 
 def configure_logger():
