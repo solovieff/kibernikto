@@ -172,9 +172,9 @@ class OpenAIExecutor:
             max_tokens=self.full_config.max_tokens,
             temperature=self.full_config.temperature
         )
-        response_message: ChatCompletionMessage = completion.choices[0].message
-
-        return response_message
+        choice: Choice = completion.choices[0]
+        usage_dict = self.process_usage(completion.usage)
+        return choice, usage_dict
 
     async def _run_for_messages(self, full_prompt, author=NOT_GIVEN):
         tools_to_use = self.tools_definitions if self.tools_definitions else NOT_GIVEN

@@ -63,6 +63,17 @@ class TelegramMessagePreprocessor():
                     return None
             else:
                 logging.warning(f"No voice processor configured for {message.voice.file_id}")
+        elif message.content_type == enums.ContentType.AUDIO and message.audio:
+            if SETTINGS.VOICE_PROCESSOR is not None:
+                voice: types.Audio = message.audio
+                user_text, file_info = await self._process_voice(voice, tg_bot=tg_bot, message=message)
+                pprint.pprint(file_info)
+                if file_info and "dialogue_location" in file_info:
+                    summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
+                    await message.reply_document(document=summary, caption=file_info['summarization'])
+                    return None
+            else:
+                logging.warning(f"No voice processor configured for {message.voice.file_id}")
         elif message.content_type == enums.ContentType.DOCUMENT and message.document:
             logging.debug(f"processing document from {who}")
             document = message.document
