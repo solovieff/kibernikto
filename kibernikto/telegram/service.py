@@ -14,7 +14,6 @@ S_SETTINGS = ServiceSettings()
 if S_SETTINGS.TG_SERVICE_GROUP_ID:
     from kibernikto.telegram import comprehensive_dispatcher
 
-    print("\t")
     print('\t%-20s%-20s' % ("service messages:", S_SETTINGS.TG_SERVICE_GROUP_ID))
 
     # runs when message comes
