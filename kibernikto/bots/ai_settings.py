@@ -15,9 +15,7 @@ class AiSettings(BaseSettings):
     OPENAI_RESET_CALL: str = "Переосмысли себя"
     OPENAI_TOOLS_ENABLED: bool = True
     OPENAI_WHO_AM_I: str = _DEFAULT_TEXT
-    OPENAI_SUMMARY: str = """
-    Give a short summary of the previous conversation in russian.
-    """
+    OPENAI_SUMMARY: str | None = None
     OPENAI_MAX_WORDS: int = 8500
     OPENAI_INPUT_PRICE: float | None = None
     OPENAI_OUTPUT_PRICE: float | None = None

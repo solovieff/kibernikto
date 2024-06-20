@@ -336,14 +336,13 @@ class OpenAIExecutor:
         Checking if additional actions like cutting the message stack or summarization needed.
         We use words not tokens here, so all numbers are very approximate
         """
-        if self.full_config.max_words_before_summary == 0:
-            while self.word_overflow:
-                for i in range(int(len(self.messages) / 3)):
-                    self.messages.popleft()
+        if self.word_overflow:
+            if not self.full_config.summarize_request:
+                self.messages.popleft()
+                self.messages.popleft()
+            else:
+                # summarizing previous discussion if needed
 
-        else:
-            # summarizing previous discussion if needed
-            if self.word_overflow:
                 logging.warning("You speak too much! Performing summarization!")
                 summary_text, usage_dict = await self._get_summary()
                 summary = dict(role=OpenAIRoles.system.value,
