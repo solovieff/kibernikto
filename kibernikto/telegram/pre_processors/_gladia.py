@@ -195,6 +195,21 @@ async def _basic_transcript_ready(result):
     return result
 
 
+def prepare_dialog(dialogue):
+    collapsed_data = []
+    current_speaker = None
+    current_text = ""
+
+    for item in dialogue:
+        if item["speaker"] == current_speaker:
+            current_text += " " + item["text"]
+        elif current_speaker is not None:
+            collapsed_data.append({"speaker": current_speaker, "text": current_text})
+        current_speaker = item["speaker"]
+        current_text = item["text"]
+    return collapsed_data
+
+
 async def _full_transcript_ready(result):
     logging.debug(f"{result}")
     summary_location = f'{DEFAULT_SETTINGS.FILE_LOCATION}/summary.txt'
@@ -203,7 +218,8 @@ async def _full_transcript_ready(result):
 
     dialogue = make_normal_dialogue(result['transcription']['utterances'])
 
-    if "summarization" in result and 'success' in result['summarization'] and result['summarization']['success'] is True:
+    if "summarization" in result and 'success' in result['summarization'] and result['summarization'][
+        'success'] is True:
         summarization = result["summarization"]["results"]
     else:
         summarization = None
@@ -211,29 +227,28 @@ async def _full_transcript_ready(result):
     async with aiofiles.open(full_location, 'w') as file:
         await file.write(json.dumps(result, indent=4, ensure_ascii=False))
     async with aiofiles.open(dialogue_location, 'w') as file:
-        await file.write(json.dumps(dialogue, indent=4, ensure_ascii=False))
+        fixed_dialogue = prepare_dialog(dialogue)
+        await file.write(json.dumps(fixed_dialogue, indent=4, ensure_ascii=False))
 
     if summarization:
         async with aiofiles.open(summary_location, 'w') as file:
             await file.write(json.dumps(summarization, indent=4, ensure_ascii=False))
 
-    return {
-        "summarization": summarization,
-        "dialogue_location": dialogue_location,
-        "full_location": full_location,
-    }
+        return {
+            "summarization": summarization,
+            "dialogue_location": dialogue_location,
+            "full_location": full_location,
+        }
 
+    async def __pure_callback(result, is_error=False):
+        if is_error:
+            raise RuntimeError(f"Something bad happened {result}")
+        data = await _full_transcript_ready(result)
+        pprint.pprint(data)
 
-async def __pure_callback(result, is_error=False):
-    if is_error:
-        raise RuntimeError(f"Someting bad happened {result}")
-    data = await _full_transcript_ready(result)
-    pprint.pprint(data)
-
-
-if __name__ == '__main__':
-    asyncio.run(
-        process_audio(file_path="fox1.ogg",
-                      context_prompt="Перед нами интервью",
-                      user_message="Как бы ты оценил результаты интервью? Какие проблемы были озвучены?")
-    )
+    if __name__ == '__main__':
+        asyncio.run(
+            process_audio(file_path="fox1.ogg",
+                          context_prompt="Перед нами интервью",
+                          user_message="Как бы ты оценил результаты интервью? Какие проблемы были озвучены?")
+        )

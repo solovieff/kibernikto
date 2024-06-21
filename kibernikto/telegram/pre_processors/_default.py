@@ -124,7 +124,7 @@ class TelegramMessagePreprocessor():
             await message.answer("⏳comlex_analysis disabled for non-admin users")
             return None, None
         elif complex_analysis:
-            await message.answer(f"⏳performing comlex_analysis for {SETTINGS.VOICE_MIN_COMPLEX_SECONDS} second audio")
+            await message.answer(f"⏳performing comlex_analysis for {voice.duration} second audio")
         logging.info(f"Is {local_file_path} big and does it need comlex_analysis? {complex_analysis}!")
 
         if SETTINGS.VOICE_PROCESSOR == "openai":
