@@ -22,6 +22,7 @@ class WeblinkPluginSettings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MAX_TOKENS: int = 800
     WEBLINK_MESSAGE: str = _DEFAULT_TEXT
+    WEBLINK_ENABLED: bool = True
 
 
 DEFAULT_SETTINGS = WeblinkPluginSettings()
@@ -36,7 +37,7 @@ class WeblinkSummaryPlugin(KiberniktoPlugin):
 
     @staticmethod
     def applicable():
-        return DEFAULT_SETTINGS.OPENAI_API_KEY is not None
+        return DEFAULT_SETTINGS.OPENAI_API_KEY is not None and DEFAULT_SETTINGS.WEBLINK_ENABLED is True
 
     def __init__(self, model: str = DEFAULT_SETTINGS.OPENAI_API_MODEL, base_url: str = DEFAULT_SETTINGS.OPENAI_BASE_URL,
                  api_key: str = DEFAULT_SETTINGS.OPENAI_API_KEY,

@@ -33,7 +33,7 @@ class OpenAiExecutorConfig(BaseModel):
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
     reaction_calls: list = ('никто', 'хонда', 'урод')
-    tools: List[Toolbox] = [],
+    tools: List[Toolbox] = []
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
