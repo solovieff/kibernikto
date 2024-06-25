@@ -126,16 +126,6 @@ class OpenAIExecutor:
         logging.debug(f"process_usage: {usage_dict}")
         return usage_dict
 
-    @property
-    def word_overflow(self):
-        """
-        if we exceeded max prompt tokens
-        :return:
-        """
-        total_word_count = sum(
-            len(obj["content"].split()) for obj in self.messages if obj["role"] != OpenAIRoles.system.value)
-        return total_word_count > self.MAX_WORD_COUNT
-
     def should_react(self, message_text):
         """
         outer scope method to be used to understand if this instance should process the message
