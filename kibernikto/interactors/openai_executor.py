@@ -55,7 +55,11 @@ class OpenAIExecutor:
     def __init__(self,
                  bored_after=0,
                  config=DEFAULT_CONFIG, unique_id=NOT_GIVEN):
-        self.max_messages = config.max_messages
+        if config.max_messages % 2 == 0:
+            self.max_messages = config.max_messages
+        else:
+            self.max_messages = config.max_messages + 1
+
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
@@ -232,7 +236,8 @@ class OpenAIExecutor:
 
     def _reset(self):
         # never gets full, +1 for system
-        self.messages = deque(maxlen=self.max_messages + 1)
+
+        self.messages = deque(maxlen=self.max_messages)
 
         wai = self.full_config.who_am_i.format(self.full_config.name)
 
