@@ -23,6 +23,7 @@ class PreprocessorSettings(BaseSettings):
     VOICE_OPENAI_API_KEY: str | None = None
     VOICE_OPENAI_API_MODEL: str = "whisper-1"
     VOICE_OPENAI_API_BASE_URL: str | None = None
+    VOICE_OPENAI_API_LANGUAGE: str | None = 'ru'
     VOICE_FILE_LOCATION: str = "/tmp"
     PRE_FILE_LOCATION: str = "/tmp"
     VOICE_GLADIA_API_KEY: str | None = None
@@ -160,6 +161,7 @@ class TelegramMessagePreprocessor():
         # not converted actually :)
         with open(local_file_path, "rb") as converted_to_feasible_file:
             transcription = await audio_client.create(model=SETTINGS.VOICE_OPENAI_API_MODEL,
+                                                      language=SETTINGS.VOICE_OPENAI_API_LANGUAGE,
                                                       file=converted_to_feasible_file,
                                                       response_format="text")
         if hasattr(transcription, 'text'):
