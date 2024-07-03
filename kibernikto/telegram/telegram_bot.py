@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
 
 
-class KiberniktoChatInfo():
+class KiberniktoChatInfo:
     def __init__(self, aiogram_chat: Chat, aiogram_user: User = None):
         self.full_name = aiogram_chat.full_name
         self.bio = aiogram_chat.bio

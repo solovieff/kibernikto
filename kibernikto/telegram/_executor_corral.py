@@ -64,7 +64,7 @@ async def get_temp_executor(key_id: int) -> TelegramBot:
 
 
 def executor_exists(key_id: int) -> bool:
-    return str(key_id) in __BOTS
+    return key_id in __BOTS
 
 
 def get_ai_executor_full(chat: Chat, user: User = None) -> TelegramBot:
@@ -100,7 +100,7 @@ def _apply_plugins(bot: TelegramBot):
             print_plugin_off(plugin_class)
 
 
-def _new_executor(key_id: str = NOT_GIVEN, chat_info: KiberniktoChatInfo = None):
+def _new_executor(key_id: int, chat_info: KiberniktoChatInfo = None):
     """
     creates new ai bot executor connected to AI API
     :return:
