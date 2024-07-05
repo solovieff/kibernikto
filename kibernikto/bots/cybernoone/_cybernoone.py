@@ -17,30 +17,35 @@ class Kibernikto(TelegramBot):
     """
 
     def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN,
-                 chat_info: KiberniktoChatInfo = None):
+                 chat_info: KiberniktoChatInfo = None, hide_errors=True):
         """
         :param master_id: telegram admin id
         :param username: telegram username
         :param config: ai bot config
         """
         self.key = key
+        self.hide_errors = hide_errors
         super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info)
 
     async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
-        try:
-            if self.username in message:
-                message_to_send = message.replace(f"@{self.username}", '')
-            else:
-                message_to_send = message
+        if self.username in message:
+            message_to_send = message.replace(f"@{self.username}", '')
+        else:
+            message_to_send = message
+
+        if not self.hide_errors:
             return await super().heed_and_reply(message_to_send, author, save_to_history=save_to_history)
-        except KiberniktoPluginException as e:
-            return f" {e.plugin_name} не сработал!\n\n {str(e)}"
-        except PermissionDeniedError as pde:
-            logging.warning(f"Что-то грубое и недопустимое! {str(pde)}")
-            return "Что-то грубое и недопустимое в ваших словах!"
-        except Exception as e:
-            print(traceback.format_exc())
-            return f"Я не справился! Горе мне! {str(e)}"
+        else:
+            try:
+                return await super().heed_and_reply(message_to_send, author, save_to_history=save_to_history)
+            except KiberniktoPluginException as e:
+                return f" {e.plugin_name} не сработал!\n\n {str(e)}"
+            except PermissionDeniedError as pde:
+                logging.warning(f"Что-то грубое и недопустимое! {str(pde)}")
+                return "Что-то грубое и недопустимое в ваших словах!"
+            except Exception as e:
+                print(traceback.format_exc())
+                return f"Я не справился! Горе мне! {str(e)}"
 
     # FIXME: not working properly
     async def ask_pure(self, prompt):

@@ -6,6 +6,8 @@ from typing import Dict, Type, List
 
 from openai._types import NOT_GIVEN
 from aiogram.types import User, Chat
+
+from kibernikto.bots.cybernoone import Kibernikto
 from kibernikto.plugins import KiberniktoPlugin
 
 from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
@@ -42,10 +44,14 @@ def init(master_id: int, username: str, config: OpenAiExecutorConfig, smart_bot_
     __EXECUTOR_CONFIG = AIBotConfig(config=config, master_id=master_id, username=username)
 
 
-async def kill():
+async def kill(exact_ids=()):
     for key in __BOTS:
         bot = __BOTS[key]
-        await bot.client.close()
+        if exact_ids:
+            if key in exact_ids:
+                await bot.client.close()
+        else:
+            await bot.client.close()
 
 
 def get_ai_executor(key_id: int) -> TelegramBot:
@@ -67,7 +73,7 @@ def executor_exists(key_id: int) -> bool:
     return key_id in __BOTS
 
 
-def get_ai_executor_full(chat: Chat, user: User = None) -> TelegramBot:
+def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True) -> TelegramBot:
     chat_key = chat.id
     bot = __BOTS.get(chat_key)
 
@@ -75,6 +81,8 @@ def get_ai_executor_full(chat: Chat, user: User = None) -> TelegramBot:
         chat_info = KiberniktoChatInfo(chat, user)
         bot = _new_executor(key_id=chat_key, chat_info=chat_info)
         _apply_plugins(bot)
+        if isinstance(bot, Kibernikto):
+            bot.hide_errors = hide_errors
         __BOTS[chat_key] = bot
     return bot
 

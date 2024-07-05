@@ -35,6 +35,7 @@ class OpenAiExecutorConfig(BaseModel):
     max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
     reaction_calls: list = ('никто', 'хонда', 'урод')
     tools: List[Toolbox] = []
+    hide_errors: bool = False
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
