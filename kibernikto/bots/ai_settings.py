@@ -11,6 +11,7 @@ class AiSettings(BaseSettings):
     OPENAI_API_KEY: str
     OPENAI_MAX_TOKENS: int = 800
     OPENAI_MAX_MESSAGES: int = 7
+    OPENAI_MAX_RETRIES: int = 5
     OPENAI_TEMPERATURE: float = 0.7
     OPENAI_RESET_CALL: str = "Переосмысли себя"
     OPENAI_TOOLS_ENABLED: bool = True

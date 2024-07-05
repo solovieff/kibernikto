@@ -27,6 +27,7 @@ class OpenAiExecutorConfig(BaseModel):
     input_price: float | None = AI_SETTINGS.OPENAI_INPUT_PRICE
     output_price: float | None = AI_SETTINGS.OPENAI_OUTPUT_PRICE
     max_messages: int = AI_SETTINGS.OPENAI_MAX_MESSAGES
+    max_retries: int = AI_SETTINGS.OPENAI_MAX_RETRIES
     who_am_i: str = AI_SETTINGS.OPENAI_WHO_AM_I
     reset_call: str = AI_SETTINGS.OPENAI_RESET_CALL
     master_call: str = "Величайший Кибеникто!"
@@ -65,7 +66,7 @@ class OpenAIExecutor:
         self.reset_call = config.reset_call
         self.unique_id = unique_id
         self.summarize = config.max_words_before_summary != 0
-        self.client = AsyncOpenAI(base_url=config.url, api_key=config.key)
+        self.client = AsyncOpenAI(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
 
         self.model = config.model
         self.full_config = config
