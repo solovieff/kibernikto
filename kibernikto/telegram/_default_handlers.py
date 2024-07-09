@@ -49,17 +49,17 @@ async def private_message(message: types.Message):
     or_f(F.chat.type == enums.ChatType.GROUP, F.chat.type == enums.ChatType.SUPERGROUP))
 async def group_message(message: types.Message):
     chat_id = message.chat.id
-    user_id = message.from_user.id
     if cd.TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS and chat_id not in cd.TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS:
         negative_reply_text = (f"Я не общаюсь в беседах, в которых мне не велено участвовать"
                                f" (если это конечно не один из моих Повелителей"
                                f" снизошёл до меня). Я передам ваше соообщение кому-нибудь.")
+        print(f"allowed chats: {cd.TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS}, given chat: {chat_id}")
         await cd.tg_bot.send_message(chat_id,
                                      negative_reply_text)
         await cd.tg_bot.send_message(cd.TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                      f"{message.from_user.username}: {message.md_text}")
     else:
-        if not executor_exists(user_id):
+        if not executor_exists(chat_id):
             # loading full chat info for the first time
             chat_info: Chat = await cd.tg_bot.get_chat(chat_id)
         else:
