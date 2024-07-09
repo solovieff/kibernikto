@@ -54,7 +54,7 @@ async def group_message(message: types.Message):
         negative_reply_text = (f"Я не общаюсь в беседах, в которых мне не велено участвовать"
                                f" (если это конечно не один из моих Повелителей"
                                f" снизошёл до меня). Я передам ваше соообщение кому-нибудь.")
-        await cd.tg_bot.send_message(user_id,
+        await cd.tg_bot.send_message(chat_id,
                                      negative_reply_text)
         await cd.tg_bot.send_message(cd.TELEGRAM_SETTINGS.TG_MASTER_IDS[0],
                                      f"{message.from_user.username}: {message.md_text}")
