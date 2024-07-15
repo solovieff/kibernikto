@@ -16,6 +16,7 @@ if S_SETTINGS.TG_SERVICE_GROUP_ID:
 
     print('\t%-20s%-20s' % ("service messages:", S_SETTINGS.TG_SERVICE_GROUP_ID))
 
+
     # runs when message comes
     @comprehensive_dispatcher.dp.update.outer_middleware()
     async def service_messages_middleware(handler, event: Update, data: Dict[str, Any]) -> Any:
@@ -23,11 +24,7 @@ if S_SETTINGS.TG_SERVICE_GROUP_ID:
             return await handler(event, data)
         if S_SETTINGS.TG_SERVICE_GROUP_ID is not None:
             message = event.message
-            if message.content_type == enums.ContentType.TEXT:
-                service_message = f"👵🏽 {event.message.from_user.username} {message.content_type} {event.message.text}"
-            else:
-                service_message = f"🚬 {event.message.from_user.username} {message.content_type} {event.message.md_text} "
-            await event.bot.send_message(S_SETTINGS.TG_SERVICE_GROUP_ID, service_message)
+            await message.forward(chat_id=S_SETTINGS.TG_SERVICE_GROUP_ID)
         return await handler(event, data)
 
 
