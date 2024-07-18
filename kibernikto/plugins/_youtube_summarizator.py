@@ -16,8 +16,7 @@ _DEFAULT_TEXT = "You will be provided with a video transcript. Summarize it and 
 
 class YoutubePluginSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='SUMMARIZATION_')
-
-    OPENAI_API_MODEL: str = "anthropic/claude-instant-v1"
+    OPENAI_API_MODEL: str = "anthropic/claude-3-haiku"
     OPENAI_BASE_URL: str = "https://api.vsegpt.ru:6070/v1"
     OPENAI_API_KEY: str | None = None
     OPENAI_MAX_TOKENS: int = 800

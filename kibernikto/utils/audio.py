@@ -15,4 +15,4 @@ def convert_ogg_audio(ogg_file_path, format: Literal["mp3", "wav"] = "mp3"):
         voice_converted = voice.export(new_file_path, format=format)
         os.remove(f"{ogg_file_path}")
         os.remove(new_file_path)
-        return voice_converted
+        return voice_converted, new_file_path
