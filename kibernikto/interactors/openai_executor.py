@@ -164,7 +164,7 @@ class OpenAIExecutor:
 
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model if not model else model,
-            messages=[this_message],
+            messages=[self.about_me, this_message],
             max_tokens=self.full_config.max_tokens,
             temperature=self.full_config.temperature
         )
