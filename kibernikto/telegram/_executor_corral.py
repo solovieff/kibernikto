@@ -1,20 +1,16 @@
 import logging
 import sys
 import traceback
-from contextlib import contextmanager, asynccontextmanager
-from typing import Dict, Type, List
+from contextlib import asynccontextmanager
+from typing import Dict, Type
 
-from openai._types import NOT_GIVEN
 from aiogram.types import User, Chat
-
-from kibernikto.bots.cybernoone import Kibernikto
-from kibernikto.plugins import KiberniktoPlugin
-
-from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 from pydantic import BaseModel
 
-from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
 from kibernikto.interactors import OpenAiExecutorConfig
+from kibernikto.plugins import KiberniktoPlugin
+from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
+from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 
 
 class AIBotConfig(BaseModel):
@@ -81,7 +77,7 @@ def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True) -> Tel
         chat_info = KiberniktoChatInfo(chat, user)
         bot = _new_executor(key_id=chat_key, chat_info=chat_info)
         _apply_plugins(bot)
-        if isinstance(bot, Kibernikto):
+        if hasattr(bot, 'hide_errors'):
             bot.hide_errors = hide_errors
         __BOTS[chat_key] = bot
     return bot
