@@ -259,6 +259,7 @@ class OpenAIExecutor:
         if not choice.message.tool_calls:
             raise ValueError("No tools provided!")
         message_dict = None
+        tool_call_messages = []
         for tool_call in choice.message.tool_calls:
             fn_name = tool_call.function.name
             function_impl = self._get_tool_implementation(fn_name)
@@ -269,8 +270,8 @@ class OpenAIExecutor:
                                                                          additional_params=additional_params)
             message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
             prompt.append(message_dict)
-            tool_call_messages = ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result,
-                                                                         xml=self.xml_tools)
+            tool_call_messages += ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result,
+                                                                          xml=self.xml_tools)
 
         choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message

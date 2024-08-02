@@ -19,7 +19,6 @@ class KiberniktoChatInfo:
         self.aiogram_user = aiogram_user
 
 
-
 class TelegramBot(OpenAIExecutor):
     def __init__(self, config: OpenAiExecutorConfig, master_id, username, key=NOT_GIVEN,
                  chat_info: KiberniktoChatInfo = None):
