@@ -16,7 +16,7 @@ class Kibernikto(TelegramBot):
     """
 
     def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN,
-                 chat_info: KiberniktoChatInfo = None, hide_errors=True, add_chat_info: bool = False, ):
+                 chat_info: KiberniktoChatInfo = None, hide_errors=True, add_chat_info: bool = True, ):
         """
         :param master_id: telegram admin id
         :param username: telegram username
@@ -70,11 +70,9 @@ class Kibernikto(TelegramBot):
             if self.chat_info.birthday:
                 chat_descr_string += f"День рождения: {self.chat_info.birthday}."
         else:
-            chat_descr_string = f"Участники группы {self.chat_info.aiogram_user.full_name} ищут твоей мудрости."
-            if self.chat_info.bio:
-                chat_descr_string += f"В bio указано: {self.chat_info.bio}."
+            chat_descr_string = f"Участники группы {self.chat_info.full_name} ищут твоей мудрости."
             if self.chat_info.description:
-                chat_descr_string += f"В description указано: {self.chat_info.bio}."
+                chat_descr_string += f"В description указано: {self.chat_info.description}."
         chat_descr_string = f"[{chat_descr_string}]"
 
         print(f"chat info: {chat_descr_string}")

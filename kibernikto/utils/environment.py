@@ -13,14 +13,12 @@ def print_banner():
 
 
 def print_plugin_banner(kbnktp_plgn: KiberniktoPlugin):
-    print("\t")
     plgn_name = kbnktp_plgn.__class__.__name__
     print('\t%-20s%-20s' % (f"{plgn_name} model: ", kbnktp_plgn.model))
     print('\t%-20s%-20s' % (f"{plgn_name} host: ", kbnktp_plgn.base_url))
 
 
 def print_plugin_off(kbnktp_plgn_cls):
-    print("\t")
     plgn_name = kbnktp_plgn_cls.__name__
     print('\t%-20s%-20s' % (f"{plgn_name}:", "off"))
 

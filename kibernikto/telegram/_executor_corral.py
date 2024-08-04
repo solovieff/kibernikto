@@ -115,4 +115,8 @@ def _new_executor(key_id: int, chat_info: KiberniktoChatInfo = None):
                       master_id=_configuration.master_id,
                       config=_configuration.config,
                       key=key_id, chat_info=chat_info)
+    if chat_info is not None:
+        print(f'- new {__BOT_CLASS.__name__} ai executor was created for {chat_info.full_name} with key {key_id}')
+    else:
+        print(f'- new temp {__BOT_CLASS.__name__} ai executor was created')
     return bot
