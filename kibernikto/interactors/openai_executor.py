@@ -270,10 +270,14 @@ class OpenAIExecutor:
 
         choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
+
         if save_to_history and message_dict:
             self.save_to_history(message_dict, usage_dict=usage)
             for tool_call_message in tool_call_messages:
                 self.save_to_history(tool_call_message, usage_dict=usage)
+            if response_message.content:
+                response_message_dict = dict(content=f"{response_message.content}", role=OpenAIRoles.assistant.value)
+                self.save_to_history(response_message_dict, usage_dict=usage)
         return response_message.content
 
     async def _run_plugins_for_message(self, message_text, author=NOT_GIVEN):
