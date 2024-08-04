@@ -243,11 +243,6 @@ class OpenAIExecutor:
 
         wai = self.full_config.who_am_i.format(self.full_config.name)
 
-        # weirdo
-        if self.xml_tools and self.tools:
-            xml_string = ai_tools.get_tools_xml(self.tools)
-            string_tool_info = ai_tools.get_claude_tools_info(xml_string)
-            wai += f"\n\n{string_tool_info}"
         self.about_me = dict(role=OpenAIRoles.system.value, content=f"{wai}")
 
     async def needs_attention(self, message):
