@@ -25,7 +25,7 @@ class PreprocessorSettings(BaseSettings):
     VOICE_OPENAI_API_BASE_URL: str | None = None
     VOICE_OPENAI_API_LANGUAGE: str | None = 'ru'
     VOICE_FILE_LOCATION: str = "/tmp"
-    PRE_FILE_LOCATION: str = "/tmp"
+    TG_FILES_LOCATION: str = "/tmp"
     VOICE_GLADIA_API_KEY: str | None = None
     VOICE_MIN_COMPLEX_SECONDS: int = 300  # more than 5 minutes seems to be a dialogue or smth.
     VOICE_GLADIA_CONTEXT: str | None = None
@@ -122,24 +122,24 @@ class TelegramMessagePreprocessor():
         complex_analysis = voice.duration > SETTINGS.VOICE_MIN_COMPLEX_SECONDS
 
         if complex_analysis and not permissions.is_from_admin(message):
-            await message.answer("⏳comlex_analysis disabled for non-admin users")
+            await message.answer("⏳complex_analysis disabled for non-admin users")
             return None, None
         elif complex_analysis:
-            await message.answer(f"⏳performing comlex_analysis for {voice.duration} second audio")
-        logging.info(f"Is {local_file_path} big and does it need comlex_analysis? {complex_analysis}!")
+            await message.answer(f"⏳performing complex_analysis for {voice.duration} second audio")
+        logging.info(f"Is {local_file_path} big and does it need complex_analysis? {complex_analysis}!")
 
         if SETTINGS.VOICE_PROCESSOR == "openai":
             resulting_text = await self._process_voice_openai(local_file_path)
         elif SETTINGS.VOICE_PROCESSOR == "gladia":
             resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
                                                                          user_message=user_text,
-                                                                         comlex_analysis=complex_analysis,
+                                                                         complex_analysis=complex_analysis,
                                                                          )
         elif SETTINGS.VOICE_PROCESSOR == "auto":
             if complex_analysis is True and SETTINGS.VOICE_GLADIA_API_KEY is not None:
                 resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
                                                                              user_message=user_text,
-                                                                             comlex_analysis=complex_analysis,
+                                                                             complex_analysis=complex_analysis,
                                                                              )
             else:
                 resulting_text = await self._process_voice_openai(local_file_path)
@@ -169,29 +169,52 @@ class TelegramMessagePreprocessor():
         else:
             return transcription
 
-    async def _process_voice_gladia(self, local_file_path, user_message, comlex_analysis=False):
+    async def _process_voice_gladia(self, local_file_path: str, user_message: str,
+                                    complex_analysis: bool = False) -> object:
         """
         :param local_file_path: The local file path of the voice input file.
         :type local_file_path: str
         :param user_message: The user's message corresponding to the voice input.
         :type user_message: str
-        :param comlex_analysis: Optional parameter to indicate if the voice input is a user request and should not be processed as dialogue or summarized. Defaults to False.
-        :type comlex_analysis: bool
+        :param complex_analysis: Optional parameter to indicate if the voice input is a user request and should not be processed as dialogue or summarized. Defaults to False.
+        :type complex_analysis: bool
         :return: None
         :rtype: None
 
         This method processes the voice input using Gladia's audio processing functionality. It takes the local file path of the voice input file, the user's message,
-        * The default value for comlex_analysis is False.
+        * The default value for complex_analysis is False.
 
         Example usage:
             await _process_voice_gladia('/path/to/voice/input.wav', 'Hello', True)
         """
         return await _gladia.process_audio(file_path=local_file_path, user_message=user_message,
-                                           context_prompt=SETTINGS.VOICE_GLADIA_CONTEXT, basic=not comlex_analysis)
+                                           context_prompt=SETTINGS.VOICE_GLADIA_CONTEXT, basic=not complex_analysis)
 
     async def _process_document(self, document: types.Document, tg_bot: AIOGramBot, message: types.Message):
+        if not permissions.is_from_admin(message):
+            await message.reply(f"Только администратор может загружать файлы!")
+            raise RuntimeError("Только администратор может загружать файлы!")
+
         file: types.File = await tg_bot.get_file(document.file_id)
-        file_path = file.file_path
-        photo_file: BinaryIO = await tg_bot.download_file(file_path)
-        file_path = photo_file.file_path
-        return file_path
+        binary_data: BinaryIO = await tg_bot.download_file(file.file_path)
+
+        if document.mime_type == 'application/pdf':
+            message_text = f"Loading {document.file_name}"
+            await reply_async(text=message_text, tg_bot=tg_bot, message=message)
+            local_file_path = os.path.join(SETTINGS.TG_FILES_LOCATION, document.file_name)
+            with open(local_file_path, 'wb') as f:
+                f.write(binary_data.getvalue())
+            try:
+                await message.reply("Пока не знаю, что делать с вашим файлом, а так всё ок :(")
+                return None
+            except Exception as e:
+                logging.error(f"Error processing PDF file from user {message.from_user.id}: {e}")
+                await message.reply(f"Error loading file: {e}")
+        else:
+            await message.reply(f"Пока могу загружать только ПДФ!")
+            raise RuntimeError("Пока могу загружать только ПДФ!")
+
+
+async def reply_async(text: str, message: types.Message, tg_bot: AIOGramBot):
+    await tg_bot.send_chat_action(message.chat.id, 'typing')
+    await message.reply(text)
