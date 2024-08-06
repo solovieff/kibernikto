@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Bot, Dispatcher, types, enums, F
 from aiogram.filters import or_f, and_f
 from kibernikto.utils.permissions import admin_or_public
@@ -24,7 +26,7 @@ async def private_message(message: types.Message):
         user_ai = await get_ready_executor(message=message)
 
         await cd.tg_bot.send_chat_action(message.chat.id, 'typing')
-        reply_text = await user_ai.heed_and_reply(message=user_text, author=message.from_user.username)
+        reply_text = await user_ai.heed_and_reply(message=user_text)
 
         if reply_text is None:
             reply_text = "My iron brain did not generate anything!"
@@ -39,6 +41,10 @@ async def private_message(message: types.Message):
     or_f(F.chat.type == enums.ChatType.GROUP, F.chat.type == enums.ChatType.SUPERGROUP))
 async def group_message(message: types.Message):
     chat_id = message.chat.id
+
+    if not message.from_user:
+        logging.warning(message.md_text)
+        return None
 
     group_ai = await get_ready_executor(message=message)
 
@@ -58,8 +64,7 @@ async def group_message(message: types.Message):
             return None  # do not reply
 
         await cd.tg_bot.send_chat_action(chat_id, 'typing')
-        reply_text = await group_ai.heed_and_reply(message=user_text,
-                                                   author=f"{chat_id}_{message.from_user.username}")
+        reply_text = await group_ai.heed_and_reply(message=user_text, author=message.from_user.username)
 
         chunks = split_text_by_sentences(reply_text,
                                          cd.TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)

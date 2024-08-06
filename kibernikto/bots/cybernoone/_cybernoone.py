@@ -1,5 +1,6 @@
 import logging
 import traceback
+from typing import Literal
 
 from openai import PermissionDeniedError
 from openai._types import NOT_GIVEN
@@ -27,17 +28,25 @@ class Kibernikto(TelegramBot):
         self.add_chat_info = add_chat_info
         super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info)
 
-    async def heed_and_reply(self, message, author=NOT_GIVEN, save_to_history=True):
+    async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
+                             response_type: Literal['text', 'json_object'] | NOT_GIVEN = NOT_GIVEN):
         if self.username in message:
             message_to_send = message.replace(f"@{self.username}", '')
         else:
             message_to_send = message
 
+        parent_call_obj = {
+            'message': message_to_send,
+            'author': author,
+            'save_to_history': save_to_history,
+            'response_type': response_type,
+        }
+
         if not self.hide_errors:
-            return await super().heed_and_reply(message_to_send, author, save_to_history=save_to_history)
+            return await super().heed_and_reply(**parent_call_obj)
         else:
             try:
-                return await super().heed_and_reply(message_to_send, author, save_to_history=save_to_history)
+                return await super().heed_and_reply(**parent_call_obj)
             except KiberniktoPluginException as e:
                 return f" {e.plugin_name} не сработал!\n\n {str(e)}"
             except PermissionDeniedError as pde:
@@ -75,5 +84,5 @@ class Kibernikto(TelegramBot):
                 chat_descr_string += f"В description указано: {self.chat_info.description}."
         chat_descr_string = f"[{chat_descr_string}]"
 
-        print(f"chat info: {chat_descr_string}")
+        print(f"{self.__class__.__name__}: {chat_descr_string}")
         return chat_descr_string

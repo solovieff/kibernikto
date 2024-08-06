@@ -131,8 +131,7 @@ async def on_startup(bot: Bot):
             master_id = TELEGRAM_SETTINGS.TG_MASTER_ID
             await send_random_sticker(chat_id=master_id)
             async with get_temp_executor(key_id=master_id) as hi_bot:
-                hi_message = await hi_bot.heed_and_reply("Поприветствуй своего хозяина!",
-                                                         save_to_history=False)
+                hi_message = await hi_bot.heed_and_reply("Поприветствуй своего хозяина!")
                 await tg_bot.send_message(chat_id=master_id, text=hi_message)
     except Exception as e:
         traceback.print_exc(file=sys.stdout)

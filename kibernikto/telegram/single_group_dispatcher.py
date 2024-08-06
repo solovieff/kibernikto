@@ -115,8 +115,7 @@ async def on_startup(bot: Bot):
 
         if TELEGRAM_SETTINGS.TG_SAY_HI:
             await send_random_sticker(chat_id=TELEGRAM_SETTINGS.TG_FRIEND_GROUP_ID)
-            hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата в двух предложениях!",
-                                                               save_to_history=False)
+            hi_message = await FRIEND_GROUP_BOT.heed_and_reply("Поприветствуй участников чата в двух предложениях!")
             await tg_bot.send_message(chat_id=TELEGRAM_SETTINGS.TG_FRIEND_GROUP_ID, text=hi_message)
     except Exception as e:
         logging.error(f"failed to send hello message! \n{str(e)}")

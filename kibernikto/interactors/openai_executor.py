@@ -1,13 +1,14 @@
 import logging
 from collections import deque
 from enum import Enum
-from typing import List
+from typing import List, Literal
 
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
 from openai.types import CompletionUsage
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
+from openai.types.chat.completion_create_params import ResponseFormat
 
 from pydantic import BaseModel
 
@@ -159,21 +160,27 @@ class OpenAIExecutor:
         await self._aware_overflow()
         self.messages.put(this_message)
 
-    async def single_request(self, message, model=None):
+    async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text'):
         this_message = dict(content=f"{message}", role=OpenAIRoles.user.value)
+
+        response_format = ResponseFormat(type=response_type)
 
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model if not model else model,
             messages=[self.about_me, this_message],
             max_tokens=self.full_config.max_tokens,
-            temperature=self.full_config.temperature
+            temperature=self.full_config.temperature,
+            response_format=response_format
         )
         choice: Choice = completion.choices[0]
         usage_dict = self.process_usage(completion.usage)
         return choice, usage_dict
 
-    async def _run_for_messages(self, full_prompt, author=NOT_GIVEN):
+    async def _run_for_messages(self, full_prompt, author=NOT_GIVEN,
+                                response_type: Literal['text', 'json_object'] = NOT_GIVEN):
         tools_to_use = self.tools_definitions if self.tools_definitions else NOT_GIVEN
+
+        response_format = ResponseFormat(type=response_type) if response_type else NOT_GIVEN
 
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
@@ -181,15 +188,18 @@ class OpenAIExecutor:
             max_tokens=AI_SETTINGS.OPENAI_MAX_TOKENS,
             temperature=AI_SETTINGS.OPENAI_TEMPERATURE,
             user=author,
-            tools=tools_to_use
+            tools=tools_to_use,
+            response_format=response_format
         )
         choice: Choice = completion.choices[0]
         usage_dict = self.process_usage(completion.usage)
         return choice, usage_dict
 
-    async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True):
+    async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
+                             response_type: Literal['text', 'json_object'] | NOT_GIVEN = NOT_GIVEN):
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
+        :param response_type:
         :param message: received message
         :param author: outer chat message author. can be more or less understood by chat gpt.
         :param save_to_history: if to save
@@ -212,7 +222,7 @@ class OpenAIExecutor:
 
         logging.debug(f"sending {prompt}")
 
-        choice, usage = await self._run_for_messages(prompt, author)
+        choice, usage = await self._run_for_messages(full_prompt=prompt, author=author, response_type=response_type)
         response_message: ChatCompletionMessage = choice.message
 
         if ai_tools.is_function_call(choice=choice, xml=self.xml_tools):
@@ -271,6 +281,8 @@ class OpenAIExecutor:
         choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
 
+        # FIXME: this choice can be a toolcall itself!!
+
         if save_to_history and message_dict:
             self.save_to_history(message_dict, usage_dict=usage)
             for tool_call_message in tool_call_messages:
@@ -278,7 +290,10 @@ class OpenAIExecutor:
             if response_message.content:
                 response_message_dict = dict(content=f"{response_message.content}", role=OpenAIRoles.assistant.value)
                 self.save_to_history(response_message_dict, usage_dict=usage)
-        return response_message.content
+        if response_message.content:
+            return response_message.content
+        else:
+            return f"{tool_call_result}"
 
     async def _run_plugins_for_message(self, message_text, author=NOT_GIVEN):
         plugins_result = None
