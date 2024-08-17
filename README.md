@@ -5,15 +5,16 @@ You can run Kibernikto with your params or use it as a core in your own app.
 
 Kibernikto base `OpenAiExecutorConfig` class can be easily extended to be used outside telegram.
 
-- ✍️ telegram conversations with different AIs in groups or privately
+- ✍️ telegram conversations with different AIs in groups or privately via OpenAI api spec
 - 🔉 voice messages recognition
 - 👂 interviews and meetings (up to 2 hours) analysis right in Telegram using Gladia.io
 - 🎞 youtube video summarization
 - 🔗 webpage summarization
 - 🧐 user messages logging to service group
 - 📸 image recognition
-- 🫡 openai function tools easy [integration](https://github.com/solovieff/kibernikto-planner). No more pain.~~(anthropic
-  xml format supported, too! looks like they changed it again, disabled)~~
+- 🫡 openai function tools easy [integration](https://github.com/solovieff/kibernikto-planner). No more pain. It will work for antrophic, too, if u use a proxy.
+- 🙈 [Brave search api](https://brave.com/search/api/) integration with openai tools.
+  See [Kiberwebber](https://github.com/solovieff/kibernikto-brave-search) project for details.
 
 Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
 
@@ -37,7 +38,8 @@ Given an image Kibernikto will publish it to a free image hosting service and th
   <img width="383" alt="image" src="https://github.com/solovieff/kibernikto/assets/5033247/bf1ac575-ad1a-464c-8535-2cf7f5ebb162">  
 
 - Setup minimal env    
-  First of all, all examples are in the [examples](/env_examples/) folder. See default ones for minimal config and fulls for more complicated cases.
+  First of all, all examples are in the [examples](/env_examples/) folder. See default ones for minimal config and fulls
+  for more complicated cases.
 
 **AI ENV**
 
