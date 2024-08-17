@@ -84,5 +84,5 @@ class Kibernikto(TelegramBot):
                 chat_descr_string += f"В description указано: {self.chat_info.description}."
         chat_descr_string = f"[{chat_descr_string}]"
 
-        print(f"{self.__class__.__name__}: {chat_descr_string}")
+        #print(f"{self.__class__.__name__}: {chat_descr_string}")
         return chat_descr_string

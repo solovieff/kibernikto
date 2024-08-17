@@ -34,6 +34,7 @@ class OpenAiExecutorConfig(BaseModel):
     master_call: str = "Величайший Кибеникто!"
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
+    tool_call_hole_deepness: int = AI_SETTINGS.OPENAI_TOOLS_DEEPNESS_LEVEL
     reaction_calls: list = ('никто', 'хонда', 'урод')
     tools: List[Toolbox] = []
     hide_errors: bool = False
@@ -259,12 +260,29 @@ class OpenAIExecutor:
         """checks if the reaction needed for the given message"""
         return self.should_react(message)
 
-    async def process_tool_calls(self, choice: Choice, original_request_text: str, save_to_history=True):
+    async def process_tool_calls(self, choice: Choice, original_request_text: str, save_to_history=True, iteration=0):
+        """
+
+        :param choice:
+        :param original_request_text:
+        :param save_to_history:
+        :param iteration: for chain calls to know how deep we are
+        :return:
+        """
+
+        if iteration > self.full_config.tool_call_hole_deepness:
+            raise BrokenPipeError("RECURSION ALERT: Too much tool calls. Stop the boat!")
         prompt = list(self.messages)
         if not choice.message.tool_calls:
             raise ValueError("No tools provided!")
         message_dict = None
         tool_call_messages = []
+
+        if original_request_text:
+            # if is None it's a tool call
+            message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
+            prompt.append(message_dict)
+
         for tool_call in choice.message.tool_calls:
             fn_name = tool_call.function.name
             function_impl = self._get_tool_implementation(fn_name)
@@ -273,10 +291,7 @@ class OpenAIExecutor:
             }
             tool_call_result = await ai_tools.execute_tool_call_function(tool_call, function_impl=function_impl,
                                                                          additional_params=additional_params)
-            message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
-            prompt.append(message_dict)
-            tool_call_messages += ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result,
-                                                                          xml=self.xml_tools)
+            tool_call_messages += ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result)
 
         choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
@@ -292,8 +307,10 @@ class OpenAIExecutor:
                 self.save_to_history(response_message_dict, usage_dict=usage)
         if response_message.content:
             return response_message.content
+        elif ai_tools.is_function_call(choice=choice):
+            return await self.process_tool_calls(choice, None, iteration=iteration + 1)
         else:
-            return f"{tool_call_result}"
+            return f"I did everything, but with no concrete result unfortunately"
 
     async def _run_plugins_for_message(self, message_text, author=NOT_GIVEN):
         plugins_result = None

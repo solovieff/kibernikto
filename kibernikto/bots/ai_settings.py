@@ -15,6 +15,7 @@ class AiSettings(BaseSettings):
     OPENAI_TEMPERATURE: float = 0.7
     OPENAI_RESET_CALL: str = "Переосмысли себя"
     OPENAI_TOOLS_ENABLED: bool = True
+    OPENAI_TOOLS_DEEPNESS_LEVEL: int = 5
     OPENAI_WHO_AM_I: str = _DEFAULT_TEXT
     OPENAI_SUMMARY: str | None = None
     OPENAI_MAX_WORDS: int = 8500
