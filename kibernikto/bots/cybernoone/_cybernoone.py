@@ -29,7 +29,7 @@ class Kibernikto(TelegramBot):
         super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info)
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
-                             response_type: Literal['text', 'json_object'] | NOT_GIVEN = NOT_GIVEN):
+                             response_type: Literal['text', 'json_object'] = 'text'):
         if self.username in message:
             message_to_send = message.replace(f"@{self.username}", '')
         else:

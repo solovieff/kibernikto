@@ -5,7 +5,7 @@ from typing import List, Literal
 
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
-from openai.types import CompletionUsage
+from openai.types import CompletionUsage, ResponseFormatText, ResponseFormatJSONObject
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.completion_create_params import ResponseFormat
@@ -164,7 +164,7 @@ class OpenAIExecutor:
     async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text'):
         this_message = dict(content=f"{message}", role=OpenAIRoles.user.value)
 
-        response_format = ResponseFormat(type=response_type)
+        response_format = {"type": response_type}
 
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model if not model else model,
@@ -178,10 +178,10 @@ class OpenAIExecutor:
         return choice, usage_dict
 
     async def _run_for_messages(self, full_prompt, author=NOT_GIVEN,
-                                response_type: Literal['text', 'json_object'] = NOT_GIVEN):
+                                response_type: Literal['text', 'json_object'] = 'text'):
         tools_to_use = self.tools_definitions if self.tools_definitions else NOT_GIVEN
 
-        response_format = ResponseFormat(type=response_type) if response_type else NOT_GIVEN
+        response_format = {"type": response_type}
 
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
@@ -197,7 +197,7 @@ class OpenAIExecutor:
         return choice, usage_dict
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
-                             response_type: Literal['text', 'json_object'] | NOT_GIVEN = NOT_GIVEN):
+                             response_type: Literal['text', 'json_object'] = 'text'):
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param response_type:
