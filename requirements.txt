@@ -1,4 +1,4 @@
-aiogram==3.5.0
+aiogram==3.11.0
 aiofiles==23.2.1
 certifi==2024.6.2
 python-dotenv==1.0.0
