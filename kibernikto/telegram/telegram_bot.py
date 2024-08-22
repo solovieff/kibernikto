@@ -16,6 +16,9 @@ class KiberniktoChatInfo:
         self.id = aiogram_chat.id
         if self.is_personal and not aiogram_user:
             raise ValueError("Failed to create kibernikto chat with private chat: no user info provided")
+
+        if not self.is_personal:
+            self.bio = aiogram_chat.description
         self.aiogram_user = aiogram_user
 
 
