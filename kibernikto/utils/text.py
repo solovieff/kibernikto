@@ -114,6 +114,16 @@ def clear_text_format(text: str) -> str:
     return format_cleared_text
 
 
+def prepare_for_MARKDOWN_V2(text: str) -> str:
+    format_cleared_text = text.replace("**", "*")
+    return format_cleared_text
+
+
+def prepare_for_MARKDOWN(text: str) -> str:
+    format_cleared_text = text.replace("**", "*")
+    return format_cleared_text
+
+
 def text_to_html(text: str) -> str:
     """
 
