@@ -96,3 +96,30 @@ def parse_json_garbage(s, start="{"):
         return json.loads(s)
     except json.JSONDecodeError as e:
         return json.loads(s[:e.pos])
+
+
+def clear_text_format(text: str) -> str:
+    """
+    Clear the given text from multiple consecutive spaces, dots, and double asterisks.
+
+    :param text: The text to be cleared.
+    :type text: str
+    :return: The cleared text.
+    :rtype: str
+    """
+    format_cleared_text = text.replace("  ", " ")
+    format_cleared_text = format_cleared_text.replace("....", "")
+    format_cleared_text = format_cleared_text.replace("**", "")
+
+    return format_cleared_text
+
+
+def text_to_html(text: str) -> str:
+    """
+
+    :param text:
+    :return:
+    """
+    html_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+
+    return html_text
