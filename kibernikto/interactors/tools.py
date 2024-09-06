@@ -9,7 +9,6 @@ class Toolbox(BaseModel):
     definition: dict
     implementation: Callable
 
-
 def get_tools_from_module(python_module, permitted_names=[]):
     tools = []
     for tool_name, tool_module in getmembers(python_module, ismodule):

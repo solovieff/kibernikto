@@ -88,14 +88,7 @@ class OpenAIExecutor:
 
     @property
     def tools_definitions(self):
-        if self.xml_tools:
-            return []
-        else:
-            return [toolbox.definition for toolbox in self.tools]
-
-    @property
-    def xml_tools(self):
-        return "claude" in self.model and 1 == 2
+        return [toolbox.definition for toolbox in self.tools]
 
     def _get_tool_implementation(self, name):
         for x in self.tools:
@@ -226,7 +219,7 @@ class OpenAIExecutor:
         choice, usage = await self._run_for_messages(full_prompt=prompt, author=author, response_type=response_type)
         response_message: ChatCompletionMessage = choice.message
 
-        if ai_tools.is_function_call(choice=choice, xml=self.xml_tools):
+        if ai_tools.is_function_call(choice=choice):
             return await self.process_tool_calls(choice, user_message)
 
         if save_to_history:

@@ -2,9 +2,10 @@ import logging
 import traceback
 from typing import Literal
 
-from openai import PermissionDeniedError
+from openai import PermissionDeniedError, AsyncOpenAI
 from openai._types import NOT_GIVEN
 
+from kibernikto.interactors.openai_executor import DEFAULT_CONFIG
 from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
 from kibernikto.interactors import OpenAiExecutorConfig, OpenAIRoles
 
@@ -84,5 +85,22 @@ class Kibernikto(TelegramBot):
                 chat_descr_string += f"В description указано: {self.chat_info.description}."
         chat_descr_string = f"[{chat_descr_string}]"
 
-        #print(f"{self.__class__.__name__}: {chat_descr_string}")
+        # print(f"{self.__class__.__name__}: {chat_descr_string}")
         return chat_descr_string
+
+    async def update_configuration(self, config_to_use: OpenAiExecutorConfig):
+
+        if self.full_config.key != config_to_use.key or self.full_config.url != config_to_use.url:
+            await self.client.close()
+            self.client = AsyncOpenAI(base_url=config_to_use.url, api_key=config_to_use.key,
+                                      max_retries=DEFAULT_CONFIG.max_retries)
+
+        self.full_config = config_to_use
+        self.model = config_to_use.model
+        self.tools = config_to_use.tools
+        self.master_call = config_to_use.master_call
+        self.reset_call = config_to_use.reset_call
+        self.max_messages = config_to_use.max_messages
+        self.tools = config_to_use.tools
+
+        self._reset()
