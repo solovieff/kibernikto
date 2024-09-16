@@ -19,6 +19,7 @@ from kibernikto.utils import ai_tools
 
 
 class OpenAiExecutorConfig(BaseModel):
+    id: int = None
     name: str = "Киберникто"
     model: str = AI_SETTINGS.OPENAI_API_MODEL
     url: str = AI_SETTINGS.OPENAI_BASE_URL
