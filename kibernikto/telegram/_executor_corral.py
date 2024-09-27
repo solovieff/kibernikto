@@ -69,14 +69,15 @@ def executor_exists(key_id: int) -> bool:
     return key_id in __BOTS
 
 
-def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True) -> TelegramBot:
+def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True, apply_plugins=True) -> TelegramBot:
     chat_key = chat.id
     bot = __BOTS.get(chat_key)
 
     if not bot:
         chat_info = KiberniktoChatInfo(chat, user)
         bot = _new_executor(key_id=chat_key, chat_info=chat_info)
-        _apply_plugins(bot)
+        if apply_plugins:
+            _apply_plugins(bot)
         if hasattr(bot, 'hide_errors'):
             bot.hide_errors = hide_errors
         __BOTS[chat_key] = bot
