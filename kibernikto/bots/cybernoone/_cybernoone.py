@@ -97,7 +97,6 @@ class Kibernikto(TelegramBot):
 
         self.full_config = config_to_use
         self.model = config_to_use.model
-        self.tools = config_to_use.tools
         self.master_call = config_to_use.master_call
         self.reset_call = config_to_use.reset_call
         self.max_messages = config_to_use.max_messages
