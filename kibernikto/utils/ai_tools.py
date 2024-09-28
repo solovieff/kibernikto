@@ -86,15 +86,21 @@ def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, too
     if not xml:
         call_message = {
             "role": "assistant",
-            "tool_call_id": tool_call.id,
             "content": None,
-            "function_call": {
-                "name": tool_call.function.name,
-                "arguments": tool_call.function.arguments,
-            },
+            "tool_calls": [
+                {
+                    "id": tool_call.id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments,
+                    }
+                }
+            ]
         }
         result_message = {
-            "role": "function",
+            # "role": "function",
+            "role": "tool",
             "tool_call_id": tool_call.id,
             "name": tool_call.function.name,
             "content": f'{{"result": {str(tool_call_result)} }}'}
