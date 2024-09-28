@@ -48,6 +48,7 @@ class OpenAIRoles(str, Enum):
     system = 'system',
     user = 'user',
     assistant = 'assistant'
+    tool = 'tool',
 
 
 class OpenAIExecutor:
@@ -60,11 +61,6 @@ class OpenAIExecutor:
     def __init__(self,
                  bored_after=0,
                  config=DEFAULT_CONFIG, unique_id=NOT_GIVEN):
-        if config.max_messages % 2 == 0:
-            self.max_messages = config.max_messages
-        else:
-            self.max_messages = config.max_messages + 1
-
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
@@ -74,6 +70,9 @@ class OpenAIExecutor:
 
         self.model = config.model
         self.full_config = config
+
+        # setting real max messages value: add some space for tools etc
+        self._set_max_history_len(config)
 
         # user string messages preprocessing entities to go here
         self.plugins: List[KiberniktoPlugin] = []
@@ -95,6 +94,15 @@ class OpenAIExecutor:
         for x in self.tools:
             if x.function_name == name:
                 return x.implementation
+
+    def _set_max_history_len(self, config: OpenAiExecutorConfig):
+        history_len = config.max_messages
+        if config.tools:
+            history_len = config.max_messages + len(config.tools) * 2
+        if config.max_messages % 2 == 0:
+            self.max_messages = history_len
+        else:
+            self.max_messages = history_len + 1
 
     def process_usage(self, usage: CompletionUsage) -> dict | None:
         """
@@ -241,7 +249,26 @@ class OpenAIExecutor:
     def save_to_history(self, this_message: dict, usage_dict: dict = None, author=NOT_GIVEN):
         self.messages.append(this_message)
 
-    def _reset(self):
+        self._ensure_no_tool_results_orphans()
+
+    def _ensure_no_tool_results_orphans(self):
+        """
+        Not me, OpenAI did this. We need to be sure we do not have lost tool call results in history
+        If the actual request moved upper. Performs the actual clearance.
+        :return:
+        """
+        if len(self.messages) > 2 and self.messages[0]['role'] == OpenAIRoles.tool.value:
+            if self.messages[1]['role'] == OpenAIRoles.assistant.value:
+                # resetting tool result orphans
+                self.messages.popleft()
+                self.messages.popleft()
+
+    def _reset(self, clear_persistent_history=False):
+        """
+        Resetting the history
+        :param clear_persistent_history: to be used in child instances
+        :return:
+        """
         # never gets full, +1 for system
 
         self.messages = deque(maxlen=self.max_messages)
