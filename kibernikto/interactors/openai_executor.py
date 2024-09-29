@@ -90,6 +90,10 @@ class OpenAIExecutor:
     def tools_definitions(self):
         return [toolbox.definition for toolbox in self.tools]
 
+    @property
+    def tools_names(self):
+        return [toolbox.function_name for toolbox in self.tools]
+
     def _get_tool_implementation(self, name):
         for x in self.tools:
             if x.function_name == name:

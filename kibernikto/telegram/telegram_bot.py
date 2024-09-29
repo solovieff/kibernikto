@@ -11,7 +11,7 @@ class KiberniktoChatInfo:
         self.bio = aiogram_chat.bio
         self.description = aiogram_chat.description
         self.business_intro = aiogram_chat.business_intro
-        self.birthday = aiogram_chat.birthdate
+        self.birthday = None
         self.is_personal = aiogram_chat.type == ChatType.PRIVATE
         self.id = aiogram_chat.id
         if self.is_personal and not aiogram_user:

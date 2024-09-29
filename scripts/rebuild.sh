@@ -1,3 +1,4 @@
+#to be put in the main bot directory
 #!/bin/bash
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 CONTAINER_NAME=$1

@@ -66,24 +66,26 @@ class Kibernikto(TelegramBot):
         super()._reset()
         wai = self.full_config.who_am_i.format(self.full_config.name)
         if self.chat_info and self.add_chat_info:
-            conversation_information = self._generate_chat_info()
-            wai += f"\n{conversation_information}"
+            conversation_information = self._get_telegram_chat_info()
+            wai += f"\n[{conversation_information}]"
         self.about_me = dict(role=OpenAIRoles.system.value, content=f"{wai}")
 
-    def _generate_chat_info(self):
+    def _get_telegram_chat_info(self):
         if self.chat_info is None:
             return ""
         if self.chat_info.is_personal:
-            chat_descr_string = f"{self.chat_info.aiogram_user.full_name} ищет твоей мудрости, не стесняйся иногда называть по имени (на русском!). При обращении учитывай мужчина это или женщина!"
+            chat_descr_string = "Interlocutor info:\n"
+            chat_descr_string += f"Name: {self.chat_info.aiogram_user.full_name}."
             if self.chat_info.bio:
-                chat_descr_string += f"В bio собеседника указано: {self.chat_info.bio}, учитывай это."
+                chat_descr_string += f"Bio: {self.chat_info.bio}."
             if self.chat_info.birthday:
-                chat_descr_string += f"День рождения: {self.chat_info.birthday}."
+                chat_descr_string += f"Birthday: {self.chat_info.birthday}."
         else:
-            chat_descr_string = f"Участники группы {self.chat_info.full_name} ищут твоей мудрости."
+            chat_descr_string = "Chat group info:\n"
+            chat_descr_string += f"Title: {self.chat_info.full_name}."
             if self.chat_info.description:
-                chat_descr_string += f"В description указано: {self.chat_info.description}."
-        chat_descr_string = f"[{chat_descr_string}]"
+                chat_descr_string += f"Description: {self.chat_info.description}."
+        chat_descr_string = f"{chat_descr_string}"
 
         # print(f"{self.__class__.__name__}: {chat_descr_string}")
         return chat_descr_string
@@ -102,4 +104,8 @@ class Kibernikto(TelegramBot):
         self.max_messages = config_to_use.max_messages
         self.tools = config_to_use.tools
 
+        print(f'- {self.__class__.__name__} for "{self.chat_info.full_name}" (id: {self.full_config.id}) update!')
+        print(f'- {self.tools_names}')
+        print(f'- {self.model}')
+        print(f'- {self.full_config.who_am_i}')
         self._reset()
