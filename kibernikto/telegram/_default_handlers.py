@@ -23,6 +23,7 @@ async def private_message(message: types.Message):
                                                              tg_bot=cd.tg_bot)
         if user_text is None:
             return None  # do not reply
+
         user_ai = await get_ready_executor(message=message)
 
         await cd.tg_bot.send_chat_action(message.chat.id, 'typing')

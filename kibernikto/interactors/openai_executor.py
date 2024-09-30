@@ -225,7 +225,8 @@ class OpenAIExecutor:
 
         await self._aware_overflow()
 
-        prompt = [self.get_cur_system_message()] + list(self.messages) + [this_message]
+        # prompt = [self.get_cur_system_message()] + list(self.messages) + [this_message]
+        prompt = list(self.messages) + [this_message]
 
         logging.debug(f"sending {prompt}")
 
