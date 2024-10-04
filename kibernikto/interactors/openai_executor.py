@@ -192,8 +192,8 @@ class OpenAIExecutor:
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model,
             messages=full_prompt,
-            max_tokens=AI_SETTINGS.OPENAI_MAX_TOKENS,
-            temperature=AI_SETTINGS.OPENAI_TEMPERATURE,
+            max_tokens=self.full_config.max_tokens,
+            temperature=self.full_config.temperature,
             user=author,
             tools=tools_to_use,
             response_format=response_format
