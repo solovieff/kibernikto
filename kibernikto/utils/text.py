@@ -110,6 +110,7 @@ def clear_text_format(text: str) -> str:
     format_cleared_text = text.replace("  ", " ")
     format_cleared_text = format_cleared_text.replace("....", "")
     format_cleared_text = format_cleared_text.replace("**", "")
+    format_cleared_text = format_cleared_text.replace("*", "")
 
     return format_cleared_text
 

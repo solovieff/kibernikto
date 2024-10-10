@@ -6,7 +6,7 @@ _DEFAULT_TEXT = """
 
 
 class AiSettings(BaseSettings):
-    OPENAI_API_MODEL: str = "gpt-4"
+    OPENAI_API_MODEL: str = "gpt-4o"
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_API_KEY: str
     OPENAI_MAX_TOKENS: int = 800
