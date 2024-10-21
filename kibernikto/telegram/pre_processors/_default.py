@@ -112,8 +112,11 @@ class TelegramMessagePreprocessor():
         """
         file: types.File = await tg_bot.get_file(voice.file_id)
         file_path = file.file_path
+        file_name = os.path.basename(file_path)
+        file_extension = os.path.splitext(file_name)[1]
 
-        local_file_path = f"{SETTINGS.VOICE_FILE_LOCATION}/{file.file_unique_id}.ogg"
+        local_file_path = f"{SETTINGS.VOICE_FILE_LOCATION}/{file.file_unique_id}{file_extension}"
+
         await tg_bot.download_file(file_path, local_file_path)
 
         resulting_text = None
