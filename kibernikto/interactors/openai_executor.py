@@ -258,14 +258,20 @@ class OpenAIExecutor:
     def _ensure_no_tool_results_orphans(self):
         """
         Not me, OpenAI did this. We need to be sure we do not have lost tool call results in history
-        If the actual request moved upper. Performs the actual clearance.
+        if the actual request moved upper. Performs the actual clearance.
         :return:
         """
-        if len(self.messages) > 2 and self.messages[0]['role'] == OpenAIRoles.tool.value:
-            if self.messages[1]['role'] == OpenAIRoles.assistant.value:
-                # resetting tool result orphans
-                self.messages.popleft()
-                self.messages.popleft()
+
+        def is_bad_first_message():
+            if not len(self.messages):
+                return False
+            is_tool_result_orphan = self.messages[0]['role'] == OpenAIRoles.tool.value
+            is_assistant_message = self.messages[0]['role'] == OpenAIRoles.assistant.value and self.messages[0].get(
+                'tool_calls') is None
+            return is_tool_result_orphan or is_assistant_message
+
+        while is_bad_first_message():
+            self.messages.popleft()
 
     def _reset(self, clear_persistent_history=False):
         """
@@ -320,8 +326,6 @@ class OpenAIExecutor:
 
         choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
-
-        # FIXME: this choice can be a toolcall itself!!
 
         if save_to_history and message_dict:
             self.save_to_history(message_dict, usage_dict=usage)

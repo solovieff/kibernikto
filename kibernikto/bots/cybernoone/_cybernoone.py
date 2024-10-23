@@ -101,11 +101,12 @@ class Kibernikto(TelegramBot):
         self.model = config_to_use.model
         self.master_call = config_to_use.master_call
         self.reset_call = config_to_use.reset_call
-        self.max_messages = config_to_use.max_messages
+        self._set_max_history_len(config=config_to_use)
         self.tools = config_to_use.tools
 
         print(f'- {self.__class__.__name__} for "{self.chat_info.full_name}" (id: {self.full_config.id}) update!')
         print(f'- {self.tools_names}')
+        print(f'- {self.max_messages}')
         print(f'- {self.model}')
         print(f'- {self.full_config.who_am_i}')
         self._reset()
