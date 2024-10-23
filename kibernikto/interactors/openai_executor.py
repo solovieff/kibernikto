@@ -150,6 +150,7 @@ class OpenAIExecutor:
             word in message_text.lower() for word in self.full_config.reaction_calls) or (
                 self.full_config.name in message_text)
 
+    # FIXME: to be reworked
     async def heed(self, message, author=None):
         """
         Save message to history, but do not call OpenAI yet.
@@ -158,14 +159,7 @@ class OpenAIExecutor:
         :return:
         """
         self.reset_if_usercall(message)
-        if len(message) > 200:
-            return
-        if author:
-            this_message = dict(role=OpenAIRoles.user.value, content=f"{author}: {message}")
-        else:
-            this_message = dict(OpenAIRoles.user.value, f"{message}")
-        await self._aware_overflow()
-        self.messages.put(this_message)
+        pass
 
     async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text'):
         this_message = dict(content=f"{message}", role=OpenAIRoles.user.value)
