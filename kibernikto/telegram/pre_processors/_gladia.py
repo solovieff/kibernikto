@@ -89,7 +89,7 @@ async def process_audio(file_path, audio_url=None, user_message=None, context_pr
         transcript_results = await _poll_transcript_ready(result_url=result_poll_url, session=session)
 
         if basic:
-            return transcript_results['transcription']['full_transcript']
+            return transcript_results['transcription']['full_transcript'], None
         else:
             data = await _full_transcript_ready(transcript_results)
             return data["summarization"], data
