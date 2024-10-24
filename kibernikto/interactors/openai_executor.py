@@ -1,4 +1,5 @@
 import logging
+import pprint
 from collections import deque
 from enum import Enum
 from typing import List, Literal
@@ -183,21 +184,26 @@ class OpenAIExecutor:
 
         response_format = {"type": response_type}
 
-        completion: ChatCompletion = await self.client.chat.completions.create(
-            model=self.model,
-            messages=full_prompt,
-            max_tokens=self.full_config.max_tokens,
-            temperature=self.full_config.temperature,
-            user=author,
-            tools=tools_to_use,
-            response_format=response_format
-        )
+        try:
+            completion: ChatCompletion = await self.client.chat.completions.create(
+                model=self.model,
+                messages=full_prompt,
+                max_tokens=self.full_config.max_tokens,
+                temperature=self.full_config.temperature,
+                user=author,
+                tools=tools_to_use,
+                response_format=response_format
+            )
+        except Exception as e:
+            pprint.pprint(f"{full_prompt}")
+            raise e
+
         choice: Choice = completion.choices[0]
         usage_dict = self.process_usage(completion.usage)
         return choice, usage_dict
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
-                             response_type: Literal['text', 'json_object'] = 'text'):
+                             response_type: Literal['text', 'json_object'] = 'text') -> str:
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param response_type:
@@ -221,7 +227,7 @@ class OpenAIExecutor:
 
         prompt = [self.get_cur_system_message()] + list(self.messages) + [this_message]
 
-        logging.debug(f"sending {prompt}")
+        # logging.debug(f"sending {prompt}")
 
         choice, usage = await self._run_for_messages(full_prompt=prompt, author=author, response_type=response_type)
         response_message: ChatCompletionMessage = choice.message
@@ -249,7 +255,7 @@ class OpenAIExecutor:
 
         self._ensure_no_tool_results_orphans()
 
-    def _ensure_no_tool_results_orphans(self):
+    def _ensure_no_tool_results_orphans(self, prompt: list = ()):
         """
         Not me, OpenAI did this. We need to be sure we do not have lost tool call results in history
         if the actual request moved upper. Performs the actual clearance.

@@ -82,58 +82,28 @@ async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
     return result
 
 
-def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, tool_call_result, xml=False):
-    if not xml:
-        call_message = {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": tool_call.id,
-                    "type": "function",
-                    "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments,
-                    }
+def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, tool_call_result):
+    call_message = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": tool_call.id,
+                "type": "function",
+                "function": {
+                    "name": tool_call.function.name,
+                    "arguments": tool_call.function.arguments,
                 }
-            ]
-        }
-        result_message = {
-            # "role": "function",
-            "role": "tool",
-            "tool_call_id": tool_call.id,
-            "name": tool_call.function.name,
-            "content": f'{{"result": {str(tool_call_result)} }}'}
-        return [call_message, result_message]
-    elif xml:
-        call_message = f"""
-            <function_calls>
-                <invoke>
-                    <tool_name>{tool_call.function.name}</tool_name>
-                    <parameters>
-                        {tool_call.function.arguments}
-                    </parameters>
-                </invoke>
-            </function_calls>
-        """
-
-        result_xml_string = f"""
-                    <function_results>
-                        <result>
-                            <tool_name>{tool_call.function.name}</tool_name>
-                            <stdout>
-                                {str(tool_call_result)}
-                            </stdout>
-                        </result>
-                    </function_results>
-                """
-        result_message = {
-            "role": "user",
-            "tool_call_id": tool_call.id,
-            "name": tool_call.function.name,
-            "content": result_xml_string
-        }
-        return [result_message]
+            }
+        ]
+    }
+    result_message = {
+        # "role": "function",
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+        "name": tool_call.function.name,
+        "content": f'{{"result": {str(tool_call_result)} }}'}
+    return [call_message, result_message]
 
 
 def get_tools_xml(tools: List[Toolbox]):

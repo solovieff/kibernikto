@@ -207,6 +207,9 @@ def prepare_dialog(dialogue):
             collapsed_data.append({"speaker": current_speaker, "text": current_text})
         current_speaker = item["speaker"]
         current_text = item["text"]
+
+    if not collapsed_data:
+        collapsed_data.append({"speaker": current_speaker, "text": current_text})
     return collapsed_data
 
 
