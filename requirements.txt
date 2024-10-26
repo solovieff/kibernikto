@@ -3,8 +3,9 @@ aiofiles==23.2.1
 certifi==2024.6.2
 python-dotenv==1.0.0
 openai==1.52.1
-youtube_transcript_api==0.6.1
-pytube==15.0
+youtube_transcript_api==0.6.2
+#pytube==15.0 this one is broken now for some reason
+pytubefix==8.1.1
 beautifulsoup4==4.12.2
 emoji-country-flag==1.3.2
 pyyaml==6.0.1

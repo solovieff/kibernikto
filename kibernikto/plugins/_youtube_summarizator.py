@@ -3,11 +3,15 @@ import re
 
 from openai.types.chat import ChatCompletion
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pytube import YouTube
+# from pytube import YouTube
+from pytubefix import YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, CouldNotRetrieveTranscript, TranscriptList
 
 from ._kibernikto_plugin import KiberniktoPlugin, KiberniktoPluginException
 from ._weblink_summarizator import _extract_link
+
+# fix for bad title handling :(
+
 
 YOUTUBE_VIDEO_PRE_URL = "https://www.youtube.com/watch?v="
 
@@ -109,7 +113,6 @@ def _eyesore(string_to_check):
         if (string_to_check.find(text) == True):
             return True
     return False
-
 
 
 def _is_youtube_url(url):
