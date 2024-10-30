@@ -101,7 +101,7 @@ async def process_audio(file_path, audio_url=None, user_message=None, context_pr
 
 
 async def _poll_transcript_ready(result_url: str, session: ClientSession):
-    transcript_headers = HEADERS
+    transcript_headers = HEADERS.copy()
     transcript_headers["Content-Type"] = "application/json"
     while True:
         async with session.get(url=result_url, headers=transcript_headers) as poll_response:
@@ -120,7 +120,7 @@ async def _poll_transcript_ready(result_url: str, session: ClientSession):
 
 
 async def _retrieve_transcript_info(session: ClientSession, transcript_data):
-    transcript_headers = HEADERS
+    transcript_headers = HEADERS.copy()
     # transcript_headers["Content-Type"] = "application/json"
 
     post_params = {
@@ -171,7 +171,7 @@ async def _upload_file(session: ClientSession, file_path):
     async with aiofiles.open(file_path, mode='rb') as f:
         form_data = aiohttp.FormData()
         file_content = await f.read()
-        upload_headers = HEADERS
+        upload_headers = HEADERS.copy()
         # upload_headers["Content-Type"] = "multipart/form-data"
 
         form_data.add_field('audio',
