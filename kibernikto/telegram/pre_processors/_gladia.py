@@ -20,7 +20,8 @@ class GladiaSettings(BaseSettings):
     GLADIA_POLLING_INTERVAL_SECONDS: int = 13
     GLADIA_SUMMARIZATION_TYPE: Literal["general", "bullet_points", "concise"] = "general"
     GLADIA_UPLOAD_URL: str = "https://api.gladia.io/v2/upload/"
-    TRANSCRIPT_URL: str = "https://api.gladia.io/v2/transcription/"
+    # TRANSCRIPT_URL: str = "https://api.gladia.io/v2/transcription/"
+    TRANSCRIPT_URL: str = "https://api.gladia.io/v2/pre-recorded"
     FILE_LOCATION: str = "/tmp"
 
 
@@ -162,7 +163,8 @@ def make_normal_dialogue(transcription_utterances: []):
 
 async def _upload_file(session: ClientSession, file_path):
     head, file_name = os.path.split(file_path)
-    path_name, file_extension = os.path.splitext('/path/to/somefile.ext')
+    path_name, file_extension = os.path.splitext(file_path)
+    file_extension = file_extension[1:]
 
     logging.info(f"{file_path} is being processed by Gladia")
 
