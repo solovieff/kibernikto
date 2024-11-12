@@ -1,8 +1,10 @@
+import json
 import logging
 import os
 import pprint
 from typing import BinaryIO, Literal, Callable
 
+import aiofiles
 from aiogram import types, enums, Bot as AIOGramBot
 from aiogram.types import FSInputFile
 from openai import AsyncOpenAI
@@ -43,38 +45,60 @@ class TelegramMessagePreprocessor():
         :param tg_bot:
         :return:
         """
-        user_text = message.md_text
+        user_text = message.caption if message.caption else message.md_text
         file_info = None
 
         who = f"{message.from_user.username}:{message.from_user.id}"
         logging.debug(f"processing {message.content_type} from {who}")
+
         if message.content_type == enums.ContentType.PHOTO and message.photo:
             if SETTINGS.IMAGE_SUMMARIZATION_OPENAI_API_KEY is not None:
                 photo: types.PhotoSize = message.photo[-1]
                 url = await self._process_photo(photo, tg_bot, message=message)
                 user_text = f"{user_text} {url}"
-        elif message.content_type == enums.ContentType.VOICE and message.voice:
+            return user_text
+
+        elif message.content_type == enums.ContentType.VOICE and message.voice is not None:
             if SETTINGS.VOICE_PROCESSOR is not None:
                 voice: types.Voice = message.voice
-                user_text, file_info = await self._process_voice(voice, tg_bot=tg_bot, message=message)
+                resulting_text, file_info = await self._process_voice(voice, tg_bot=tg_bot, user_text=user_text, message=message)
                 pprint.pprint(file_info)
-                if file_info and "dialogue_location" in file_info:
-                    summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
-                    await message.reply_document(document=summary, caption=file_info['summarization'])
-                    return None
+
+                if user_text:  # If the text is attached. Most likely this option can only happen in theory.
+                    if resulting_text and file_info and "dialogue_location" in file_info:
+                        summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
+                        await message.reply_document(document=summary, caption=resulting_text)
+                        return None
+                else:
+
+                    if file_info and "dialogue_location" in file_info:
+                        summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
+                        await message.reply_document(document=summary, caption=file_info['summarization'])
+                        return None
             else:
                 logging.warning(f"No voice processor configured for {message.voice.file_id}")
+                return None
+        
         elif message.content_type == enums.ContentType.AUDIO and message.audio:
             if SETTINGS.VOICE_PROCESSOR is not None:
                 voice: types.Audio = message.audio
-                user_text, file_info = await self._process_voice(voice, tg_bot=tg_bot, message=message)
+                resulting_text, file_info = await self._process_voice(voice, tg_bot=tg_bot, user_text=user_text, message=message)
                 pprint.pprint(file_info)
-                if file_info and "dialogue_location" in file_info:
-                    summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
-                    await message.reply_document(document=summary, caption=file_info['summarization'])
-                    return None
+
+                if user_text:
+                    if resulting_text and file_info and "dialogue_location" in file_info:
+                        summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
+                        await message.reply_document(document=summary, caption=resulting_text)
+                        return None
+                else:
+                    if file_info and "dialogue_location" in file_info:
+                        summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
+                        await message.reply_document(document=summary, caption=file_info['summarization'])
+                        return None
             else:
                 logging.warning(f"No voice processor configured for {message.voice.file_id}")
+                return None
+
         elif message.content_type == enums.ContentType.DOCUMENT and message.document:
             logging.debug(f"processing document from {who}")
             document = message.document
@@ -82,6 +106,7 @@ class TelegramMessagePreprocessor():
         elif message.content_type == enums.ContentType.TEXT and message.text:
             logging.debug(f"processing text from {who}")
             user_text = await self._process_text(message)
+
         return user_text
 
     async def _process_text(self, message: types.Message):
@@ -132,20 +157,64 @@ class TelegramMessagePreprocessor():
         logging.info(f"Is {local_file_path} big and does it need complex_analysis? {complex_analysis}!")
 
         if SETTINGS.VOICE_PROCESSOR == "openai":
-            resulting_text = await self._process_voice_openai(local_file_path)
+            try:
+                resulting_text = await self._process_voice_openai(local_file_path)
+            except Exception as e:
+                logging.error(f"Error while processing voice with OpenAI: {e}")
+                await message.reply("An error occurred during voice processing with OpenAI")
+                return None, None
+        
+        
         elif SETTINGS.VOICE_PROCESSOR == "gladia":
-            resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
+            try:
+                resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
                                                                          user_message=user_text,
                                                                          complex_analysis=complex_analysis,
                                                                          )
+                
+                audio_to_llm = await extract_audio_to_llm(file_info)
+                if audio_to_llm and audio_to_llm.get('success') and audio_to_llm.get('results'):
+                    first_result = audio_to_llm['results'][0]
+                    if first_result.get('success') and 'results' in first_result:
+                        response_text = first_result['results'].get('response')
+                        if response_text:
+                            resulting_text = response_text
+
+            except Exception as e:
+                logging.error(f"Error while processing voice with Gladia: {e}")
+                await message.reply("An error occurred during voice processing with Gladia.")
+                return None, None   
+            
         elif SETTINGS.VOICE_PROCESSOR == "auto":
             if complex_analysis is True and SETTINGS.VOICE_GLADIA_API_KEY is not None:
-                resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
+                try:
+                    resulting_text, file_info = await self._process_voice_gladia(local_file_path=local_file_path,
                                                                              user_message=user_text,
                                                                              complex_analysis=complex_analysis,
                                                                              )
+            
+                    audio_to_llm = await extract_audio_to_llm(file_info)
+                    if audio_to_llm and audio_to_llm.get('success') and audio_to_llm.get('results'):
+                        first_result = audio_to_llm['results'][0]
+                        if first_result.get('success') and 'results' in first_result:
+                            response_text = first_result['results'].get('response')
+                            if response_text:
+                                resulting_text = response_text
+
+
+                except Exception as e:
+                    logging.error(f"Error while processing voice with Gladia: {e}")
+                    await message.reply("An error occurred during voice processing with Gladia.")
+                    return None, None
+            
             else:
-                resulting_text = await self._process_voice_openai(local_file_path)
+                try:
+                    resulting_text = await self._process_voice_openai(local_file_path)
+                except Exception as e:
+                    logging.error(f"Error while processing voice with OpenAI: {e}")
+                    await message.reply("An error occurred during voice processing with OpenAI.")
+                    return None, None 
+
         return resulting_text, file_info
 
     async def _process_voice_openai(self, local_file_path):
@@ -221,3 +290,55 @@ class TelegramMessagePreprocessor():
 async def reply_async(text: str, message: types.Message, tg_bot: AIOGramBot):
     await tg_bot.send_chat_action(message.chat.id, 'typing')
     await message.reply(text)
+
+
+async def extract_audio_to_llm(file_info):
+    """
+    Extracts "audio_to_llm" section data from a JSON file whose path is specified in "full_location" of "file_info".
+
+    :param file_info: A dictionary with file information containing the JSON file path in the full_location key.
+    :return: The "audio_to_llm" data from the JSON file, or None if no data is found.
+    """
+    # print("Starting extract_audio_to_llm...")
+    # print("Received file_info:", file_info)
+
+    full_data_path = file_info.get('full_location')
+    # print("full_data_path:", full_data_path)
+    
+    if not full_data_path:
+        print("Path to file 'full_data.json' not found in file_info")
+        return None
+
+    if not os.path.exists(full_data_path):
+        print(f"File {full_data_path} does not exist.")
+        return None
+
+    try:
+        print(f"Attempting to open file at {full_data_path}")
+        async with aiofiles.open(full_data_path, 'r') as f:
+            content = await f.read()
+            print("File content successfully read.")
+            
+            try:
+                full_data = json.loads(content)
+                print("JSON content successfully parsed.")
+            except json.JSONDecodeError:
+                print(f"Error: File {full_data_path} is not valid JSON.")
+                return None
+
+            # print("Parsed JSON data:", full_data)
+
+            # Extract "audio_to_llm" section
+            audio_to_llm = full_data.get('audio_to_llm')
+            # print("audio_to_llm extracted:", audio_to_llm)
+            
+            if isinstance(audio_to_llm, dict):
+                print("audio_to_llm data found and is a dictionary:", audio_to_llm)
+                return audio_to_llm
+            else:
+                print("audio_to_llm data not found or not in expected format in full_data.json")
+                return None
+
+    except Exception as e:
+        print(f"Unexpected error reading {full_data_path}: {e}")
+        return None
