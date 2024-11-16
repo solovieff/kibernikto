@@ -72,7 +72,7 @@ async def process_audio(file_path, audio_url=None, user_message=None, context_pr
                 "summarization_config": {
                     "type": DEFAULT_SETTINGS.GLADIA_SUMMARIZATION_TYPE
                 },
-                "audio_to_llm": True,
+                "audio_to_llm": user_message is not None,
                 "audio_to_llm_config": {
                     "prompts": [
                         default_prompt
@@ -94,10 +94,6 @@ async def process_audio(file_path, audio_url=None, user_message=None, context_pr
         else:
             data = await _full_transcript_ready(transcript_results)
             return data["summarization"], data
-            # polling_task = asyncio.get_event_loop().create_task(
-            #    _poll_transcript_ready(result_url=result_poll_url, callback=callback_preprocessor))
-            # await polling_task
-            # return None
 
 
 async def _poll_transcript_ready(result_url: str, session: ClientSession):
