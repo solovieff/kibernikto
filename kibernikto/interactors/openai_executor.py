@@ -182,12 +182,22 @@ class OpenAIExecutor:
                                 response_type: Literal['text', 'json_object'] = 'text'):
         tools_to_use = self.tools_definitions if self.tools_definitions else NOT_GIVEN
 
+        if not full_prompt:
+            raise ValueError("full_prompt cannot be empty")
+
+        # Need to be sure the prompt is fine
+        system_message = [full_prompt[0]] if full_prompt[0]['role'] == 'system' else []
+        conversation_messages = full_prompt[1:] if system_message else full_prompt
+        # can not start with tool result, for example
+        filtered_messages = self.prepare_message_prompt(conversation_messages)
+        final_prompt = system_message + filtered_messages
+
         response_format = {"type": response_type}
 
         try:
             completion: ChatCompletion = await self.client.chat.completions.create(
                 model=self.model,
-                messages=full_prompt,
+                messages=final_prompt,
                 max_tokens=self.full_config.max_tokens,
                 temperature=self.full_config.temperature,
                 user=author,
@@ -195,7 +205,7 @@ class OpenAIExecutor:
                 response_format=response_format
             )
         except Exception as e:
-            pprint.pprint(f"{full_prompt}")
+            pprint.pprint(f"{final_prompt}")
             raise e
 
         choice: Choice = completion.choices[0]
@@ -225,7 +235,9 @@ class OpenAIExecutor:
 
         await self._aware_overflow()
 
-        prompt = [self.get_cur_system_message()] + list(self.messages) + [this_message]
+        messages_to_use = list(self.messages)
+
+        prompt = [self.get_cur_system_message()] + messages_to_use + [this_message]
 
         # logging.debug(f"sending {prompt}")
 
@@ -253,7 +265,27 @@ class OpenAIExecutor:
     def save_to_history(self, this_message: dict, usage_dict: dict = None, author=NOT_GIVEN):
         self.messages.append(this_message)
 
-        self._ensure_no_tool_results_orphans()
+    def prepare_message_prompt(self, messages_to_check: list) -> list:
+        messages_list: list = messages_to_check.copy()
+
+        def is_bad_first_message() -> bool:
+            if not len(messages_list):
+                return False
+            first_message = messages_list[0]
+            is_tool_result_orphan = first_message['role'] == OpenAIRoles.tool
+            is_assistant_message = first_message['role'] == OpenAIRoles.assistant and self.messages[0].get(
+                'tool_calls') is None
+            bad = is_tool_result_orphan or is_assistant_message
+            if bad:
+                print('!!! fixing bad first message !!!')
+                pprint.pprint(first_message)
+
+        while is_bad_first_message():
+            print(f"removing 0 message:")
+            pprint.pprint(messages_list[0])
+            messages_list.pop(0)
+
+        return messages_list
 
     def _ensure_no_tool_results_orphans(self, prompt: list = ()):
         """
@@ -261,17 +293,6 @@ class OpenAIExecutor:
         if the actual request moved upper. Performs the actual clearance.
         :return:
         """
-
-        def is_bad_first_message():
-            if not len(self.messages):
-                return False
-            is_tool_result_orphan = self.messages[0]['role'] == OpenAIRoles.tool.value
-            is_assistant_message = self.messages[0]['role'] == OpenAIRoles.assistant.value and self.messages[0].get(
-                'tool_calls') is None
-            return is_tool_result_orphan or is_assistant_message
-
-        while is_bad_first_message():
-            self.messages.popleft()
 
     def _reset(self, clear_persistent_history=False):
         """
@@ -302,7 +323,8 @@ class OpenAIExecutor:
         """
 
         if iteration > self.full_config.tool_call_hole_deepness:
-            raise BrokenPipeError("RECURSION ALERT: Too much tool calls. Stop the boat!")
+            # raise BrokenPipeError("RECURSION ALERT: Too much tool calls. Stop the boat!")
+            return "RECURSION ALERT: Too much recursive tool calls. Stop the boat!"
         prompt = list(self.messages)
         if not choice.message.tool_calls:
             raise ValueError("No tools provided!")
@@ -324,7 +346,8 @@ class OpenAIExecutor:
                                                                          additional_params=additional_params)
             tool_call_messages += ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result)
 
-        choice, usage = await self._run_for_messages(full_prompt=prompt + tool_call_messages)
+        choice, usage = await self._run_for_messages(
+            full_prompt=[self.get_cur_system_message()] + prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
 
         if save_to_history and message_dict:

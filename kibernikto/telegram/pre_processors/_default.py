@@ -2,10 +2,11 @@ import json
 import logging
 import os
 import pprint
-from typing import BinaryIO, Literal, Callable
+from typing import BinaryIO, Literal, Callable, Tuple
 
 import aiofiles
 from aiogram import types, enums, Bot as AIOGramBot
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile
 from openai import AsyncOpenAI
 from openai.resources.audio import AsyncTranscriptions
@@ -14,6 +15,7 @@ from pydantic_settings import BaseSettings
 from kibernikto.utils.image import publish_image_file
 from . import _gladia
 from kibernikto.utils import permissions
+from ._gladia import CompositeAudioReply
 
 
 class PreprocessorSettings(BaseSettings):
@@ -62,10 +64,10 @@ class TelegramMessagePreprocessor():
             pprint.pprint(file_info)
 
             if file_info is not None:
-                caption_text = resulting_text if user_text else f"{file_info['summarization']}"
-                if "dialogue_location" in file_info:
-                    summary = FSInputFile(file_info['dialogue_location'], filename="everything.txt")
-                    await message.reply_document(document=summary, caption=caption_text)
+                caption_text = resulting_text
+                if file_info.dialogue_location:
+                    dialogue_doc = FSInputFile(file_info.dialogue_location, filename="everything.txt")
+                    await message.reply_document(document=dialogue_doc, caption=caption_text)
                     return None
             else:
                 user_text = resulting_text
@@ -92,7 +94,7 @@ class TelegramMessagePreprocessor():
         return url
 
     async def _process_voice(self, tg_bot: AIOGramBot,
-                             message: types.Message = None, notifications=True):
+                             message: types.Message = None, notifications=True) -> Tuple[str, CompositeAudioReply]:
         """
         :param voice: The `types.Voice` object containing the voice file information.
         :type voice: `types.Voice`
@@ -109,7 +111,11 @@ class TelegramMessagePreprocessor():
         voice = message.voice or message.audio
         caption_text = message.caption if message.caption else message.md_text
 
-        file: types.File = await tg_bot.get_file(voice.file_id)
+        try:
+            file: types.File = await tg_bot.get_file(voice.file_id)
+        except TelegramBadRequest as e:
+            await message.reply(f"Telegram error occurred during audio file processing: {e}")
+            return None, None
         file_path = file.file_path
         file_name = os.path.basename(file_path)
         file_extension = os.path.splitext(file_name)[1]
@@ -121,6 +127,7 @@ class TelegramMessagePreprocessor():
         file_info = None
 
         complex_analysis = voice.duration > SETTINGS.VOICE_MIN_COMPLEX_SECONDS
+        complex_analysis = complex_analysis or file.file_size > 3145728  # 3MB in bytes
         complex_analysis = complex_analysis and SETTINGS.VOICE_GLADIA_API_KEY is not None
         complex_analysis = complex_analysis and SETTINGS.VOICE_PROCESSOR != "openai"
 
@@ -173,7 +180,7 @@ class TelegramMessagePreprocessor():
             return transcription
 
     async def _process_voice_gladia(self, local_file_path: str, user_message: str,
-                                    complex_analysis: bool = False) -> object:
+                                    complex_analysis: bool = False) -> Tuple[str, CompositeAudioReply]:
         """
         :param local_file_path: The local file path of the voice input file.
         :type local_file_path: str
@@ -193,13 +200,6 @@ class TelegramMessagePreprocessor():
         resulting_text, file_info = await _gladia.process_audio(file_path=local_file_path, user_message=user_message,
                                                                 context_prompt=SETTINGS.VOICE_GLADIA_CONTEXT,
                                                                 basic=not complex_analysis)
-        audio_to_llm = await extract_audio_to_llm(file_info)
-        if audio_to_llm and audio_to_llm.get('success') and audio_to_llm.get('results'):
-            first_result = audio_to_llm['results'][0]
-            if first_result.get('success') and 'results' in first_result:
-                response_text = first_result['results'].get('response')
-                if response_text:
-                    resulting_text = response_text
         return resulting_text, file_info
 
     async def _process_document(self, document: types.Document, tg_bot: AIOGramBot, message: types.Message):
@@ -231,55 +231,3 @@ class TelegramMessagePreprocessor():
 async def reply_async(text: str, message: types.Message, tg_bot: AIOGramBot):
     await tg_bot.send_chat_action(message.chat.id, 'typing')
     await message.reply(text)
-
-
-async def extract_audio_to_llm(file_info):
-    """
-    Extracts "audio_to_llm" section data from a JSON file whose path is specified in "full_location" of "file_info".
-
-    :param file_info: A dictionary with file information containing the JSON file path in the full_location key.
-    :return: The "audio_to_llm" data from the JSON file, or None if no data is found.
-    """
-    # print("Starting extract_audio_to_llm...")
-    # print("Received file_info:", file_info)
-
-    full_data_path = file_info.get('full_location')
-    # print("full_data_path:", full_data_path)
-
-    if not full_data_path:
-        print("Path to file 'full_data.json' not found in file_info")
-        return None
-
-    if not os.path.exists(full_data_path):
-        print(f"File {full_data_path} does not exist.")
-        return None
-
-    try:
-        print(f"Attempting to open file at {full_data_path}")
-        async with aiofiles.open(full_data_path, 'r') as f:
-            content = await f.read()
-            print("File content successfully read.")
-
-            try:
-                full_data = json.loads(content)
-                print("JSON content successfully parsed.")
-            except json.JSONDecodeError:
-                print(f"Error: File {full_data_path} is not valid JSON.")
-                return None
-
-            # print("Parsed JSON data:", full_data)
-
-            # Extract "audio_to_llm" section
-            audio_to_llm = full_data.get('audio_to_llm')
-            # print("audio_to_llm extracted:", audio_to_llm)
-
-            if isinstance(audio_to_llm, dict):
-                print("audio_to_llm data found and is a dictionary:", audio_to_llm)
-                return audio_to_llm
-            else:
-                print("audio_to_llm data not found or not in expected format in full_data.json")
-                return None
-
-    except Exception as e:
-        print(f"Unexpected error reading {full_data_path}: {e}")
-        return None

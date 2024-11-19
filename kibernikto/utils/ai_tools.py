@@ -102,7 +102,7 @@ def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, too
         "role": "tool",
         "tool_call_id": tool_call.id,
         "name": tool_call.function.name,
-        "content": f'{{"result": {str(tool_call_result)} }}'}
+        "content": f'{str(tool_call_result)}'}
     return [call_message, result_message]
 
 

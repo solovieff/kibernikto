@@ -6,11 +6,12 @@ import os
 import pprint
 from asyncio import sleep
 from http.client import HTTPException
-from typing import Callable, Literal
+from typing import Callable, Literal, Any
 
 import aiofiles
 import aiohttp
 from aiohttp import ClientSession
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,15 @@ class GladiaSettings(BaseSettings):
     # TRANSCRIPT_URL: str = "https://api.gladia.io/v2/transcription/"
     TRANSCRIPT_URL: str = "https://api.gladia.io/v2/pre-recorded"
     FILE_LOCATION: str = "/tmp"
+
+
+class CompositeAudioReply(BaseModel):
+    metadata: dict[str, Any] = {}
+    summarization: str | None = None
+    llm_response: str | None = None
+    dialogue_location: str | None = None
+    full_location: str | None = None
+    full_transcript: str | None = None
 
 
 DEFAULT_SETTINGS = GladiaSettings()
@@ -93,7 +103,7 @@ async def process_audio(file_path, audio_url=None, user_message=None, context_pr
             return transcript_results['transcription']['full_transcript'], None
         else:
             data = await _full_transcript_ready(transcript_results)
-            return data["summarization"], data
+            return data.summarization, data
 
 
 async def _poll_transcript_ready(result_url: str, session: ClientSession):
@@ -134,29 +144,6 @@ async def _retrieve_transcript_info(session: ClientSession, transcript_data):
             raise HTTPException(f"Failed to start file transcription {transcript_json}")
 
 
-def make_normal_dialogue(transcription_utterances: []):
-    current_person = 0
-    normal_utterances = []
-    cur_utt = {
-        "speaker": 0,
-        "text": ""
-    }
-    for utterance in transcription_utterances:
-        speaker_string = f"Speaker {utterance['speaker']}"
-        text = utterance['text']
-        if utterance['speaker'] != current_person:
-            normal_utterances.append(cur_utt.copy())
-            cur_utt = {
-                "speaker": speaker_string,
-                "text": ""
-            }
-        cur_utt['text'] += f"{text}."
-
-    normal_utterances.append(cur_utt.copy())
-
-    return normal_utterances
-
-
 async def _upload_file(session: ClientSession, file_path):
     head, file_name = os.path.split(file_path)
     path_name, file_extension = os.path.splitext(file_path)
@@ -193,63 +180,119 @@ async def _basic_transcript_ready(result):
     return result
 
 
-def prepare_dialog(dialogue):
-    collapsed_data = []
-    current_speaker = None
-    current_text = ""
+async def _full_transcript_ready(result) -> CompositeAudioReply:
+    # logging.debug(f"{result}")
+    metadata = result.get('metadata', {})
+    prefix = metadata.get('billing_time')
 
-    for item in dialogue:
-        if item["speaker"] == current_speaker:
-            current_text += " " + item["text"]
-        elif current_speaker is not None:
-            collapsed_data.append({"speaker": current_speaker, "text": current_text})
-        current_speaker = item["speaker"]
-        current_text = item["text"]
+    summary_location = f'{DEFAULT_SETTINGS.FILE_LOCATION}/summary_{prefix}.txt'
+    dialogue_location = f'{DEFAULT_SETTINGS.FILE_LOCATION}/audio_transcription_{prefix}.txt'
+    full_location = f"{DEFAULT_SETTINGS.FILE_LOCATION}/full_data_{prefix}.json"
 
-    if not collapsed_data:
-        collapsed_data.append({"speaker": current_speaker, "text": current_text})
-    return collapsed_data
+    if result.get('transcription', {}).get('utterances'):
+        dialogue = process_dialogue(result['transcription']['utterances'])
+    else:
+        dialogue = None
+        full_transcript = None
+        dialogue_location = None
 
-
-async def _full_transcript_ready(result):
-    logging.debug(f"{result}")
-    summary_location = f'{DEFAULT_SETTINGS.FILE_LOCATION}/summary.txt'
-    dialogue_location = f'{DEFAULT_SETTINGS.FILE_LOCATION}/dialogue.json'
-    full_location = f"{DEFAULT_SETTINGS.FILE_LOCATION}/full_data.json"
-
-    dialogue = make_normal_dialogue(result['transcription']['utterances'])
-
-    if "summarization" in result and 'success' in result['summarization'] and result['summarization'][
-        'success'] is True:
+    if result.get('summarization', {}).get('success') is True:
         summarization = result["summarization"]["results"]
     else:
         summarization = None
         summary_location = None
+
+    if result.get('audio_to_llm', {}).get('success') is True:
+        llm_response = extract_llm_response(result)
+        if llm_response:
+            if summarization:
+                summarization += f"\n{llm_response}"
+            else:
+                summarization = f"\n{llm_response}"
+    else:
+        llm_response = None
+
     async with aiofiles.open(full_location, 'w') as file:
         await file.write(json.dumps(result, indent=4, ensure_ascii=False))
-    async with aiofiles.open(dialogue_location, 'w') as file:
-        fixed_dialogue = prepare_dialog(dialogue)
-        await file.write(json.dumps(fixed_dialogue, indent=4, ensure_ascii=False))
+
+    if dialogue:
+        async with aiofiles.open(dialogue_location, 'w') as file:
+            await file.write(dialogue)
 
     if summarization:
         async with aiofiles.open(summary_location, 'w') as file:
-            await file.write(json.dumps(summarization, indent=4, ensure_ascii=False))
+            await file.write(summarization)
 
-        return {
-            "summarization": summarization,
-            "dialogue_location": dialogue_location,
-            "full_location": full_location,
-        }
+    return CompositeAudioReply(metadata=metadata,
+                               summarization=summarization,
+                               llm_response=llm_response,
+                               full_location=full_location,
+                               dialogue_location=dialogue_location)
 
-    async def __pure_callback(result, is_error=False):
-        if is_error:
-            raise RuntimeError(f"Something bad happened {result}")
-        data = await _full_transcript_ready(result)
-        pprint.pprint(data)
 
-    if __name__ == '__main__':
-        asyncio.run(
-            process_audio(file_path="fox1.ogg",
-                          context_prompt="Перед нами интервью",
-                          user_message="Как бы ты оценил результаты интервью? Какие проблемы были озвучены?")
-        )
+def process_dialogue(transcription_utterances: []):
+    current_person = 0
+    normal_utterances = []
+    cur_utt = {
+        "speaker": 0,
+        "text": ""
+    }
+    for utterance in transcription_utterances:
+        utterance_speaker = utterance["speaker"]
+        text = utterance['text']
+        if utterance_speaker != current_person:
+            normal_utterances.append(cur_utt.copy())
+            cur_utt = {
+                "speaker": utterance_speaker,
+                "text": ""
+            }
+            current_person = utterance_speaker
+        cur_utt['text'] += f"{text}."
+
+    normal_utterances.append(cur_utt.copy())
+    result_string = ""
+    for utterance in normal_utterances:
+        result_string += f"\n\n{utterance['speaker']}:\n{utterance['text']}"
+
+    return result_string
+
+
+async def __pure_callback(result, is_error=False):
+    if is_error:
+        raise RuntimeError(f"Something bad happened {result}")
+    data = await _full_transcript_ready(result)
+    pprint.pprint(data)
+
+
+if __name__ == '__main__':
+    asyncio.run(
+        process_audio(file_path="fox1.ogg",
+                      context_prompt="Перед нами интервью",
+                      user_message="Как бы ты оценил результаты интервью? Какие проблемы были озвучены?")
+    )
+
+
+def extract_llm_response(gladia_response: dict):
+    """
+    Extracts "audio_to_llm" section data from a gladia dict.
+
+    :param gladia_response: Full gladia response dict.
+    :return: The "audio_to_llm" data from the JSON file, or None if no data is found.
+    """
+
+    # Extract "audio_to_llm" section
+    audio_to_llm = gladia_response.get('audio_to_llm')
+
+    llm_response = None
+
+    if isinstance(audio_to_llm, dict):
+        print("audio_to_llm data found and is a dictionary:", audio_to_llm)
+        if audio_to_llm and audio_to_llm.get('success') and audio_to_llm.get('results'):
+            first_result = audio_to_llm['results'][0]
+
+            if first_result.get('success') and 'results' in first_result:
+                llm_response = first_result['results'].get('response')
+
+    else:
+        print("audio_to_llm data not found in the reply!")
+    return llm_response

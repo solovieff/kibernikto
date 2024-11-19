@@ -67,14 +67,14 @@ class Kibernikto(TelegramBot):
         wai = self.full_config.who_am_i.format(self.full_config.name)
         if self.chat_info and self.add_chat_info:
             conversation_information = self._get_telegram_chat_info()
-            wai += f"\n[{conversation_information}]"
+            wai += f"[{conversation_information}]"
         self.about_me = dict(role=OpenAIRoles.system.value, content=f"{wai}")
 
     def _get_telegram_chat_info(self):
         if self.chat_info is None:
             return ""
         if self.chat_info.is_personal:
-            chat_descr_string = "Interlocutor info:\n"
+            chat_descr_string = "Interlocutor info:"
             chat_descr_string += f"Name: {self.chat_info.aiogram_user.full_name}."
             if self.chat_info.bio:
                 chat_descr_string += f"Bio: {self.chat_info.bio}."
