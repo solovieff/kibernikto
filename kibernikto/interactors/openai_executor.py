@@ -274,14 +274,16 @@ class OpenAIExecutor:
             if not len(messages_list):
                 return False
             first_message = messages_list[0]
-            is_tool_result_orphan = first_message['role'] == OpenAIRoles.tool
-            is_assistant_message = first_message['role'] == OpenAIRoles.assistant and first_message.get(
-                'tool_calls') is None
-            bad = is_tool_result_orphan or is_assistant_message
-            if bad:
-                # print('!!! fixing bad first message !!!')
-                pprint.pprint(first_message)
-            return bad
+
+            # is_tool_result_orphan = first_message['role'] == OpenAIRoles.tool
+            # is_assistant_message = first_message['role'] == OpenAIRoles.assistant and first_message.get(
+            #    'tool_calls') is None
+            # bad = is_tool_result_orphan or is_assistant_message
+
+            # if first_message['role'] != 'user':
+            # print('!!! fixing bad first message !!!')
+            # pprint.pprint(first_message)
+            return first_message['role'] != 'user'
 
         while is_bad_first_message():
             # print(f"removing 0 message:")
