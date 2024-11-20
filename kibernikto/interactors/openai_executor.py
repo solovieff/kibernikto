@@ -17,6 +17,7 @@ from kibernikto.bots.ai_settings import AI_SETTINGS
 from kibernikto.interactors.tools import Toolbox
 from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils import ai_tools
+from kibernikto.utils.ai_tools import run_tool_calls
 
 
 class OpenAiExecutorConfig(BaseModel):
@@ -279,6 +280,7 @@ class OpenAIExecutor:
             if bad:
                 print('!!! fixing bad first message !!!')
                 pprint.pprint(first_message)
+            return bad
 
         while is_bad_first_message():
             print(f"removing 0 message:")
@@ -326,37 +328,28 @@ class OpenAIExecutor:
             # raise BrokenPipeError("RECURSION ALERT: Too much tool calls. Stop the boat!")
             return "RECURSION ALERT: Too much recursive tool calls. Stop the boat!"
         prompt = list(self.messages)
-        if not choice.message.tool_calls:
-            raise ValueError("No tools provided!")
+
         message_dict = None
-        tool_call_messages = []
 
         if original_request_text:
             # if is None it's a tool call
             message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
             prompt.append(message_dict)
 
-        for tool_call in choice.message.tool_calls:
-            fn_name = tool_call.function.name
-            function_impl = self._get_tool_implementation(fn_name)
-            additional_params = {
-                "key": self.unique_id
-            }
-            tool_call_result = await ai_tools.execute_tool_call_function(tool_call, function_impl=function_impl,
-                                                                         additional_params=additional_params)
-            tool_call_messages += ai_tools.get_tool_call_serving_messages(tool_call, tool_call_result)
+        tool_call_messages = await run_tool_calls(choice=choice, available_tools=self.tools, unique_id=self.unique_id)
 
         choice, usage = await self._run_for_messages(
             full_prompt=[self.get_cur_system_message()] + prompt + tool_call_messages)
         response_message: ChatCompletionMessage = choice.message
 
-        if save_to_history and message_dict:
+        if message_dict and save_to_history:
             self.save_to_history(message_dict, usage_dict=usage)
-            for tool_call_message in tool_call_messages:
-                self.save_to_history(tool_call_message, usage_dict=usage)
-            if response_message.content:
-                response_message_dict = dict(content=f"{response_message.content}", role=OpenAIRoles.assistant.value)
-                self.save_to_history(response_message_dict, usage_dict=usage)
+        for tool_call_message in tool_call_messages:
+            self.save_to_history(tool_call_message, usage_dict=usage)
+        if response_message.content and save_to_history:
+            response_message_dict = dict(content=f"{response_message.content}", role=OpenAIRoles.assistant.value)
+            self.save_to_history(response_message_dict, usage_dict=usage)
+
         if response_message.content:
             return response_message.content
         elif ai_tools.is_function_call(choice=choice):

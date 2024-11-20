@@ -35,29 +35,33 @@ def tool_to_claude_dict(tool: Toolbox):
     return claude_dict
 
 
-def is_function_call(choice: Choice, xml=False):
-    if not xml:
-        return choice.finish_reason == "tool_calls"
-    else:
-        if 'function_name' in choice.message.content and 'call_id' in choice.message.content:
-            try:
-                logging.warning(choice.message.content)
-                function_string = choice.message.content.replace('\n', ' ').replace('\r', '')
-                call_dict = parse_json_garbage(function_string)
-                # call_dict = json.loads(json_string)
-                pprint.pprint(call_dict)
-            except JSONDecodeError as err:
-                logging.error(str(err))
-                return False
-            new_ai_tool_call = ChatCompletionMessageToolCall(
-                id=str(call_dict['call_id']),
-                type="function",
-                function=Function(name=call_dict['function_name'],
-                                  arguments=json.dumps(call_dict['parameters'])
-                                  ))
-            choice.message.tool_calls = [new_ai_tool_call]
-            return True
-    return False
+def is_function_call(choice: Choice):
+    return choice.finish_reason == "tool_calls"
+
+
+async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_id: str):
+    if not choice.message.tool_calls:
+        raise ValueError("No tools provided!")
+
+        # if is None it's a recursive tool call
+    tool_call_messages = []
+
+    for tool_call in choice.message.tool_calls:
+        fn_name = tool_call.function.name
+        function_impl = get_tool_impl(available_tools=available_tools, fn_name=fn_name)
+        additional_params = dict(key=unique_id)
+        tool_call_result = await execute_tool_call_function(tool_call, function_impl=function_impl,
+                                                            additional_params=additional_params)
+        tool_call_messages += get_tool_call_serving_messages(tool_call, tool_call_result)
+
+    return tool_call_messages
+
+
+def get_tool_impl(available_tools: list[Toolbox], fn_name: str) -> Callable:
+    for x in available_tools:
+        if x.function_name == fn_name:
+            return x.implementation
+    return None
 
 
 async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
