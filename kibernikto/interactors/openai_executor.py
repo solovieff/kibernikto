@@ -2,7 +2,7 @@ import logging
 import pprint
 from collections import deque
 from enum import Enum
-from typing import List, Literal
+from typing import List, Literal, Type
 
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
@@ -14,6 +14,7 @@ from openai.types.chat.completion_create_params import ResponseFormat
 from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS
+from kibernikto.interactors.schema import KiberniktoAIClient
 from kibernikto.interactors.tools import Toolbox
 from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils import ai_tools
@@ -55,20 +56,22 @@ class OpenAIRoles(str, Enum):
 
 class OpenAIExecutor:
     """
-    Basic Entity on the OpenAI library level.
+    Basic Entity on the OpenAI API level.
     Sends requests and receives responses. Can store chat summary.
     Can process group chats at some point.
     """
 
     def __init__(self,
                  bored_after=0,
-                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN):
+                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN, client_class: Type[KiberniktoAIClient] = AsyncOpenAI, ):
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
         self.unique_id = unique_id
         self.summarize = config.max_words_before_summary != 0
-        self.client = AsyncOpenAI(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
+
+        self.client_class = client_class
+        self.client = client_class(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
 
         self.model = config.model
         self.full_config = config
@@ -181,7 +184,7 @@ class OpenAIExecutor:
 
     async def _run_for_messages(self, full_prompt, author=NOT_GIVEN,
                                 response_type: Literal['text', 'json_object'] = 'text'):
-        tools_to_use = self.tools_definitions if self.tools_definitions else NOT_GIVEN
+        tools_to_use = self.tools_definitions
 
         if not full_prompt:
             raise ValueError("full_prompt cannot be empty")
@@ -196,16 +199,21 @@ class OpenAIExecutor:
 
         response_format = {"type": response_type}
 
+        completion_params = {
+            "model": self.model,
+            "messages": final_prompt,
+            "max_tokens": self.full_config.max_tokens,
+            "temperature": self.full_config.temperature,
+            "user": author,
+            "response_format": response_format
+        }
+
+        # Добавляем tools только если они есть
+        if tools_to_use:
+            completion_params["tools"] = tools_to_use
+
         try:
-            completion: ChatCompletion = await self.client.chat.completions.create(
-                model=self.model,
-                messages=final_prompt,
-                max_tokens=self.full_config.max_tokens,
-                temperature=self.full_config.temperature,
-                user=author,
-                tools=tools_to_use,
-                response_format=response_format
-            )
+            completion: ChatCompletion = await self.client.chat.completions.create(**completion_params)
         except Exception as e:
             pprint.pprint(f"{final_prompt}")
             raise e

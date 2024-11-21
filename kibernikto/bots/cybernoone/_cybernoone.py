@@ -18,7 +18,7 @@ class Kibernikto(TelegramBot):
     """
 
     def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN,
-                 chat_info: KiberniktoChatInfo = None, hide_errors=True, add_chat_info: bool = True, ):
+                 chat_info: KiberniktoChatInfo = None, hide_errors=True, add_chat_info: bool = True, **kwargs):
         """
         :param master_id: telegram admin id
         :param username: telegram username
@@ -27,7 +27,7 @@ class Kibernikto(TelegramBot):
         self.key = key
         self.hide_errors = hide_errors
         self.add_chat_info = add_chat_info
-        super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info)
+        super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info, **kwargs)
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
                              response_type: Literal['text', 'json_object'] = 'text'):
@@ -94,8 +94,8 @@ class Kibernikto(TelegramBot):
 
         if self.full_config.key != config_to_use.key or self.full_config.url != config_to_use.url:
             await self.client.close()
-            self.client = AsyncOpenAI(base_url=config_to_use.url, api_key=config_to_use.key,
-                                      max_retries=DEFAULT_CONFIG.max_retries)
+            self.client = self.client_class(base_url=config_to_use.url, api_key=config_to_use.key,
+                                            max_retries=DEFAULT_CONFIG.max_retries)
 
         self.full_config = config_to_use
         self.model = config_to_use.model

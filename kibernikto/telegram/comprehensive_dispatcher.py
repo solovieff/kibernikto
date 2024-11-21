@@ -26,6 +26,7 @@ class TelegramSettings(BaseSettings):
     TG_CHUNK_SENTENCES: int = 7
     TG_REACTION_CALLS: List[str] = ['honda', 'киберникто']
     TG_SAY_HI: bool = False
+    TG_PROGRESS_MESSAGES: bool = True
     TG_STICKER_LIST: List[str] = ["CAACAgIAAxkBAAELx29l_2OsQzpRWhmXTIMBM4yekypTOwACdgkAAgi3GQI1Wnpqru6xgTQE"]
 
 
