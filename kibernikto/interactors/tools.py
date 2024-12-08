@@ -1,3 +1,4 @@
+import logging
 from inspect import getmembers, isfunction, ismodule
 from typing import Any, Callable
 
@@ -16,11 +17,13 @@ def get_tools_from_module(python_module, permitted_names=[]):
         if permitted_names and tool_name not in permitted_names:
             continue
         for function_name, function in getmembers(tool_module, isfunction):
-
             if tool_name in function_name:
                 if function_name.endswith("_tool"):
                     definition = function()
                 else:
                     implementation = function
-        tools.append(Toolbox(function_name=tool_name, definition=definition, implementation=implementation))
+        try:
+            tools.append(Toolbox(function_name=tool_name, definition=definition, implementation=implementation))
+        except Exception as e:
+            logging.warning(f"skipping '{tool_name}' in tools {python_module.__name__}: {e}")
     return tools

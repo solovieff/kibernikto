@@ -215,9 +215,11 @@ class OpenAIExecutor:
         return choice, usage_dict
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
-                             response_type: Literal['text', 'json_object'] = 'text') -> str:
+                             response_type: Literal['text', 'json_object'] = 'text',
+                             additional_content: dict = None) -> str:
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
+        :param additional_content: for example type: image_url
         :param response_type:
         :param message: received message
         :param author: outer chat message author. can be more or less understood by chat gpt.
@@ -234,6 +236,15 @@ class OpenAIExecutor:
                 return plugins_result
 
         this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
+
+        if additional_content:
+            this_message = {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_message},
+                    additional_content
+                ]
+            }
 
         await self._aware_overflow()
 
@@ -274,15 +285,6 @@ class OpenAIExecutor:
             if not len(messages_list):
                 return False
             first_message = messages_list[0]
-
-            # is_tool_result_orphan = first_message['role'] == OpenAIRoles.tool
-            # is_assistant_message = first_message['role'] == OpenAIRoles.assistant and first_message.get(
-            #    'tool_calls') is None
-            # bad = is_tool_result_orphan or is_assistant_message
-
-            # if first_message['role'] != 'user':
-            # print('!!! fixing bad first message !!!')
-            # pprint.pprint(first_message)
             return first_message['role'] != 'user'
 
         while is_bad_first_message():
@@ -403,7 +405,8 @@ class OpenAIExecutor:
         """
         total_word_count = sum(
             len(obj["content"].split()) for obj in list(self.messages) if
-            obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None)
+            obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None and
+            isinstance(obj['content'], str))
         return ((
                         self.full_config.max_words_before_summary and total_word_count > self.full_config.max_words_before_summary) or
                 len(self.messages) > self.max_messages)
