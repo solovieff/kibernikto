@@ -43,7 +43,7 @@ async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_
     if not choice.message.tool_calls:
         raise ValueError("No tools provided!")
 
-        # if is None it's a recursive tool call
+    # if is None it's a recursive tool call
     tool_call_messages = []
 
     for tool_call in choice.message.tool_calls:

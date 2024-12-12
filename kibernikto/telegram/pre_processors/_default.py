@@ -65,10 +65,16 @@ class TelegramMessagePreprocessor():
 
             if file_info is not None:
                 caption_text = resulting_text
+                max_caption_length = 1024
+                truncated_caption = caption_text[:max_caption_length] if len(
+                    caption_text) > max_caption_length else caption_text
+
                 if file_info.dialogue_location:
                     dialogue_doc = FSInputFile(file_info.dialogue_location, filename="everything.txt")
-                    await message.reply_document(document=dialogue_doc, caption=caption_text)
+                    await message.reply_document(document=dialogue_doc, caption=truncated_caption)
                     return None
+                elif truncated_caption:
+                    await message.reply(text=truncated_caption)
             else:
                 user_text = resulting_text
         elif message.content_type == enums.ContentType.DOCUMENT and message.document:
