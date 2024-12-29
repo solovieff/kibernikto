@@ -41,6 +41,7 @@ class OpenAiExecutorConfig(BaseModel):
     reaction_calls: list = ('никто', 'хонда', 'урод')
     tools: List[Toolbox] = []
     hide_errors: bool = False
+    app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
@@ -91,6 +92,10 @@ class OpenAIExecutor:
     @property
     def tools_definitions(self):
         return [toolbox.definition for toolbox in self.tools]
+
+    @property
+    def default_headers(self):
+        return None
 
     @property
     def tools_names(self):
@@ -168,12 +173,15 @@ class OpenAIExecutor:
 
         response_format = {"type": response_type}
 
+        headers = self.default_headers
+
         completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model if not model else model,
             messages=[self.about_me, this_message],
             max_tokens=self.full_config.max_tokens,
             temperature=self.full_config.temperature,
-            response_format=response_format
+            response_format=response_format,
+            extra_headers=headers
         )
         choice: Choice = completion.choices[0]
         usage_dict = self.process_usage(completion.usage)
@@ -204,7 +212,8 @@ class OpenAIExecutor:
                 temperature=self.full_config.temperature,
                 user=author,
                 tools=tools_to_use,
-                response_format=response_format
+                response_format=response_format,
+                extra_headers=self.default_headers
             )
         except Exception as e:
             pprint.pprint(f"{final_prompt}")

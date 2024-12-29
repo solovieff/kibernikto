@@ -18,6 +18,7 @@ class AiSettings(BaseSettings):
     OPENAI_TOOLS_DEEPNESS_LEVEL: int = 5
     OPENAI_WHO_AM_I: str = _DEFAULT_TEXT
     OPENAI_SUMMARY: str | None = None
+    OPENAI_INSTANCE_ID: str = "kbnkt"
     OPENAI_MAX_WORDS: int = 8500
     OPENAI_INPUT_PRICE: float | None = None
     OPENAI_OUTPUT_PRICE: float | None = None
