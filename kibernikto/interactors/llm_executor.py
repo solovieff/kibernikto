@@ -2,7 +2,7 @@ import logging
 import pprint
 from collections import deque
 from enum import Enum
-from typing import List, Literal
+from typing import List, Literal, Type
 
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
@@ -14,13 +14,14 @@ from openai.types.chat.completion_create_params import ResponseFormat
 from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS
+from kibernikto.interactors.schema import KiberniktoAIClient
 from kibernikto.interactors.tools import Toolbox
 from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils import ai_tools
 from kibernikto.utils.ai_tools import run_tool_calls
 
 
-class OpenAiExecutorConfig(BaseModel):
+class LLMExecutorConfig(BaseModel):
     id: int = None
     name: str = "Киберникто"
     model: str = AI_SETTINGS.OPENAI_API_MODEL
@@ -41,10 +42,9 @@ class OpenAiExecutorConfig(BaseModel):
     reaction_calls: list = ('никто', 'хонда', 'урод')
     tools: List[Toolbox] = []
     hide_errors: bool = False
-    app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
 
 
-DEFAULT_CONFIG = OpenAiExecutorConfig()
+DEFAULT_CONFIG = LLMExecutorConfig()
 
 
 class OpenAIRoles(str, Enum):
@@ -54,22 +54,25 @@ class OpenAIRoles(str, Enum):
     tool = 'tool',
 
 
-class OpenAIExecutor:
+class LLMExecutor:
     """
-    Basic Entity on the OpenAI library level.
+    Basic Entity on the OpenAI API level.
     Sends requests and receives responses. Can store chat summary.
     Can process group chats at some point.
     """
 
     def __init__(self,
                  bored_after=0,
-                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN):
+                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN, client_class: Type[KiberniktoAIClient] = AsyncOpenAI, ):
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
         self.unique_id = unique_id
         self.summarize = config.max_words_before_summary != 0
-        self.client = AsyncOpenAI(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
+
+        self.client_class = client_class
+        self.client = client_class(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
+        self.client.close
 
         self.model = config.model
         self.full_config = config
@@ -82,7 +85,6 @@ class OpenAIExecutor:
 
         # additional tools in Toolbox formats
         self.tools: List[Toolbox] = config.tools
-        self.use_system = True
 
         if self.max_messages < 2:
             self.max_messages = 2  # hahaha
@@ -95,10 +97,6 @@ class OpenAIExecutor:
         return [toolbox.definition for toolbox in self.tools]
 
     @property
-    def default_headers(self):
-        return None
-
-    @property
     def tools_names(self):
         return [toolbox.function_name for toolbox in self.tools]
 
@@ -107,7 +105,7 @@ class OpenAIExecutor:
             if x.function_name == name:
                 return x.implementation
 
-    def _set_max_history_len(self, config: OpenAiExecutorConfig):
+    def _set_max_history_len(self, config: LLMExecutorConfig):
         history_len = config.max_messages
         if config.tools:
             history_len = config.max_messages + len(config.tools) * 2
@@ -122,9 +120,9 @@ class OpenAIExecutor:
         :param usage:
         :return: usage dict updated with costs
         """
-        # logging.warning(f"usage is {usage}")
+        logging.warning(f"usage is {usage}")
         if not usage:
-            # logging.debug("usage unknown!")
+            logging.debug("usage unknown!")
             return None
 
         usage_dict = usage.model_dump()
@@ -144,9 +142,8 @@ class OpenAIExecutor:
                 usage_dict['prompt_cost'] = prompt_cost
             usage_dict['total_cost'] = total
         else:
-            pass
-            # logging.warning("no OPENAI_INPUT_PRICE (input_price) and OPENAI_OUTPUT_PRICE (output_price) provided")
-        # logging.debug(f"process_usage: {usage_dict}")
+            logging.warning("no OPENAI_INPUT_PRICE (input_price) and OPENAI_OUTPUT_PRICE (output_price) provided")
+        logging.debug(f"process_usage: {usage_dict}")
         return usage_dict
 
     def should_react(self, message_text):
@@ -175,25 +172,13 @@ class OpenAIExecutor:
 
         response_format = {"type": response_type}
 
-        headers = self.default_headers
-
-        completion_dict = dict(
+        completion: ChatCompletion = await self.client.chat.completions.create(
             model=self.model if not model else model,
-            response_format=response_format,
-            extra_headers=self.default_headers
+            messages=[self.about_me, this_message],
+            max_tokens=self.full_config.max_tokens,
+            temperature=self.full_config.temperature,
+            response_format=response_format
         )
-
-        if self.use_system:
-            messages = [self.about_me, this_message]
-            completion_dict['max_tokens'] = self.full_config.max_tokens
-            completion_dict['temperature'] = self.full_config.temperature
-        else:
-            messages = [this_message]
-            completion_dict['max_completion_tokens'] = self.full_config.max_tokens
-
-        completion_dict['messages'] = messages
-
-        completion: ChatCompletion = await self.client.chat.completions.create(**completion_dict)
         choice: Choice = completion.choices[0]
         usage_dict = self.process_usage(completion.usage)
         return choice, usage_dict
@@ -207,31 +192,24 @@ class OpenAIExecutor:
 
         # Need to be sure the prompt is fine
         system_message = [full_prompt[0]] if full_prompt[0]['role'] == 'system' else []
-        response_format = {"type": response_type}
         conversation_messages = full_prompt[1:] if system_message else full_prompt
         # can not start with tool result, for example
         filtered_messages = self.prepare_message_prompt(conversation_messages)
 
-        completion_dict = dict(
-            model=self.model,
-            user=author,
-            tools=tools_to_use,
-            response_format=response_format,
-            extra_headers=self.default_headers
-        )
+        final_prompt = system_message + filtered_messages
 
-        if self.use_system:
-            final_prompt = system_message + filtered_messages
-            completion_dict['max_tokens'] = self.full_config.max_tokens
-            completion_dict['temperature'] = self.full_config.temperature
-        else:
-            final_prompt = filtered_messages
-            completion_dict['max_completion_tokens'] = self.full_config.max_tokens * 5
-
-        completion_dict['messages'] = final_prompt
+        response_format = {"type": response_type}
 
         try:
-            completion: ChatCompletion = await self.client.chat.completions.create(**completion_dict)
+            completion: ChatCompletion = await self.client.chat.completions.create(
+                model=self.model,
+                messages=final_prompt,
+                max_tokens=self.full_config.max_tokens,
+                temperature=self.full_config.temperature,
+                user=author,
+                tools=tools_to_use,
+                response_format=response_format
+            )
         except Exception as e:
             pprint.pprint(f"{final_prompt}")
             raise e
@@ -241,11 +219,9 @@ class OpenAIExecutor:
         return choice, usage_dict
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
-                             response_type: Literal['text', 'json_object'] = 'text',
-                             additional_content: dict = None, with_history: bool = True) -> str:
+                             response_type: Literal['text', 'json_object'] = 'text') -> str:
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
-        :param additional_content: for example type: image_url
         :param response_type:
         :param message: received message
         :param author: outer chat message author. can be more or less understood by chat gpt.
@@ -263,21 +239,9 @@ class OpenAIExecutor:
 
         this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
 
-        if additional_content:
-            this_message = {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": user_message},
-                    additional_content
-                ]
-            }
-
         await self._aware_overflow()
 
-        if with_history:
-            messages_to_use = list(self.messages)
-        else:
-            messages_to_use = []
+        messages_to_use = list(self.messages)
 
         prompt = [self.get_cur_system_message()] + messages_to_use + [this_message]
 
@@ -314,6 +278,15 @@ class OpenAIExecutor:
             if not len(messages_list):
                 return False
             first_message = messages_list[0]
+
+            # is_tool_result_orphan = first_message['role'] == OpenAIRoles.tool
+            # is_assistant_message = first_message['role'] == OpenAIRoles.assistant and first_message.get(
+            #    'tool_calls') is None
+            # bad = is_tool_result_orphan or is_assistant_message
+
+            # if first_message['role'] != 'user':
+            # print('!!! fixing bad first message !!!')
+            # pprint.pprint(first_message)
             return first_message['role'] != 'user'
 
         while is_bad_first_message():
@@ -434,8 +407,7 @@ class OpenAIExecutor:
         """
         total_word_count = sum(
             len(obj["content"].split()) for obj in list(self.messages) if
-            obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None and
-            isinstance(obj['content'], str))
+            obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None)
         return ((
                         self.full_config.max_words_before_summary and total_word_count > self.full_config.max_words_before_summary) or
                 len(self.messages) > self.max_messages)

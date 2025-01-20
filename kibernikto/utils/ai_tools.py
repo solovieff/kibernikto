@@ -36,7 +36,7 @@ def tool_to_claude_dict(tool: Toolbox):
 
 
 def is_function_call(choice: Choice):
-    return choice.finish_reason == "tool_calls"
+    return choice.finish_reason == "tool_calls" or (choice.message.tool_calls and len(choice.message.tool_calls) > 0)
 
 
 async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_id: str):

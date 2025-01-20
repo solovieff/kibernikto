@@ -75,7 +75,7 @@ class Kibernikto(TelegramBot):
         if self.chat_info is None:
             return ""
         if self.chat_info.is_personal:
-            chat_descr_string = "Interlocutor info:"
+            chat_descr_string = "[Interlocutor info]"
             chat_descr_string += f"Name: {self.chat_info.aiogram_user.full_name}."
             if self.chat_info.bio:
                 chat_descr_string += f"Bio: {self.chat_info.bio}."

@@ -2,10 +2,10 @@ aiogram==3.16.0
 aiofiles==23.2.1
 certifi==2024.8.30
 python-dotenv==1.0.0
-openai==1.55.3
+openai==1.59.3
 youtube_transcript_api==0.6.2
 #pytube==15.0 this one is broken now for some reason
-pytubefix==8.1.1
+pytubefix==8.12.0
 pyyaml==6.0.1
 pydantic-settings
 pydub
