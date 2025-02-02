@@ -1,14 +1,13 @@
-aiogram==3.16.0
-aiofiles==23.2.1
-certifi==2024.8.30
-python-dotenv==1.0.0
+aiogram>=3.17.0
+aiofiles>=24.1.0
+certifi>=2025.1.31
+python-dotenv>=1.0.0
 openai==1.59.3
 youtube_transcript_api==0.6.2
 #pytube==15.0 this one is broken now for some reason
-pytubefix==8.12.0
-pyyaml==6.0.1
+pytubefix>=8.12.0
+pyyaml==6.0.2
 pydantic-settings
-pydub
 psycopg==3.1.18
 psycopg[binary]==3.1.18
 psycopg-pool==3.2
