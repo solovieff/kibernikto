@@ -38,7 +38,7 @@ class OpenAiExecutorConfig(BaseModel):
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
     tool_call_hole_deepness: int = AI_SETTINGS.OPENAI_TOOLS_DEEPNESS_LEVEL
-    reaction_calls: list = ('никто', 'хонда', 'урод')
+    reaction_calls: list = ['никто', 'хонда', 'урод']
     tools: List[Toolbox] = []
     hide_errors: bool = False
     app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
@@ -170,8 +170,18 @@ class OpenAIExecutor:
         self.reset_if_usercall(message)
         pass
 
-    async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text'):
+    async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text',
+                             additional_content: dict = None):
         this_message = dict(content=f"{message}", role=OpenAIRoles.user.value)
+
+        if additional_content:
+            this_message = {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": message},
+                    additional_content
+                ]
+            }
 
         response_format = {"type": response_type}
 
@@ -240,9 +250,12 @@ class OpenAIExecutor:
         usage_dict = self.process_usage(completion.usage)
         return choice, usage_dict
 
-    async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
-                             response_type: Literal['text', 'json_object'] = 'text',
-                             additional_content: dict = None, with_history: bool = True) -> str:
+    async def heed_and_reply(self, **kwargs):
+        return await self.request_llm(**kwargs)
+
+    async def request_llm(self, message: str, author=NOT_GIVEN, save_to_history=True,
+                          response_type: Literal['text', 'json_object'] = 'text',
+                          additional_content: dict = None, with_history: bool = True) -> str:
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param additional_content: for example type: image_url

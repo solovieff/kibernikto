@@ -1,15 +1,15 @@
-from kibernikto.bots.ai_settings import AI_SETTINGS
+from kibernikto.bots.ai_settings import AI_SETTINGS, AiSettings
 
 import logging
 
 from kibernikto.plugins import KiberniktoPlugin
 
 
-def print_banner():
+def print_banner(ai_settings: AiSettings = AI_SETTINGS):
     print("\t")
-    print('\t%-20s%-20s' % ("avatar model:", AI_SETTINGS.OPENAI_API_MODEL))
-    print('\t%-20s%-20s' % ("avatar host:", AI_SETTINGS.OPENAI_BASE_URL))
-    print('\t%-20s%-20s' % ("avatar temp:", AI_SETTINGS.OPENAI_TEMPERATURE))
+    print('\t%-20s%-20s' % ("avatar model:", ai_settings.OPENAI_API_MODEL))
+    print('\t%-20s%-20s' % ("avatar host:", ai_settings.OPENAI_BASE_URL))
+    print('\t%-20s%-20s' % ("avatar temp:", ai_settings.OPENAI_TEMPERATURE))
 
 
 def print_plugin_banner(kbnktp_plgn: KiberniktoPlugin):

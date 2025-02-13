@@ -75,7 +75,7 @@ class Kibernikto(TelegramBot):
         if self.chat_info is None:
             return ""
         if self.chat_info.is_personal:
-            chat_descr_string = "[Interlocutor info]"
+            chat_descr_string = "[Interlocutor info] "
             chat_descr_string += f"Name: {self.chat_info.aiogram_user.full_name}."
             if self.chat_info.bio:
                 chat_descr_string += f"Bio: {self.chat_info.bio}."
@@ -106,8 +106,8 @@ class Kibernikto(TelegramBot):
         self.tools = config_to_use.tools
 
         print(f'- {self.__class__.__name__} for "{self.chat_info.full_name}" (id: {self.full_config.id}) update!')
-        print(f'- {self.tools_names}')
-        print(f'- {self.max_messages}')
-        print(f'- {self.model}')
-        print(f'- {self.full_config.who_am_i}')
+        # print(f'- {self.tools_names}')
+        # print(f'- {self.max_messages}')
+        # print(f'- {self.model}')
+        # print(f'- {self.full_config.who_am_i}')
         self._reset()
