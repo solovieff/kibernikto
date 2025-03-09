@@ -34,16 +34,16 @@ def configure_logger():
         datefmt='%Y-%m-%d:%H:%M:%S',
         level=logging.DEBUG)
     logger = logging.getLogger('openai')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARNING)
 
     logger = logging.getLogger('aiosqlite')
     logger.setLevel(logging.ERROR)
 
     logger = logging.getLogger('httpcore')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARNING)
 
     logger = logging.getLogger('httpx')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARNING)
 
     logger = logging.getLogger('asyncio')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARNING)
