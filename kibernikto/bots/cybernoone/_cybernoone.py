@@ -58,13 +58,13 @@ class Kibernikto(TelegramBot):
                 print(traceback.format_exc())
                 return f"Я не справился! Горе мне! {str(e)}"
 
-    def _reset(self):
+    def _reset(self, **kwargs):
         """
         Adding additional data to default system message
 
         :return:
         """
-        super()._reset()
+        super()._reset(**kwargs)
         wai = self.full_config.who_am_i.format(self.full_config.name)
         if self.chat_info and self.add_chat_info:
             conversation_information = self._get_telegram_chat_info()
@@ -74,19 +74,18 @@ class Kibernikto(TelegramBot):
     def _get_telegram_chat_info(self):
         if self.chat_info is None:
             return ""
+        chat_descr_string = "[Static info from client app]\n"
         if self.chat_info.is_personal:
-            chat_descr_string = "[Interlocutor info]"
             chat_descr_string += f"Name: {self.chat_info.aiogram_user.full_name}."
             if self.chat_info.bio:
                 chat_descr_string += f"Bio: {self.chat_info.bio}."
             if self.chat_info.birthday:
                 chat_descr_string += f"Birthday: {self.chat_info.birthday}."
         else:
-            chat_descr_string = "Chat group info:\n"
             chat_descr_string += f"Title: {self.chat_info.full_name}."
             if self.chat_info.description:
                 chat_descr_string += f"Description: {self.chat_info.description}."
-        chat_descr_string = f"{chat_descr_string}"
+        chat_descr_string = f"{chat_descr_string}\n[End static info from client app]\n"
 
         # print(f"{self.__class__.__name__}: {chat_descr_string}")
         return chat_descr_string
@@ -106,8 +105,8 @@ class Kibernikto(TelegramBot):
         self.tools = config_to_use.tools
 
         print(f'- {self.__class__.__name__} for "{self.chat_info.full_name}" (id: {self.full_config.id}) update!')
-        print(f'- {self.tools_names}')
-        print(f'- {self.max_messages}')
-        print(f'- {self.model}')
-        print(f'- {self.full_config.who_am_i}')
+        # print(f'- {self.tools_names}')
+        # print(f'- {self.max_messages}')
+        # print(f'- {self.model}')
+        # print(f'- {self.full_config.who_am_i}')
         self._reset()

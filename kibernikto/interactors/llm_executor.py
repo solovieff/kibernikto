@@ -39,7 +39,7 @@ class LLMExecutorConfig(BaseModel):
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
     tool_call_hole_deepness: int = AI_SETTINGS.OPENAI_TOOLS_DEEPNESS_LEVEL
-    reaction_calls: list = ('никто', 'хонда', 'урод')
+    reaction_calls: list = ['никто', 'хонда', 'урод'],
     tools: List[Toolbox] = []
     hide_errors: bool = False
 
