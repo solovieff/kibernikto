@@ -91,7 +91,8 @@ class Kibernikto(TelegramBot):
         return chat_descr_string
 
     async def update_configuration(self, config_to_use: OpenAiExecutorConfig):
-
+        if self.restrict_client_instance is True:
+            raise RuntimeError("updating the running instance config is restricted!")
         if self.full_config.key != config_to_use.key or self.full_config.url != config_to_use.url:
             await self.client.close()
             self.client = AsyncOpenAI(base_url=config_to_use.url, api_key=config_to_use.key,

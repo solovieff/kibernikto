@@ -21,6 +21,8 @@ from kibernikto.utils.ai_tools import run_tool_calls
 
 
 class OpenAiExecutorConfig(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
     id: int = None
     name: str = "Киберникто"
     model: str = AI_SETTINGS.OPENAI_API_MODEL
@@ -42,6 +44,7 @@ class OpenAiExecutorConfig(BaseModel):
     tools: List[Toolbox] = []
     hide_errors: bool = False
     app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
+    client: AsyncOpenAI = None
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
@@ -69,7 +72,12 @@ class OpenAIExecutor:
         self.reset_call = config.reset_call
         self.unique_id = unique_id
         self.summarize = config.max_words_before_summary != 0
-        self.client = AsyncOpenAI(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
+        if config.client:
+            self.client = config.client
+            self.restrict_client_instance = True
+        else:
+            self.client = AsyncOpenAI(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
+            self.restrict_client_instance = False
 
         self.model = config.model
         self.full_config = config
@@ -171,7 +179,7 @@ class OpenAIExecutor:
         pass
 
     async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text',
-                             additional_content: dict = None):
+                             additional_content: dict = None, max_tokens=None, temperature=None):
         this_message = dict(content=f"{message}", role=OpenAIRoles.user.value)
 
         if additional_content:
@@ -193,13 +201,15 @@ class OpenAIExecutor:
             extra_headers=self.default_headers
         )
 
+        max_output_tokens = max_tokens if max_tokens else self.full_config.max_tokens
+
         if self.use_system:
             messages = [self.about_me, this_message]
-            completion_dict['max_tokens'] = self.full_config.max_tokens
+            completion_dict['max_tokens'] = max_output_tokens
             completion_dict['temperature'] = self.full_config.temperature
         else:
             messages = [this_message]
-            completion_dict['max_completion_tokens'] = self.full_config.max_tokens
+            completion_dict['max_completion_tokens'] = max_output_tokens
 
         completion_dict['messages'] = messages
 
