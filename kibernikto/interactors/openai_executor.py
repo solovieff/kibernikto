@@ -407,10 +407,10 @@ class OpenAIExecutor:
             response_message_dict = dict(content=f"{response_message.content}", role=OpenAIRoles.assistant.value)
             self.save_to_history(response_message_dict, usage_dict=usage)
 
-        if response_message.content:
-            return response_message.content
-        elif ai_tools.is_function_call(choice=choice):
+        if ai_tools.is_function_call(choice=choice):
             return await self.process_tool_calls(choice, None, iteration=iteration + 1)
+        elif response_message.content:
+            return response_message.content
         else:
             return f"I did everything, but with no concrete result unfortunately"
 
