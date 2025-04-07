@@ -44,7 +44,6 @@ class OpenAiExecutorConfig(BaseModel):
     tools: List[Toolbox] = []
     hide_errors: bool = False
     app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
-    client: AsyncOpenAI = None
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
@@ -66,14 +65,15 @@ class OpenAIExecutor:
 
     def __init__(self,
                  bored_after=0,
-                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN):
+                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN,
+                 client: AsyncOpenAI = None):
         self.bored_after = bored_after
         self.master_call = config.master_call
         self.reset_call = config.reset_call
         self.unique_id = unique_id
         self.summarize = config.max_words_before_summary != 0
-        if config.client:
-            self.client = config.client
+        if client:
+            self.client = client
             self.restrict_client_instance = True
         else:
             self.client = AsyncOpenAI(base_url=config.url, api_key=config.key, max_retries=DEFAULT_CONFIG.max_retries)
@@ -219,11 +219,14 @@ class OpenAIExecutor:
         return choice, usage_dict
 
     async def _run_for_messages(self, full_prompt, author=NOT_GIVEN,
-                                response_type: Literal['text', 'json_object'] = 'text'):
+                                response_type: Literal['text', 'json_object'] = 'text', model: str = None):
         tools_to_use = self.tools_definitions if self.tools_definitions else NOT_GIVEN
 
         if not full_prompt:
             raise ValueError("full_prompt cannot be empty")
+
+        if not model:
+            model = self.model
 
         # Need to be sure the prompt is fine
         system_message = [full_prompt[0]] if full_prompt[0]['role'] == 'system' else []
@@ -233,7 +236,7 @@ class OpenAIExecutor:
         filtered_messages = self.prepare_message_prompt(conversation_messages)
 
         completion_dict = dict(
-            model=self.model,
+            model=model,
             user=author,
             tools=tools_to_use,
             response_format=response_format,
@@ -265,9 +268,11 @@ class OpenAIExecutor:
 
     async def request_llm(self, message: str, author=NOT_GIVEN, save_to_history=True,
                           response_type: Literal['text', 'json_object'] = 'text',
-                          additional_content: dict = None, with_history: bool = True) -> str:
+                          additional_content: dict = None, with_history: bool = True,
+                          custom_model: str = None) -> str:
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
+        :param custom_model: is to use model not equal to default executor ones. Can break the tools!
         :param additional_content: for example type: image_url
         :param response_type:
         :param message: received message
@@ -306,7 +311,8 @@ class OpenAIExecutor:
 
         # logging.debug(f"sending {prompt}")
 
-        choice, usage = await self._run_for_messages(full_prompt=prompt, author=author, response_type=response_type)
+        choice, usage = await self._run_for_messages(full_prompt=prompt, author=author, response_type=response_type,
+                                                     model=custom_model)
         response_message: ChatCompletionMessage = choice.message
 
         if ai_tools.is_function_call(choice=choice):

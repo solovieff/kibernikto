@@ -1,5 +1,6 @@
 from aiogram.types import Chat, User
 from aiogram.enums import ChatType
+from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
 from pydantic import BaseModel
 from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
@@ -24,12 +25,12 @@ class KiberniktoChatInfo:
 
 class TelegramBot(OpenAIExecutor):
     def __init__(self, config: OpenAiExecutorConfig, master_id, username, key=NOT_GIVEN,
-                 chat_info: KiberniktoChatInfo = None):
+                 chat_info: KiberniktoChatInfo = None, client: AsyncOpenAI = None):
         self.key = key
         self.master_id = master_id
         self.username = username
         self.chat_info = chat_info
-        super().__init__(config=config, unique_id=key)
+        super().__init__(config=config, unique_id=key, client=client)
 
     def should_react(self, message_text):
         if not message_text:

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, Type
 
 from aiogram.types import User, Chat
+from attr.filters import exclude
 from pydantic import BaseModel
 
 from kibernikto.interactors import OpenAiExecutorConfig

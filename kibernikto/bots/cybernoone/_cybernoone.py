@@ -18,7 +18,8 @@ class Kibernikto(TelegramBot):
     """
 
     def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN,
-                 chat_info: KiberniktoChatInfo = None, hide_errors=True, add_chat_info: bool = True, ):
+                 chat_info: KiberniktoChatInfo = None, hide_errors=True, add_chat_info: bool = True,
+                 client: AsyncOpenAI = None):
         """
         :param master_id: telegram admin id
         :param username: telegram username
@@ -27,7 +28,8 @@ class Kibernikto(TelegramBot):
         self.key = key
         self.hide_errors = hide_errors
         self.add_chat_info = add_chat_info
-        super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info)
+        super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info,
+                         client=client)
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
                              response_type: Literal['text', 'json_object'] = 'text', additional_content=None):
