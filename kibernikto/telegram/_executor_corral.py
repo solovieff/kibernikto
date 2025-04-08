@@ -45,9 +45,10 @@ async def kill(exact_ids=()):
     for key in __BOTS:
         bot = __BOTS[key]
         if exact_ids:
-            if key in exact_ids:
+            if key in exact_ids and bot.restrict_client_instance is not True:
                 await bot.client.close()
         else:
+            # this will kill a global client. So it has to be restarted manually after this.
             await bot.client.close()
 
 
@@ -62,7 +63,7 @@ async def get_temp_executor(key_id: int) -> TelegramBot:
     try:
         yield bot
     finally:
-        if bot and not bot.restrict_client_instance:
+        if bot and bot.restrict_client_instance is not True:
             await bot.client.close()
 
 
