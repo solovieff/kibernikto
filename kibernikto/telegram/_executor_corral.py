@@ -62,7 +62,7 @@ async def get_temp_executor(key_id: int) -> TelegramBot:
     try:
         yield bot
     finally:
-        if bot:
+        if bot and not bot.restrict_client_instance:
             await bot.client.close()
 
 
