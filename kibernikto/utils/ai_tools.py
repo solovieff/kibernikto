@@ -49,6 +49,9 @@ async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_
     for tool_call in choice.message.tool_calls:
         fn_name = tool_call.function.name
         function_impl = get_tool_impl(available_tools=available_tools, fn_name=fn_name)
+        if not function_impl:
+            logging.error(f"no impl for {fn_name}")
+            pprint.pprint(tool_call)
         additional_params = dict(key=unique_id)
         tool_call_result = await execute_tool_call_function(tool_call, function_impl=function_impl,
                                                             additional_params=additional_params)

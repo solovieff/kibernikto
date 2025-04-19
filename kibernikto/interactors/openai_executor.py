@@ -414,6 +414,8 @@ class OpenAIExecutor:
             self.save_to_history(response_message_dict, usage_dict=usage)
 
         if ai_tools.is_function_call(choice=choice):
+            if response_message.content:
+                print(f"!!!{response_message.content}")
             return await self.process_tool_calls(choice, None, iteration=iteration + 1)
         elif response_message.content:
             return response_message.content
