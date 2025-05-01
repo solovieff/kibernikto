@@ -179,7 +179,7 @@ class OpenAIExecutor:
         pass
 
     async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text',
-                             additional_content: dict = None, max_tokens=None, temperature=None):
+                             additional_content: dict = None, max_tokens=None, temperature=None, use_system=True):
         this_message = dict(content=f"{message}", role=OpenAIRoles.user.value)
 
         if additional_content:
@@ -193,8 +193,6 @@ class OpenAIExecutor:
 
         response_format = {"type": response_type}
 
-        headers = self.default_headers
-
         completion_dict = dict(
             model=self.model if not model else model,
             response_format=response_format,
@@ -203,10 +201,12 @@ class OpenAIExecutor:
 
         max_output_tokens = max_tokens if max_tokens else self.full_config.max_tokens
 
-        if self.use_system:
+        system_prompt_enabled = use_system if use_system else self.use_system
+
+        if system_prompt_enabled:
             messages = [self.about_me, this_message]
             completion_dict['max_tokens'] = max_output_tokens
-            completion_dict['temperature'] = self.full_config.temperature
+            completion_dict['temperature'] = temperature if temperature else self.full_config.temperature
         else:
             messages = [this_message]
             completion_dict['max_completion_tokens'] = max_output_tokens
