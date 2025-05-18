@@ -237,7 +237,7 @@ class OpenAIExecutor:
 
         completion_dict = dict(
             model=model,
-            user=author,
+            # user=f"{author}",
             tools=tools_to_use,
             response_format=response_format,
             extra_headers=self.default_headers
