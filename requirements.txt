@@ -5,7 +5,7 @@ python-dotenv>=1.0.0
 openai>=1.66
 youtube_transcript_api==0.6.2
 #pytube==15.0 this one is broken now for some reason
-pytubefix>=8.13.1
+pytubefix==8.13.1
 pyyaml==6.0.2
 pydantic-settings
 dict2xml==1.7.5
