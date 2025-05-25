@@ -256,7 +256,7 @@ class OpenAIExecutor:
         try:
             completion: ChatCompletion = await self.client.chat.completions.create(**completion_dict)
         except Exception as e:
-            pprint.pprint(f"{final_prompt}")
+            # pprint.pprint(f"{final_prompt}")
             raise e
 
         choice: Choice = completion.choices[0]
