@@ -1,10 +1,9 @@
 aiogram>=3.17.0
 aiofiles>=24.1.0
-certifi>=2025.1.31
+certifi>=2025.4.26
 python-dotenv>=1.0.0
 openai>=1.66
 youtube_transcript_api==0.6.2
-#pytube==15.0 this one is broken now for some reason
 pytubefix==9.0.1
 pyyaml==6.0.2
 pydantic-settings
