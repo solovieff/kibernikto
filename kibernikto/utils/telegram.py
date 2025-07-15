@@ -106,7 +106,7 @@ async def _send_random_sticker(message: Message) -> None:
     Args:
         message: The message to reply to with a sticker
     """
-    from ..telegram.comprehensive_dispatcher import TELEGRAM_SETTINGS
+    from ..telegram.dispatcher import TELEGRAM_SETTINGS
 
     try:
         sticker = random.choice(TELEGRAM_SETTINGS.TG_STICKERS)

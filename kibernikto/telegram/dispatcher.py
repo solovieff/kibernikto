@@ -80,10 +80,11 @@ def start(bot_class, tools=[], msg_preprocessor: TelegramMessagePreprocessor = N
     dp.run_polling(tg_bot, skip_updates=True)
 
 
-async def async_start(bot_class, tools=[], msg_preprocessor=None, on_finish: Callable = None):
+async def async_start(bot_class, tools=[], msg_preprocessor=None):
     """
     runs the executor polling the dispatcher for incoming messages
 
+    :param msg_preprocessor:
     :param tools: tools available for bots created by this dispatcher
     :type tools: List[Toolbox]
     :param bot_class: the bot class to use

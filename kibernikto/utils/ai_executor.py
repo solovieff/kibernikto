@@ -17,6 +17,6 @@ async def get_ready_executor(message: Message, apply_plugins=False, hide_errors:
         chat_info: Chat = await message.bot.get_chat(chat_id)
     else:
         chat_info = message.chat
-    user_ai = get_ai_executor_full(chat=chat_info, user=message.from_user, apply_plugins=apply_plugins,
+    user_ai = get_ai_executor_full(chat=chat_info, user=message.from_user,
                                    hide_errors=hide_errors)
     return user_ai

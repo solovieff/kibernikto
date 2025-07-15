@@ -22,7 +22,7 @@ def start(outer_env=False):
         load_dotenv(dotenv_path=args.env_file_path)
 
     from kibernikto.utils.environment import configure_logger, print_banner
-    from kibernikto.telegram import comprehensive_dispatcher
+    from kibernikto.telegram import dispatcher
     configure_logger()
     print_banner()
 
@@ -36,7 +36,7 @@ def start(outer_env=False):
     from kibernikto.telegram import service
     # for default commands
     from kibernikto.telegram import commands
-    comprehensive_dispatcher.start(bot_class=bot_class)
+    dispatcher.start(bot_class=bot_class)
 
 
 # Initialize bot and dispatcher

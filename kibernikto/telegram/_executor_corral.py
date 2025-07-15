@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from typing import Dict, Type
 
 from aiogram.types import User, Chat
-from attr.filters import exclude
 from pydantic import BaseModel
 
 from kibernikto.interactors import OpenAiExecutorConfig
@@ -71,15 +70,16 @@ def executor_exists(key_id: int) -> bool:
     return key_id in __BOTS
 
 
-def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True, apply_plugins=True) -> TelegramBot:
+def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True, apply_plugins=False) -> TelegramBot:
     chat_key = chat.id
     bot = __BOTS.get(chat_key)
+
+    if apply_plugins:
+        raise EnvironmentError("Plugins are deprecated!")
 
     if not bot:
         chat_info = KiberniktoChatInfo(chat, user)
         bot = _new_executor(key_id=chat_key, chat_info=chat_info)
-        if apply_plugins:
-            _apply_plugins(bot)
         if hasattr(bot, 'hide_errors'):
             bot.hide_errors = hide_errors
         __BOTS[chat_key] = bot
@@ -88,8 +88,9 @@ def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True, apply_
 
 def _apply_plugins(bot: TelegramBot):
     def apply_plugin(plugin: KiberniktoPlugin):
-        bot.plugins.append(plugin)
-        print_plugin_banner(plugin)
+        if hasattr(bot, 'plugins'):
+            bot.plugins.append(plugin)
+            print_plugin_banner(plugin)
 
     plugin_classes = KiberniktoPlugin.__subclasses__()
     plugin_classes.sort(key=lambda x: x.index)

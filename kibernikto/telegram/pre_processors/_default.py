@@ -22,20 +22,39 @@ class PreprocessorSettings(BaseSettings):
     TG_MASTER_ID: int
     TG_MASTER_IDS: list = []
     TG_PUBLIC: bool = False
+    TG_FILES_LOCATION: str = "/tmp"
     VOICE_PROCESSOR: Literal["openai", "gladia", "auto"] | None = None
-    IMAGE_SUMMARIZATION_OPENAI_API_KEY: str | None = None
     VOICE_OPENAI_API_KEY: str | None = None
     VOICE_OPENAI_API_MODEL: str = "whisper-1"
     VOICE_OPENAI_API_BASE_URL: str | None = None
     VOICE_OPENAI_API_LANGUAGE: str | None = 'ru'
     VOICE_FILE_LOCATION: str = "/tmp"
-    TG_FILES_LOCATION: str = "/tmp"
     VOICE_GLADIA_API_KEY: str | None = None
     VOICE_MIN_COMPLEX_SECONDS: int = 300  # more than 5 minutes seems to be a dialogue or smth.
     VOICE_GLADIA_CONTEXT: str | None = None
 
 
 SETTINGS = PreprocessorSettings()
+
+IGNORED_TYPES = {
+    enums.ContentType.STICKER,
+    enums.ContentType.DOCUMENT,
+    enums.ContentType.NEW_CHAT_MEMBERS,
+    enums.ContentType.LEFT_CHAT_MEMBER,
+    enums.ContentType.NEW_CHAT_TITLE,
+    enums.ContentType.NEW_CHAT_PHOTO,
+    enums.ContentType.DELETE_CHAT_PHOTO,
+    enums.ContentType.GROUP_CHAT_CREATED,
+    enums.ContentType.SUPERGROUP_CHAT_CREATED,
+    enums.ContentType.CHANNEL_CHAT_CREATED,
+    enums.ContentType.MESSAGE_AUTO_DELETE_TIMER_CHANGED,
+    enums.ContentType.VIDEO_CHAT_SCHEDULED,
+    enums.ContentType.VIDEO_CHAT_STARTED,
+    enums.ContentType.VIDEO_CHAT_ENDED,
+    enums.ContentType.VIDEO_CHAT_PARTICIPANTS_INVITED,
+    enums.ContentType.PROXIMITY_ALERT_TRIGGERED,
+    enums.ContentType.WEB_APP_DATA,
+}
 
 
 class TelegramMessagePreprocessor():
@@ -47,19 +66,22 @@ class TelegramMessagePreprocessor():
         :param tg_bot:
         :return:
         """
+        if message.content_type in IGNORED_TYPES:
+            await message.reply(f'Unknown message type :(')
+            return None
+
         user_text = message.caption if message.caption else message.md_text
-        file_info = None
 
         who = f"{message.from_user.username}:{message.from_user.id}"
         logging.debug(f"processing {message.content_type} from {who}")
 
         if message.content_type == enums.ContentType.PHOTO and message.photo:
-            if SETTINGS.IMAGE_SUMMARIZATION_OPENAI_API_KEY is not None:
-                photo: types.PhotoSize = message.photo[-1]
-                url = await self._process_photo(photo, tg_bot, message=message)
-                user_text = f"{user_text} {url}"
-            return user_text
+            photo: types.PhotoSize = message.photo[-1]
+            url = await self._process_photo(photo, tg_bot, message=message)
+            user_text = f"{user_text} {url}"
         elif message.voice or message.audio:
+            if not SETTINGS.VOICE_OPENAI_API_KEY:
+                return "Failed to transcribe: no VOICE_OPENAI_API_KEY"
             resulting_text, file_info = await self._process_voice(tg_bot=tg_bot, message=message)
             pprint.pprint(file_info)
 
@@ -94,7 +116,6 @@ class TelegramMessagePreprocessor():
         file: types.File = await tg_bot.get_file(photo.file_id)
         file_path = file.file_path
         photo_file: BinaryIO = await tg_bot.download_file(file_path)
-        # file_path = photo_file.file_path
         url = await publish_image_file(photo_file, photo.file_unique_id)
         logging.info(f"published image: {url}")
         return url

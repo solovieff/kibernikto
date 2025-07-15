@@ -5,8 +5,10 @@ from aiogram.filters import or_f, and_f
 from kibernikto.utils.permissions import admin_or_public
 from kibernikto.utils.text import split_text_by_sentences
 from kibernikto.utils.ai_executor import get_ready_executor
-from . import comprehensive_dispatcher as cd
+from . import dispatcher as cd
 from aiogram.fsm.state import State, StatesGroup, any_state, default_state
+
+from ..utils.telegram import reply
 
 
 @cd.dp.message(
@@ -18,7 +20,6 @@ async def private_message(message: types.Message):
         await message.reply(text=negative_reply_text)
         await message.forward(cd.TELEGRAM_SETTINGS.TG_MASTER_ID)
     else:
-        # TODO: plugins should be reworked and combined with preprocessor
         user_text = await cd.preprocessor.process_tg_message(message,
                                                              tg_bot=cd.tg_bot)
         if user_text is None:
@@ -31,9 +32,7 @@ async def private_message(message: types.Message):
         if reply_text is None:
             reply_text = "My iron brain did not generate anything!"
 
-        chunks = split_text_by_sentences(reply_text, cd.TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
-        for chunk in chunks:
-            await message.reply(text=chunk)
+        await reply(message=message, reply_text=reply_text)
 
 
 # noinspection SpellCheckingInspection
@@ -66,10 +65,7 @@ async def group_message(message: types.Message):
         await cd.tg_bot.send_chat_action(chat_id, 'typing')
         reply_text = await group_ai.heed_and_reply(message=user_text, author=message.from_user.username)
 
-        chunks = split_text_by_sentences(reply_text,
-                                         cd.TELEGRAM_SETTINGS.TG_MAX_MESSAGE_LENGTH)
-        for chunk in chunks:
-            await message.reply(text=chunk)
+        await reply(message=message, reply_text=reply_text)
 
 
 def imported_ok():

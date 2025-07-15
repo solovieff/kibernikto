@@ -13,13 +13,13 @@ with open(path.join(HERE, "requirements.txt")) as f:
 
 setup(
     name="kibernikto",
-    version="1.5.5",
+    version="1.6.5",
     packages=find_packages(),
     install_requires=required,
     url='https://github.com/solovieff/kibernikto',
     license='GPL-3.0 license',
     author_email='solovieff.nnov@gmail.com',
-    description='Easily run telegram bots connected to AI models.',
+    description='Telegram bots connected to AI models.',
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[

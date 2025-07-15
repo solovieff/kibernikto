@@ -1,23 +1,21 @@
 import logging
-import pprint
 from collections import deque
 from enum import Enum
 from typing import List, Literal
 
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
-from openai.types import CompletionUsage, ResponseFormatText, ResponseFormatJSONObject
+from openai.types import CompletionUsage
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
-from openai.types.chat.completion_create_params import ResponseFormat
-
 from pydantic import BaseModel
 
 from kibernikto.bots.ai_settings import AI_SETTINGS
 from kibernikto.interactors.tools import Toolbox
-from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.utils import ai_tools
 from kibernikto.utils.ai_tools import run_tool_calls
+from .openai_executor_utils import get_tool_implementation, calculate_max_messages, process_usage, has_pricing, \
+    prepare_message_prompt, check_word_overflow
 
 
 class OpenAiExecutorConfig(BaseModel):
@@ -40,7 +38,7 @@ class OpenAiExecutorConfig(BaseModel):
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
     tool_call_hole_deepness: int = AI_SETTINGS.OPENAI_TOOLS_DEEPNESS_LEVEL
-    reaction_calls: list = ['никто', 'хонда', 'урод']
+    reaction_calls: list = ['никто', 'honda', 'кибер']
     tools: List[Toolbox] = []
     hide_errors: bool = False
     app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
@@ -85,9 +83,6 @@ class OpenAIExecutor:
         # setting real max messages value: add some space for tools etc
         self._set_max_history_len(config)
 
-        # user string messages preprocessing entities to go here
-        self.plugins: List[KiberniktoPlugin] = []
-
         # additional tools in Toolbox formats
         self.tools: List[Toolbox] = config.tools
         self.use_system = True
@@ -95,7 +90,6 @@ class OpenAIExecutor:
         if self.max_messages < 2:
             self.max_messages = 2  # hahaha
 
-        # default configuration. TODO: rework
         self._reset()
 
     @property
@@ -111,18 +105,10 @@ class OpenAIExecutor:
         return [toolbox.function_name for toolbox in self.tools]
 
     def _get_tool_implementation(self, name):
-        for x in self.tools:
-            if x.function_name == name:
-                return x.implementation
+        return get_tool_implementation(self)
 
     def _set_max_history_len(self, config: OpenAiExecutorConfig):
-        history_len = config.max_messages
-        if config.tools:
-            history_len = config.max_messages + len(config.tools) * 2
-        if config.max_messages % 2 == 0:
-            self.max_messages = history_len
-        else:
-            self.max_messages = history_len + 1
+        self.max_messages = calculate_max_messages(config)
 
     def process_usage(self, usage: CompletionUsage) -> dict | None:
         """
@@ -130,31 +116,15 @@ class OpenAIExecutor:
         :param usage:
         :return: usage dict updated with costs
         """
-        # logging.warning(f"usage is {usage}")
         if not usage:
-            # logging.debug("usage unknown!")
             return None
 
         usage_dict = usage.model_dump()
-        usage_dict['completion_cost'] = 0
-        usage_dict['prompt_cost'] = 0
-        usage_dict['total_cost'] = 0
-
-        if self.full_config.input_price and self.full_config.output_price:
-            total = 0
-            if usage.completion_tokens:
-                completion_cost = usage.completion_tokens * self.full_config.output_price
-                total += completion_cost
-                usage_dict['completion_cost'] = completion_cost
-            if usage.prompt_tokens:
-                prompt_cost = usage.prompt_tokens * self.full_config.input_price
-                total += prompt_cost
-                usage_dict['prompt_cost'] = prompt_cost
-            usage_dict['total_cost'] = total
-        else:
-            pass
-            # logging.warning("no OPENAI_INPUT_PRICE (input_price) and OPENAI_OUTPUT_PRICE (output_price) provided")
-        # logging.debug(f"process_usage: {usage_dict}")
+        if has_pricing(self.full_config):
+            usage_dict = process_usage(
+                usage_dict,
+                input_price=self.full_config.input_price,
+                output_price=self.full_config.output_price)
         return usage_dict
 
     def should_react(self, message_text):
@@ -166,17 +136,6 @@ class OpenAIExecutor:
         return self.full_config.master_call in message_text or any(
             word in message_text.lower() for word in self.full_config.reaction_calls) or (
                 self.full_config.name in message_text)
-
-    # FIXME: to be reworked
-    async def heed(self, message, author=None):
-        """
-        Save message to history, but do not call OpenAI yet.
-        :param message: recieved message
-        :param author: outer chat message author
-        :return:
-        """
-        self.reset_if_usercall(message)
-        pass
 
     async def single_request(self, message, model=None, response_type: Literal['text', 'json_object'] = 'text',
                              additional_content: dict = None, max_tokens=None, temperature=None, use_system=True):
@@ -233,7 +192,7 @@ class OpenAIExecutor:
         response_format = {"type": response_type}
         conversation_messages = full_prompt[1:] if system_message else full_prompt
         # can not start with tool result, for example
-        filtered_messages = self.prepare_message_prompt(conversation_messages)
+        filtered_messages = prepare_message_prompt(conversation_messages)
 
         completion_dict = dict(
             model=model,
@@ -282,12 +241,6 @@ class OpenAIExecutor:
         """
         user_message = message
         self.reset_if_usercall(user_message)
-        plugins_result, continue_execution = await self._run_plugins_for_message(user_message, author)
-        if plugins_result is not None:
-            if continue_execution is True:
-                user_message = plugins_result
-            else:
-                return plugins_result
 
         this_message = dict(content=f"{user_message}", role=OpenAIRoles.user.value)
 
@@ -336,32 +289,9 @@ class OpenAIExecutor:
     def save_to_history(self, this_message: dict, usage_dict: dict = None, author=NOT_GIVEN):
         self.messages.append(this_message)
 
-    def prepare_message_prompt(self, messages_to_check: list) -> list:
-        messages_list: list = messages_to_check.copy()
-
-        def is_bad_first_message() -> bool:
-            if not len(messages_list):
-                return False
-            first_message = messages_list[0]
-            return first_message['role'] != 'user'
-
-        while is_bad_first_message():
-            # print(f"removing 0 message:")
-            # pprint.pprint(messages_list[0])
-            messages_list.pop(0)
-
-        return messages_list
-
-    def _ensure_no_tool_results_orphans(self, prompt: list = ()):
-        """
-        Not me, OpenAI did this. We need to be sure we do not have lost tool call results in history
-        if the actual request moved upper. Performs the actual clearance.
-        :return:
-        """
-
     def _reset(self, clear_persistent_history=False):
         """
-        Resetting the history
+        Resetting the history and filling in the system message dict
         :param clear_persistent_history: to be used in child instances
         :return:
         """
@@ -415,77 +345,18 @@ class OpenAIExecutor:
 
         if ai_tools.is_function_call(choice=choice):
             if response_message.content:
-                print(f"!!!{response_message.content}")
+                logging.warning(f"Preliminary tool call comment: {response_message.content}")
             return await self.process_tool_calls(choice, None, iteration=iteration + 1)
         elif response_message.content:
             return response_message.content
         else:
             return f"I did everything, but with no concrete result unfortunately"
 
-    async def _run_plugins_for_message(self, message_text, author=NOT_GIVEN):
-        plugins_result = None
-        for plugin in self.plugins:
-            plugin_result = await plugin.run_for_message(message_text)
-            if plugin_result is not None:
-                if not plugin.post_process_reply:
-                    if plugin.store_reply:
-                        self.save_to_history(dict(content=f"{message_text}", role=OpenAIRoles.user.value),
-                                             author=author)
-                        self.save_to_history(
-                            dict(role=OpenAIRoles.assistant.value, content=plugin_result, author=author))
-                    return plugin_result, False
-                else:
-                    plugins_result = plugin_result
-        return plugins_result, True
-
-    async def _get_summary(self):
-        """
-        Performs OpenAPI call to summarize previous messages. Does not put about_me message, that can be a problem.
-        :return: summary for current messages
-        """
-        logging.info(f"getting summary for {len(self.messages)} messages")
-        sum_request = {"role": "user", "content": self.full_config.summarize_request}
-
-        response: ChatCompletion = await self.client.chat.completions.create(
-            model=self.model,
-            messages=list(self.messages) + [sum_request],
-            max_tokens=self.full_config.max_tokens,
-            temperature=self.full_config.temperature,
-        )
-        response_text = response.choices[0].message.content.strip()
-        usage_dict = self.process_usage(response.usage)
-        logging.info(response_text)
-        return response_text, usage_dict
-
-    @property
-    def word_overflow(self):
-        """
-        if we exceeded max word tokens
-        :return:
-        """
-        total_word_count = sum(
-            len(obj["content"].split()) for obj in list(self.messages) if
-            obj["role"] not in [OpenAIRoles.system.value] and obj["content"] is not None and
-            isinstance(obj['content'], str))
-        return ((
-                        self.full_config.max_words_before_summary and total_word_count > self.full_config.max_words_before_summary) or
-                len(self.messages) > self.max_messages)
-
     async def _aware_overflow(self):
         """
-        Checking if additional actions like cutting the message stack or summarization needed.
-        We use words not tokens here, so all numbers are very approximate
+        Checking if additional actions like cutting the message stack needed and doing it if needed.
         """
-        if self.word_overflow:
-            if not self.full_config.summarize_request:
-                self.messages.popleft()
-                self.messages.popleft()
-            else:
-                # summarizing previous discussion if needed
-
-                logging.warning("You speak too much! Performing summarization!")
-                summary_text, usage_dict = await self._get_summary()
-                summary = dict(role=OpenAIRoles.system.value,
-                               content=f"just in case, summary of the previous dialogue, don't give it much thought: {summary_text}")
-                self._reset()
-                self.save_to_history(summary, usage_dict=usage_dict)
+        words_check = check_word_overflow(list(self.messages), self.full_config.max_words_before_summary)
+        if words_check or len(self.messages) > self.max_messages:
+            self.messages.popleft()
+            self.messages.popleft()
