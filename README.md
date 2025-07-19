@@ -260,7 +260,6 @@ TG_FILES_LOCATION=/tmp
 OPENAI_INSTANCE_ID=kibernikto
 OPENAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 # https://api.vsegpt.ru:6070/v1 for vsegpt
-# https://openrouter.ai/api/v1 for openrouter
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_API_MODEL=gpt-4.1
 OPENAI_MAX_TOKENS=550

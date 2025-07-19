@@ -121,10 +121,7 @@ class OpenAIExecutor:
 
         usage_dict = usage.model_dump()
         if has_pricing(self.full_config):
-            usage_dict = process_usage(
-                usage_dict,
-                input_price=self.full_config.input_price,
-                output_price=self.full_config.output_price)
+            usage_dict = process_usage(usage_dict, self)
         return usage_dict
 
     def should_react(self, message_text):
