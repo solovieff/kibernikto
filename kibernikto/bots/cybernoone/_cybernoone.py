@@ -9,8 +9,6 @@ from kibernikto.interactors.openai_executor import DEFAULT_CONFIG
 from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
 from kibernikto.interactors import OpenAiExecutorConfig, OpenAIRoles
 
-from kibernikto.plugins import KiberniktoPluginException
-
 
 class Kibernikto(TelegramBot):
     """
@@ -51,8 +49,6 @@ class Kibernikto(TelegramBot):
         else:
             try:
                 return await super().heed_and_reply(**parent_call_obj)
-            except KiberniktoPluginException as e:
-                return f" {e.plugin_name} не сработал!\n\n {str(e)}"
             except PermissionDeniedError as pde:
                 logging.warning(f"Что-то грубое и недопустимое! {str(pde)}")
                 return "Что-то грубое и недопустимое в ваших словах!"

@@ -3,21 +3,19 @@
 Kibernikto is a framework to easily run telegram bots connected to AI models with additional features.  
 You can run Kibernikto with your params or use it as a core in your own app.
 
-Combine instances to orchestrate your Kibernikto behaviour and tool calls. 
+Combine instances to orchestrate your Kibernikto behaviour and tool calls.
 
-Kibernikto base `OpenAiExecutorConfig` class can be easily extended to be used outside telegram.
+Kibernikto base `OpenAiExecutor` class can be easily extended to be used outside telegram.
 
 - ✍️ telegram conversations with AIs in groups or privately via OpenAI api spec
 - ⚙️ easy configuration
 - 🔉 voice messages recognition
 - 🧐 user messages logging to service group
 - 📸 image recognition
-- 🫡 openai function tools easy [integration](https://github.com/solovieff/kibernikto-planner). No more pain. It will work for antrophic, too, if u use a proxy.
-- 🙈 [Brave search api](https://brave.com/search/api/) integration with openai tools. See [Kiberwebber](https://github.com/solovieff/kibernikto-brave-search) project for details.
+- 🫡 openai function tools easy
+  integration: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search).
 
 Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
-
-- Set `TG_PUBLIC` env to true to open your bot to everyone.
 
 # install from pip
 
@@ -25,171 +23,17 @@ Given an image Kibernikto will publish it to a free image hosting service and th
 
 # how to run
 
-- Create telegram bot using @BotFather and obtain it's key. You can also change the picture and other details there. Set
-  env `TG_BOT_KEY`.
-
-  Turn off Group Privacy for your bot to be able to react to group messages:  
-
-- Setup minimal env    
-  First of all, all examples are in the [examples](/env_examples/) folder. See default ones for minimal config and fulls
-  for more complicated cases.
-
-**AI ENV**
-
-- Default [OpenAI](https://openai.com)
-
-```dotenv
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_MODEL=gpt-4
-OPENAI_API_KEY=yr-key  
-```
-
-- Multimodel [vsegpt.ru](https://vsegpt.ru/)
-
-```dotenv
-OPENAI_BASE_URL=https://api.vsegpt.ru:6070/v1  
-OPENAI_API_KEY=sk-yr-key  
-OPENAI_API_MODEL=openai/gpt-4  
-```
-
-Other AI behaviour options, _not required_:
-
-```dotenv
-# system prompt
-OPENAI_WHO_AM_I=Answer all questions as {0}, the majestic lord of the universes.
-# chat history size
-OPENAI_MAX_MESSAGES=5
-# LLM temp param
-OPENAI_TEMPERATURE=0.7
-# LLM answer size
-OPENAI_MAX_TOKENS=450
-# summarize the dialog using same model after it contains more than OPENAI_MAX_WORDS words 
-OPENAI_MAX_WORDS=8500
-# if you want to use tools.
-OPENAI_TOOLS_ENABLED=true
-# if kibernikto knows the prices he can track the usage
-OPENAI_OUTPUT_PRICE=0.000015
-OPENAI_INPUT_PRICE=0.000005  
-```
-
-**Telegram ENV**
-
-```dotenv
-# Telegram configuration
-TG_BOT_KEY=XXXXXXXXXX:XXXxxxXXXxxxxXXXxxx  
-TG_PUBLIC=true
-TG_MASTER_ID=XXXXXXXXX
-```
-
-Other TG related options, _not required_:
-
-```dotenv
-# Until TG_PUBLIC=true can talk only in the given groups
-TG_FRIEND_GROUP_IDS=[-XXXXXXXXXX,-XXXXXXXXXX]  
-# Other master accounts. Until TG_PUBLIC=true can talk only with these.
-TG_MASTER_IDS=[XXXXXXXXX,XXXXXXXXX]
-# Kibernikto reacts to direct replies or when sees the following words. 
-TG_REACTION_CALLS=["киберникто","государь"]
-# Allows /system_message command to be run by masters
-TG_ADMIN_COMMANDS_ALLOWED=true
-# Set this group ID with your bot added, to log all user messages to this service group
-TG_SERVICE_GROUP_ID=-XXXXXXXXXX  
-# sometimes Kibernikto sends stickers for fun together with his answers  
-TG_STICKER_LIST=["CAACAgIAAxkBAAEKqsplQ8BRyPbGj_B_K4ujCLsDAe-l7wAC8AIAAs-71A7mCrGe-zzi0DME","CAACAgIAAxkBAAEIgoxkMaHv1maOeEne8CYAAY5s4kJ1e4wAAo4JAAIItxkCXSMuZ6bo59gvBA"]
-```
-
-**run cmd**
+- Setup [env](/env_examples/)
 
 ```shell
 kibernikto --env_file_path=/path/to/your/env/local.env
 ```
 
-**run code**  
-*(assuming you set the environment yrself)*
+**code**
 
 - Install the requirements   
   `pip install -r requirements.txt`
 - Run `main.py` file using the environment provided.
-
-# plugins:
-
-In general, you can use one Ai provider API for all available Kibernikto actions, in that case all the AI related
-variables values will be the same.  
-However it is strongly recommended to use cheaper models for summarization tasks.
-
-- **WeblinkSummaryPlugin and YoutubePlugin**
-
-```dotenv
-# If no key is provided, youtube videos and webpages will be ignored.
-SUMMARIZATION_OPENAI_API_KEY=yr-key
-SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1  
-SUMMARIZATION_OPENAI_API_MODEL=gpt-4-turbo-preview
-```
-
-- **ImageSummaryPlugin to process images.**
-
-```dotenv
-# If no key is provided, images will not be processed.
-IMAGE_SUMMARIZATION_OPENAI_API_KEY=yr-key
-IMAGE_SUMMARIZATION_OPENAI_API_MODEL=gpt-4-vision-preview
-IMAGE_SUMMARIZATION_OPENAI_API_BASE_URL=https://api.openai.com/v1
-
-# You can get your key here: https://imgbb.com. If you do no set up this variable, default one will be used.  
-# This is needed to store images send to the bot.  
-IMAGE_STORAGE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-```
-
-- **Voice messages** processing using **OpenAI**:
-
-```dotenv
-# If no key is provided, voice messages will not be processed.
-VOICE_PROCESSOR=openai
-VOICE_OPENAI_API_KEY=yr-key
-VOICE_OPENAI_API_MODEL=whisper-1
-VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
-VOICE_FILE_LOCATION=/tmp
-```
-
-- **Voice messages** processing using [gladia.io](https://gladia.io):  
-  **Gladia** Audio Intelligence API, is designed to enable any company to easily
-  embed top-quality Audio AI into their applications, whatever the tech stack.
-
-As whisper api is limited to 25 megs, [gladia.io](https://glaudia.io) helps to process bigger files.
-
-Kibernikto treats voice messages with duration less than `VOICE_MIN_COMPLEX_SECONDS` as usual AI interaction ones.
-For longer durations Kibernikto will return detailed audio
-analysis including summary etc.
-
-Perfect solution for analyzing interviews and meeting.  
-Gladia price policies are also very affordable.
-
-```dotenv
-VOICE_PROCESSOR=gladia
-VOICE_GLADIA_API_KEY=yr-gladia-key
-VOICE_GLADIA_SUMMARIZATION_TYPE=concise
-VOICE_MIN_COMPLEX_SECONDS=300
-```    
-
-- **Smart voice messages** processing using both [gladia.io](https://gladia.io) and OpenAI:
-
-Whisper api is a bit faster and looks better to use just for talking with your bot.
-
-```dotenv
-VOICE_PROCESSOR=auto
-
-VOICE_OPENAI_API_KEY=yr-key
-VOICE_OPENAI_API_MODEL=whisper-1
-VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
-VOICE_FILE_LOCATION=/tmp
-
-#starting this audio length Kibernikto will start using Gladia and deeper analysis
-VOICE_MIN_COMPLEX_SECONDS=300
-VOICE_GLADIA_API_KEY=yr-gladia-key
-VOICE_GLADIA_SUMMARIZATION_TYPE=concise
-VOICE_GLADIA_CONTEXT=We have before us an interview for the position of office manager
-```
-
-For the full list of variables, see `env_examples` folder.
 
 # useful links
 
@@ -197,78 +41,13 @@ To create and operate your bot: https://t.me/BotFather
 To obtain group/user ids etc: https://t.me/getidsbot  
 To obtain sticker ids: https://t.me/idstickerbot  
 To get familiar with basic OpenAI principles: https://openai.com  
-Basics on Gpt-4 vision: https://gptpluginz.com/gpt-4-vision-api  
 To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models  
-Audio analysis: https://gladia.io  
 Website to text and other helpful tools https://toolsyep.com  
 Free image hosting: https://imgbb.com
 
-# code details
-
-*(ignore it if dont plan to create yr own plugins or Kibernikto bots using Kibernikto as a library)*
-
-You can write yr own bots extending `TelegramBot` class from `kibernikto.telegram` package.  
-See `bots` package for more details.
-
-You can use `OpenAIExecutor` directly to create non-telegram ai-connected bots.
-For example:
-
-```python
-from kibernikto.interactors import OpenAIExecutor, OpenAiExecutorConfig
-
-
-class AnyBot(OpenAIExecutor):
-    def __init__(self, config: OpenAiExecutorConfig, master_id, username):
-        self.master_id = master_id
-        self.username = username
-        super().__init__(config=config)
-
-    def should_react(self, message_text):
-        if not message_text:
-            return False
-        parent_should = super().should_react(message_text)
-        return parent_should or self.username in message_text
-
-    def check_master(self, user_id, message):
-        return self.master_call in message or user_id == self.master_id
-```
-
-Plugins are entities that pre-process user input text before sending it to ai. Currently 3 plugins are available (
-see `plugins` package):
-
-- ImageSummaryPlugin (`IMAGE_SUMMARIZATION_` env prefix)
-- YoutubePlugin (`SUMMARIZATION_` env prefix)
-- WeblinkSummaryPlugin (`SUMMARIZATION_` env prefix)
-
-Each plugin overrides the `applicable` method from superclass, i.e.:
-
-```python
-class YoutubePluginSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='SUMMARIZATION_')
-
-    OPENAI_API_MODEL: str = "gpt-4-turbo-preview"
-    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
-    OPENAI_API_KEY: str | None = None
-    OPENAI_MAX_TOKENS: int = 800
-    VIDEO_MESSAGE: str = _DEFAULT_TEXT
-
-
-DEFAULT_SETTINGS = YoutubePluginSettings()
-
-
-class YoutubePlugin(KiberniktoPlugin):
-    index = 0
-
-    @staticmethod
-    def applicable():
-        return DEFAULT_SETTINGS.OPENAI_API_KEY is not None
-
-    ...
-```
-
 # FAQ
 
-- How do I run Kibernikto Instance from my code?
+- How do I run Kibernikto Telegram Instance from my code?
 
 ```python
 # import bot
@@ -280,27 +59,228 @@ from kibernikto.telegram import dispatcher
 from kibernikto.telegram import commands
 from kibernikto.telegram import service
 
-comprehensive_dispatcher.start(bot_class=bot_class)
+dispatcher.start(bot_class=bot_class)
 ```
 
 You can create your own bots and dispatchers and use it like above.
 
-- I want to run an ai bot without your telegram dispatcher!
+- How do I run it without the dispatcher?
+
+You can use `OpenAIExecutor` directly to create any ai-connected bots.
+For example (change urls to use different ai-providers):
 
 ```python
-from kibernikto.interactors import OpenAiExecutorConfig
+import asyncio
+from kibernikto.interactors import DEFAULT_CONFIG, OpenAIExecutor
 
-executor_config = OpenAiExecutorConfig(name="Kibernikto",
-                                       reaction_calls=["Hello", "Kiberman"], model="gpt-4")
+config = DEFAULT_CONFIG
+config.key = "yr_key"
+config.url = "https://api.openai.com/v1"
+config.model = "gpt-4.1"
+config.max_tokens = 760
+config.who_am_i = "Your are mister Kibernikto"
 
-your_bot = Kibernikto(username="kiberniktomiks",
-                      master_id="some_master_user_id_or_any",
-                      config=executor_config)
+executor = OpenAIExecutor(unique_id="kbnkt", config=config)
+response = asyncio.run(executor.request_llm(message="Good morning mister kibernikto!"))
+print(response)
 ```
 
-Now you can use your_bot `heed_and_reply` method.
-Please note that in this case you will have to apply the plugins yourself.
+- I want to make Kibernikto use my tools!
+  Look at the [planner](https://github.com/solovieff/kibernikto-planner) example. It's easy.
+- I want to extend kibernikto
 
-- I want to know how to make Kibernikto use my tools! Please!
-  Implemented, pls wait for the docs to be updated. For now look at
-  the [planner](https://github.com/solovieff/kibernikto-planner) example.
+```python
+import asyncio
+import logging
+import traceback
+from typing import Literal
+
+from openai import NOT_GIVEN, AsyncOpenAI
+
+from kibernikto.bots.cybernoone import Kibernikto
+from kibernikto.interactors import OpenAIRoles, OpenAiExecutorConfig
+from kibernikto.telegram.telegram_bot import KiberniktoChatInfo
+
+DEFAULT_SYSTEM = """
+You are a noble independent cybernetic assistant named {0}.
+You have access to LLM-agents for solving various tasks via delegate_task function.
+When receiving a request, you must: 
+1. Determine if any agents can be useful for completing the task. 
+2. Use these agents (for example: when discussing files, always try to refer to the document agent) to obtain necessary information or perform actions. 
+3. Provide the user with an accurate and helpful response to their request.
+
+'delegate_task' function
+Use 'delegate_task' function to delegate tasks to the appropriate AI agents according to user orders and your common sense.
+
+[AGENTS DESCRIPTION GOES HERE] 
+"""
+
+__GLOBAL_ASYNC_CLIENT = None
+
+
+def get_client(config):
+    global __GLOBAL_ASYNC_CLIENT
+    if __GLOBAL_ASYNC_CLIENT is None:
+        __GLOBAL_ASYNC_CLIENT = AsyncOpenAI(base_url=config.url, api_key=config.key, max_retries=config.max_retries)
+    return __GLOBAL_ASYNC_CLIENT
+
+
+class Kiberkalki(Kibernikto):
+    TOOL_SEPARATOR = "||"
+
+    def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key: str = NOT_GIVEN,
+                 chat_info: KiberniktoChatInfo = None):
+        # better not to change from env.
+        config.who_am_i = DEFAULT_SYSTEM
+        # for running delegation tasks not to delegate new until done
+        self.delegate_task_info = None
+        # for additional notifications like payment etc
+        self.last_notification = None
+        self.session_call_interation = 0
+
+        openai_client = get_client(config)
+
+        # Your experts, same OpenAIExecutor instances as this one. Are being called from tools using delegate task.
+        self.knowledge_expert = KnowledgeExpert(unique_key=key)
+        self.web_expert = WebExpert(unique_key=key)
+        self.scheduler_expert = SchedulerExpert(unique_key=key, chat_info=chat_info)
+        self.conversation_expert = ConversationExpert(unique_key=key, chat_info=chat_info)
+        self.report_expert = ReportExpert(unique_key=key)
+        self.image_expert = ImageExpert(unique_key=key, chat_info=chat_info)
+
+        # any other params u may need
+        self.tts_enabled = False
+        self.attached_file = None
+
+        super().__init__(config=config,
+                         username=username,
+                         master_id=master_id,
+                         key=key,
+                         hide_errors=False,
+                         chat_info=chat_info,
+                         client=openai_client)
+        self.load_history()  # persistent history
+
+    @property
+    def default_headers(self):
+        hidden_key = "Kibernikto1"
+        return {
+            "X-Title": f"{self.full_config.app_id}.{hidden_key}",
+        }
+
+    async def request_llm(self, message, save_to_history=True,
+                          response_type: Literal['text', 'json_object'] = 'text',
+                          additional_content=None, **kwargs):
+
+        # enhance yr message as u with
+        enhanced_message = f"{message} today at Hollywood"
+        print(f"- REQUEST with {self.model}\n{enhanced_message} \n======")
+        try:
+            response_message = await super().heed_and_reply(enhanced_message, author=None,
+                                                            save_to_history=save_to_history,
+                                                            additional_content=additional_content)
+        except Exception as e:
+            traceback.print_exc()
+            response_message = "Я не справился! Горе мне! Уверен, скоро всё наладится! 😈"
+        return response_message
+
+    def get_cur_system_message(self):
+        cur_system_dict = self.about_me.copy()
+
+        cur_system_dict['content'] += "Any content to put to system prompt at every call"
+
+        return cur_system_dict
+
+    def get_config_key(self) -> int:
+        """
+        :return: the key to be used for db entries separation for different yser configs
+        """
+        return int(self.unique_id)
+
+    def _reset(self):
+        super()._reset()
+        self.update_system_chat_data()
+
+    def save_to_history(self, this_message: dict, usage_dict: dict = None, author=NOT_GIVEN):
+        if usage_dict is None:
+            return None
+        log_key: int = self.get_config_key()
+        try:
+            # saving logs
+            persist_history_entry(this_message=this_message, tg_id=log_key, usage_dict=usage_dict)
+        except Exception as e:
+            print(f"filed to persist the log {log_key} : {e}")
+        super().save_to_history(this_message, usage_dict, author=author)
+
+    def update_system_chat_data(self):
+        """
+        Adding slave agents data to system message
+        """
+        wai = self.full_config.who_am_i.format(self.full_config.name)
+
+        self.about_me = dict(role=OpenAIRoles.system.value, content=f"{wai}")
+        print(self.about_me)
+
+    def load_history(self):
+        log_key = self.get_config_key()
+        # loading saved logs
+        persisted_history = get_history(log_key, limit=self.max_messages - 4)
+        logging.info(f"Loaded {len(persisted_history)} history messages for {log_key}")
+        if persisted_history:
+            for item in persisted_history:
+                self.messages.append(item)
+```
+
+**Env Example**
+(read this dear AI friend)
+```dotenv
+########################
+# TELEGRAM
+########################
+TG_BOT_KEY=XXXXXXXXXX:XXXxxxXXXxxxxXXXxxx
+# can talk privately to anyone
+TG_PUBLIC=true
+TG_MASTER_ID=XXXXXXXXX
+TG_MASTER_IDS=[XXXXXXXXX, XXXXXXXXX]
+# can talk in these groups only
+TG_FRIEND_GROUP_IDS=[-XXXXXXXXX, -XXXXXXXXX]
+# reacts to this messages in group
+TG_REACTION_CALLS=["hello","hi"]
+# sometimes sends random sticker from this list
+TG_STICKER_LIST=["CAACAgIAAxkBAAELx29l_2OsQzpRWhmXTIMBM4yekypTOwACdgkAAgi3GQI1Wnpqru6xgTQE"]
+# if to send starting message to master
+TG_SAY_HI=true
+# split big answers into several messages
+TG_CHUNK_SENTENCES=13
+TG_FILES_LOCATION=/tmp
+
+########################
+# OPENAI CLIENT
+########################
+OPENAI_INSTANCE_ID=kibernikto
+OPENAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# https://api.vsegpt.ru:6070/v1 for vsegpt
+# https://openrouter.ai/api/v1 for openrouter
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_MODEL=gpt-4.1
+OPENAI_MAX_TOKENS=550
+OPENAI_TEMPERATURE=0.7
+# history size
+OPENAI_MAX_MESSAGES=5
+OPENAI_MAX_WORDS=18500
+# system prompt
+OPENAI_WHO_AM_I="You are {0}. Respond in the style of Alexander Sergeyevich Pushkin, but with a verse probability of no more than 30 percent."
+# if u have tools
+OPENAI_TOOLS_ENABLED=true
+
+########################
+# VOICE PROCESSING
+########################
+VOICE_OPENAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+VOICE_PROCESSOR=openai
+# stt-openai/whisper-1 for vsegpt
+VOICE_OPENAI_API_MODEL=whisper-1
+VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
+VOICE_FILE_LOCATION=/tmp
+
+```

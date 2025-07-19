@@ -3,11 +3,10 @@ from aiogram.types import Message, Chat
 from kibernikto.telegram import executor_exists, get_ai_executor_full
 
 
-async def get_ready_executor(message: Message, apply_plugins=False, hide_errors: bool = True):
+async def get_ready_executor(message: Message, hide_errors: bool = True):
     """
 
     :param message: telegram message
-    :param apply_plugins: if to use plugins
     :param hide_errors: if the errors should be processed in Kibernikto superclass or sent to the top
     :return:
     """

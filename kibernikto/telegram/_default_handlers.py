@@ -1,13 +1,12 @@
 import logging
 
-from aiogram import Bot, Dispatcher, types, enums, F
+from aiogram import types, enums, F
 from aiogram.filters import or_f, and_f
-from kibernikto.utils.permissions import admin_or_public
-from kibernikto.utils.text import split_text_by_sentences
-from kibernikto.utils.ai_executor import get_ready_executor
-from . import dispatcher as cd
-from aiogram.fsm.state import State, StatesGroup, any_state, default_state
+from aiogram.fsm.state import default_state
 
+from kibernikto.utils.ai_executor import get_ready_executor
+from kibernikto.utils.permissions import admin_or_public
+from . import dispatcher as cd
 from ..utils.telegram import reply
 
 
@@ -49,9 +48,9 @@ async def group_message(message: types.Message):
 
     if cd.is_reply(message) or group_ai.should_react(message.html_text):
         if cd.TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS and chat_id not in cd.TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS:
-            negative_reply_text = (f"Я не общаюсь в беседах, в которых мне не велено участвовать"
-                                   f" (если это конечно не один из моих Повелителей"
-                                   f" снизошёл до меня). Я передам ваше соообщение кому-нибудь.")
+            negative_reply_text = (f"I don't participate in conversations where I'm not invited to join"
+                                   f" (unless of course one of my Masters"
+                                   f" has deigned to address me). I'll forward your message to someone.")
             print(f"allowed chats: {cd.TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS}, given chat: {chat_id}")
             await message.reply(text=negative_reply_text)
             await message.forward(chat_id=cd.TELEGRAM_SETTINGS.TG_MASTER_ID)
@@ -69,4 +68,4 @@ async def group_message(message: types.Message):
 
 
 def imported_ok():
-    print('\t%-20s%-20s' % ("handlers:", 'private_message, group_message'))
+    print('\t%-15s%-20s' % ("handlers:", 'private_message, group_message'))

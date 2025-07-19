@@ -1,1 +1,1 @@
-from .openai_executor import OpenAIRoles, OpenAIExecutor, OpenAiExecutorConfig
+from .openai_executor import OpenAIRoles, OpenAIExecutor, OpenAiExecutorConfig, DEFAULT_CONFIG

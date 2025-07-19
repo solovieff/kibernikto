@@ -34,7 +34,7 @@ class OpenAiExecutorConfig(BaseModel):
     max_retries: int = AI_SETTINGS.OPENAI_MAX_RETRIES
     who_am_i: str = AI_SETTINGS.OPENAI_WHO_AM_I
     reset_call: str = AI_SETTINGS.OPENAI_RESET_CALL
-    master_call: str = "Величайший Кибеникто!"
+    master_call: str = "Mister kibernikto!"
     summarize_request: str | None = AI_SETTINGS.OPENAI_SUMMARY
     max_words_before_summary: int = AI_SETTINGS.OPENAI_MAX_WORDS
     tool_call_hole_deepness: int = AI_SETTINGS.OPENAI_TOOLS_DEEPNESS_LEVEL

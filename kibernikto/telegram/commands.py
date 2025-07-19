@@ -37,12 +37,6 @@ if PP_SETTINGS.TG_ADMIN_COMMANDS_ALLOWED:
                 f"Моя температура ```{user_ai.full_config.temperature}```"
                 f"Откликаюсь на ```{str(user_ai.full_config.reaction_calls)}```"
                 await reply(message, text)
-                await message.reply(f"Меня зовут ```{user_ai.full_config.name}```"
-                                    f"Мой систем промт ```{user_ai.about_me['content']}```"
-                                    f"Моя модель ```{user_ai.full_config.model}```"
-                                    f"Моя температура ```{user_ai.full_config.temperature}```"
-                                    f"Откликаюсь на ```{str(user_ai.full_config.reaction_calls)}```",
-                                    parse_mode='Markdown')
 
             else:
                 await message.reply(f"❌Не при всех!")

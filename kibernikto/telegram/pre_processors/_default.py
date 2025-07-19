@@ -60,7 +60,7 @@ IGNORED_TYPES = {
 class TelegramMessagePreprocessor():
     async def process_tg_message(self, message: types.Message, tg_bot: AIOGramBot) -> str:
         """
-        returns text to be processed by AI and it's plugins
+        returns text to be processed by AI
 
         :param message:
         :param tg_bot:

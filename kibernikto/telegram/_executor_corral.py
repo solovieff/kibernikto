@@ -8,9 +8,7 @@ from aiogram.types import User, Chat
 from pydantic import BaseModel
 
 from kibernikto.interactors import OpenAiExecutorConfig
-from kibernikto.plugins import KiberniktoPlugin
 from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
-from kibernikto.utils.environment import print_plugin_banner, print_plugin_off
 
 
 class AIBotConfig(BaseModel):
@@ -70,12 +68,9 @@ def executor_exists(key_id: int) -> bool:
     return key_id in __BOTS
 
 
-def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True, apply_plugins=False) -> TelegramBot:
+def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True) -> TelegramBot:
     chat_key = chat.id
     bot = __BOTS.get(chat_key)
-
-    if apply_plugins:
-        raise EnvironmentError("Plugins are deprecated!")
 
     if not bot:
         chat_info = KiberniktoChatInfo(chat, user)
@@ -84,28 +79,6 @@ def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True, apply_
             bot.hide_errors = hide_errors
         __BOTS[chat_key] = bot
     return bot
-
-
-def _apply_plugins(bot: TelegramBot):
-    def apply_plugin(plugin: KiberniktoPlugin):
-        if hasattr(bot, 'plugins'):
-            bot.plugins.append(plugin)
-            print_plugin_banner(plugin)
-
-    plugin_classes = KiberniktoPlugin.__subclasses__()
-    plugin_classes.sort(key=lambda x: x.index)
-
-    for plugin_class in plugin_classes:
-        if plugin_class.applicable():
-            try:
-                plugin_instance = plugin_class()
-                apply_plugin(plugin_instance)
-            except Exception as plugin_error:
-                logging.error(str(plugin_error))
-                traceback.print_exc(file=sys.stdout)
-                logging.error("PLUGINS WERE NOT LOADED!")
-        else:
-            print_plugin_off(plugin_class)
 
 
 def _new_executor(key_id: int, chat_info: KiberniktoChatInfo = None):

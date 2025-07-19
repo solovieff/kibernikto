@@ -70,7 +70,7 @@ def start(bot_class, tools=[], msg_preprocessor: TelegramMessagePreprocessor = N
     print('\t%-15s%-15s' % ("tg master:", TELEGRAM_SETTINGS.TG_MASTER_ID))
     print('\t%-15s%-15s' % ("tg masters:", TELEGRAM_SETTINGS.TG_MASTER_IDS))
     print('\t%-15s%-15s' % ("tg groups:", TELEGRAM_SETTINGS.TG_FRIEND_GROUP_IDS))
-    print('\t%-15s%-15s' % ("dispatcher:", 'multi-user-and-group'))
+    print('\t%-15s%-15s' % ("dispatcher:", 'default'))
 
     smart_bot_class = bot_class
     dp.startup.register(on_startup)
@@ -132,7 +132,7 @@ async def on_startup(bot: Bot):
             master_id = TELEGRAM_SETTINGS.TG_MASTER_ID
             await send_random_sticker(chat_id=master_id)
             async with get_temp_executor(key_id=master_id) as hi_bot:
-                hi_message = await hi_bot.heed_and_reply("Поприветствуй своего хозяина!")
+                hi_message = await hi_bot.heed_and_reply("Say hi to everyone!")
                 await tg_bot.send_message(chat_id=master_id, text=hi_message)
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
@@ -145,7 +145,6 @@ async def on_startup(bot: Bot):
 async def send_random_sticker(chat_id):
     sticker_id = choice(TELEGRAM_SETTINGS.TG_STICKER_LIST)
 
-    # say hi to everyone
     await tg_bot.send_sticker(
         sticker=sticker_id,
         chat_id=chat_id)
