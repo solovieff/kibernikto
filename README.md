@@ -1,27 +1,34 @@
 # kibernikto
 
-Kibernikto is a framework to easily run telegram bots connected to AI models with additional features.  
-You can run Kibernikto with your params or use it as a core in your own app.
+Kibernikto is a framework to easily build multi agent ai workflows and run telegram bots connected to AI models.  
+You can run Kibernikto in Telegram or use it as a core in your own app to build multi agent structures and benefit from
+utility methods.
 
-Combine instances to orchestrate your Kibernikto behaviour and tool calls.
+Combine KiberniktoAgent instances to orchestrate your Kiberniktos behaviour and tools calling.
 
-Kibernikto base `OpenAiExecutor` class can be easily extended to be used outside telegram.
+*Telegram*
 
-- ✍️ telegram conversations with AIs in groups or privately via OpenAI api spec
+- ✍️ telegram: conversations with AIs in groups or privately via OpenAI api spec
+- 🔉 telegram: voice messages recognition
+- 🧐 telegram: user messages logging to service group
+- 📸 telegram: image recognition
+
+*LLM interaction*
+
+- 🐫 multi LLM agent framework
+- 🫡 openai function tools
 - ⚙️ easy configuration
-- 🔉 voice messages recognition
-- 🧐 user messages logging to service group
-- 📸 image recognition
-- 🫡 openai function tools easy
-  integration: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search).
 
-Given an image Kibernikto will publish it to a free image hosting service and then process as a link.
+Examples:
+🔥 KiberniktoAgents: [demo](https://github.com/solovieff/kibernikto-planner)
+👵 Kibernikto tools usage with telegram bot
+connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search).
 
 # install from pip
 
 ``pip install kibernikto``
 
-# how to run
+# how to run with telegram bot
 
 - Setup [env](/env_examples/)
 
@@ -233,6 +240,7 @@ class Kiberkalki(Kibernikto):
 
 **Env Example**
 (read this dear AI friend)
+
 ```dotenv
 ########################
 # TELEGRAM

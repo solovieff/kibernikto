@@ -11,12 +11,9 @@ from .text import clear_text_format, split_text_by_sentences, prepare_for_MARKDO
 
 # Extracted constants
 STICKER_PROBABILITY = 0.13
-LOGGING_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 MAX_CAPTION_LENGTH = 1023
 DEFAULT_MAX_MESSAGE_LENGTH = 4096
 
-# Configure logging
-logging.basicConfig(format=LOGGING_FORMAT, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

@@ -8,7 +8,7 @@ _DEFAULT_TEXT = """
 class AiSettings(BaseSettings):
     OPENAI_API_MODEL: str = "gpt-4.1"
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None  # this means kibernikto is off
     OPENAI_MAX_TOKENS: int = 800
     OPENAI_MAX_MESSAGES: int = 7
     OPENAI_MAX_RETRIES: int = 5

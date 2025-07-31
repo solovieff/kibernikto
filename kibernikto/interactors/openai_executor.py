@@ -21,7 +21,7 @@ from .openai_executor_utils import get_tool_implementation, calculate_max_messag
 class OpenAiExecutorConfig(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
-    id: int = None
+    id: int | str = None
     name: str = "Киберникто"
     model: str = AI_SETTINGS.OPENAI_API_MODEL
     url: str = AI_SETTINGS.OPENAI_BASE_URL
@@ -42,6 +42,7 @@ class OpenAiExecutorConfig(BaseModel):
     tools: List[Toolbox] = []
     hide_errors: bool = False
     app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
+    tools_with_history: bool = True
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
@@ -160,7 +161,7 @@ class OpenAIExecutor:
         system_prompt_enabled = use_system if use_system else self.use_system
 
         if system_prompt_enabled:
-            messages = [self.about_me, this_message]
+            messages = [self.get_cur_system_message(), this_message]
             completion_dict['max_tokens'] = max_output_tokens
             completion_dict['temperature'] = temperature if temperature else self.full_config.temperature
         else:
@@ -225,7 +226,7 @@ class OpenAIExecutor:
     async def request_llm(self, message: str, author=NOT_GIVEN, save_to_history=True,
                           response_type: Literal['text', 'json_object'] = 'text',
                           additional_content: dict = None, with_history: bool = True,
-                          custom_model: str = None) -> str:
+                          custom_model: str = None, call_session_id: str = None) -> str:
         """
         Sends message to OpenAI and receives response. Can preprocess user message and work before actual API call.
         :param custom_model: is to use model not equal to default executor ones. Can break the tools!
@@ -266,7 +267,7 @@ class OpenAIExecutor:
         response_message: ChatCompletionMessage = choice.message
 
         if ai_tools.is_function_call(choice=choice):
-            return await self.process_tool_calls(choice, user_message)
+            return await self.process_tool_calls(choice, user_message, call_session_id=call_session_id)
 
         if save_to_history:
             self.save_to_history(this_message, usage_dict=usage, author=author)
@@ -304,9 +305,11 @@ class OpenAIExecutor:
         """checks if the reaction needed for the given message"""
         return self.should_react(message)
 
-    async def process_tool_calls(self, choice: Choice, original_request_text: str, save_to_history=True, iteration=0):
+    async def process_tool_calls(self, choice: Choice, original_request_text: str, save_to_history=True, iteration=0,
+                                 call_session_id: str = None):
         """
 
+        :param call_session_id: current user call session id.
         :param choice:
         :param original_request_text:
         :param save_to_history:
@@ -317,7 +320,12 @@ class OpenAIExecutor:
         if iteration > self.full_config.tool_call_hole_deepness:
             # raise BrokenPipeError("RECURSION ALERT: Too much tool calls. Stop the boat!")
             return "RECURSION ALERT: Too much recursive tool calls. Stop the boat!"
-        prompt = list(self.messages)
+
+        # using or not using previous dialogue in a tool call
+        if self.full_config.tools_with_history:
+            prompt = list(self.messages)
+        else:
+            prompt = []
 
         message_dict = None
 
@@ -326,7 +334,8 @@ class OpenAIExecutor:
             message_dict = dict(content=f"{original_request_text}", role=OpenAIRoles.user.value)
             prompt.append(message_dict)
 
-        tool_call_messages = await run_tool_calls(choice=choice, available_tools=self.tools, unique_id=self.unique_id)
+        tool_call_messages = await run_tool_calls(choice=choice, available_tools=self.tools, unique_id=self.unique_id,
+                                                  call_session_id=call_session_id)
 
         choice, usage = await self._run_for_messages(
             full_prompt=[self.get_cur_system_message()] + prompt + tool_call_messages)

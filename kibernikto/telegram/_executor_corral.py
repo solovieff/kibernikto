@@ -17,7 +17,7 @@ class AIBotConfig(BaseModel):
     username: str
 
 
-__BOTS: Dict[int, TelegramBot] = {}
+__BOTS: Dict[int | str, TelegramBot] = {}
 __BOT_CLASS: Type[TelegramBot] = None
 __EXECUTOR_CONFIG: AIBotConfig = None
 
@@ -49,13 +49,13 @@ async def kill(exact_ids=()):
             await bot.client.close()
 
 
-def get_ai_executor(key_id: int) -> TelegramBot:
+def get_ai_executor(key_id: int | str) -> TelegramBot:
     bot = __BOTS.get(key_id)
     return bot
 
 
 @asynccontextmanager
-async def get_temp_executor(key_id: int) -> TelegramBot:
+async def get_temp_executor(key_id: int | str) -> TelegramBot:
     bot = _new_executor(key_id=key_id)
     try:
         yield bot
@@ -64,7 +64,7 @@ async def get_temp_executor(key_id: int) -> TelegramBot:
             await bot.client.close()
 
 
-def executor_exists(key_id: int) -> bool:
+def executor_exists(key_id: int | str) -> bool:
     return key_id in __BOTS
 
 
@@ -81,7 +81,7 @@ def get_ai_executor_full(chat: Chat, user: User = None, hide_errors=True) -> Tel
     return bot
 
 
-def _new_executor(key_id: int, chat_info: KiberniktoChatInfo = None):
+def _new_executor(key_id: int | str, chat_info: KiberniktoChatInfo = None):
     """
     creates new ai bot executor connected to AI API
     :return:

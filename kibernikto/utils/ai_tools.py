@@ -2,9 +2,10 @@ import inspect
 import json
 import logging
 import pprint
-import uuid
-from json import JSONDecodeError
 from typing import Callable, List
+
+# Initialize logger
+logger = logging.getLogger("kibernikto.ai_tools")
 
 from dict2xml import dict2xml
 from openai.types.chat import ChatCompletionMessageToolCall
@@ -39,7 +40,7 @@ def is_function_call(choice: Choice):
     return choice.finish_reason == "tool_calls" or (choice.message.tool_calls and len(choice.message.tool_calls) > 0)
 
 
-async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_id: str):
+async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_id: str, call_session_id: str = None):
     if not choice.message.tool_calls:
         raise ValueError("No tools provided!")
 
@@ -50,9 +51,9 @@ async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_
         fn_name = tool_call.function.name
         function_impl = get_tool_impl(available_tools=available_tools, fn_name=fn_name)
         if not function_impl:
-            logging.error(f"no impl for {fn_name}")
+            logger.error(f"no impl for {fn_name}")
             pprint.pprint(tool_call)
-        additional_params = dict(key=unique_id)
+        additional_params = dict(key=unique_id, call_session_id=call_session_id)
         tool_call_result = await execute_tool_call_function(tool_call, function_impl=function_impl,
                                                             additional_params=additional_params)
         tool_call_messages += get_tool_call_serving_messages(tool_call, tool_call_result)
@@ -80,12 +81,14 @@ async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
     for key in additional_params:
         if key in impl_params:
             dict_args[key] = additional_params[key]
-    logging.info(f"running {fn_name} with params {dict_args}")
+    logger.info(f"👷‍♀️ running '{fn_name}' with params {dict_args}")
     try:
         result = await function_impl(**dict_args)
     except Exception as e:
-        logging.error(f"{e}")
-        result = str(e)
+        logger.error(f"{e}", exc_info=True)
+        result = parse_json_garbage(
+            f"ERROR: {e} [TOOL CALL FAILED]"
+        )
     return result
 
 
@@ -124,25 +127,3 @@ def get_tools_xml(tools: List[Toolbox]):
     xml = dict2xml(all_tools)
     print(xml)
     return xml
-
-
-def get_claude_tools_info(xml_string):
-    call_example = """
-                {
-                    "function_name": $TOOL_NAME,
-                    "parameters": {
-                        "$PARAM_NAME": $PARAM_VALUE
-                        ...
-                    },
-                    "call_id": $RANDOM
-                }
-            """
-    tools_content = f"""
-    In this environment you have access to a set of tools you can use to answer the user's question. 
-    To let me know you want to call a tool return only tool call description JSON without any comments.
-    Like this:
-    {call_example}\n
-    Call the tools only if you need to!
-    Here are the tools available:\n{xml_string}
-            """
-    return tools_content
