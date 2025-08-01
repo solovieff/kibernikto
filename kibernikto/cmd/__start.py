@@ -13,9 +13,6 @@ def start(outer_env=False):
     parser.add_argument('--env_file_path', metavar='env_file_path', required=False,
                         help='env file location', default='.env')
 
-    parser.add_argument('--bot_type', metavar='bot_type', required=False,
-                        help='kibernikto', default='kibernikto')
-
     args = parser.parse_args()
 
     if not outer_env:
@@ -26,17 +23,12 @@ def start(outer_env=False):
     configure_logger()
     print_banner()
 
-    if args.bot_type == 'kibernikto':
-        from kibernikto.bots.cybernoone import Kibernikto
-        bot_class = Kibernikto
-    else:
-        raise RuntimeError("Wrong bot_type, should be in ('kibernikto')")
-
     # for service messages
     from kibernikto.telegram import service
     # for default commands
     from kibernikto.telegram import commands
-    dispatcher.start(bot_class=bot_class)
+    from kibernikto.bots.cybernoone import Kibernikto
+    dispatcher.start(bot_class=Kibernikto)
 
 
 # Initialize bot and dispatcher

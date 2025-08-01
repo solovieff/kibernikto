@@ -1,34 +1,36 @@
 # kibernikto
 
-Kibernikto is a framework to easily build multi agent ai workflows and run telegram bots connected to AI models.  
+Kibernikto is a multi agent ai framework with a telegram bot connection.  
 You can run Kibernikto in Telegram or use it as a core in your own app to build multi agent structures and benefit from
 utility methods.
 
-Combine KiberniktoAgent instances to orchestrate your Kiberniktos behaviour and tools calling.
+You can combine KiberniktoAgent instances to orchestrate your Kiberniktos behaviour and tools calling.
 
-*Telegram*
+**Telegram**  
+Ready `aiogram` dispatcher with AI Executors connection and telegram message processors.
 
-- ✍️ telegram: conversations with AIs in groups or privately via OpenAI api spec
-- 🔉 telegram: voice messages recognition
-- 🧐 telegram: user messages logging to service group
-- 📸 telegram: image recognition
+- ✍️ conversations with AIs in groups or privately via OpenAI api spec
+- 🔉 voice messages recognition
+- 🧐 user messages logging to service group
+- 📸 image recognition
 
-*LLM interaction*
+**LLM interaction**
 
 - 🐫 multi LLM agent framework
 - 🫡 openai function tools
 - ⚙️ easy configuration
 
-Examples:
-🔥 KiberniktoAgents: [demo](https://github.com/solovieff/kibernikto-planner)
+**Examples**:  
+⚙️ [Environment](/env_examples/)  
+🔥 KiberniktoAgents (no Telegram): [demo](/kibernikto/agent/demo)   
 👵 Kibernikto tools usage with telegram bot
-connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search).
+connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search)  
 
 # install from pip
 
 ``pip install kibernikto``
 
-# how to run with telegram bot
+# how to run the telegram bot
 
 - Setup [env](/env_examples/)
 
@@ -40,17 +42,7 @@ kibernikto --env_file_path=/path/to/your/env/local.env
 
 - Install the requirements   
   `pip install -r requirements.txt`
-- Run `main.py` file using the environment provided.
-
-# useful links
-
-To create and operate your bot: https://t.me/BotFather  
-To obtain group/user ids etc: https://t.me/getidsbot  
-To obtain sticker ids: https://t.me/idstickerbot  
-To get familiar with basic OpenAI principles: https://openai.com  
-To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models  
-Website to text and other helpful tools https://toolsyep.com  
-Free image hosting: https://imgbb.com
+- Run `main.py` file using your environment.
 
 # FAQ
 
@@ -71,7 +63,7 @@ dispatcher.start(bot_class=bot_class)
 
 You can create your own bots and dispatchers and use it like above.
 
-- How do I run it without the dispatcher?
+- How do I run it without telegram?
 
 You can use `OpenAIExecutor` directly to create any ai-connected bots.
 For example (change urls to use different ai-providers):
@@ -80,14 +72,14 @@ For example (change urls to use different ai-providers):
 import asyncio
 from kibernikto.interactors import DEFAULT_CONFIG, OpenAIExecutor
 
-config = DEFAULT_CONFIG
+config = DEFAULT_CONFIG  # <--- setting from env
 config.key = "yr_key"
 config.url = "https://api.openai.com/v1"
 config.model = "gpt-4.1"
 config.max_tokens = 760
 config.who_am_i = "Your are mister Kibernikto"
 
-executor = OpenAIExecutor(unique_id="kbnkt", config=config)
+executor = OpenAIExecutor(unique_id="kbnkt", config=config)  # <--- executor instance creation
 response = asyncio.run(executor.request_llm(message="Good morning mister kibernikto!"))
 print(response)
 ```
@@ -188,7 +180,7 @@ class Kiberkalki(Kibernikto):
                                                             additional_content=additional_content)
         except Exception as e:
             traceback.print_exc()
-            response_message = "Я не справился! Горе мне! Уверен, скоро всё наладится! 😈"
+            response_message = "ERROR! 😈"
         return response_message
 
     def get_cur_system_message(self):
@@ -291,3 +283,18 @@ VOICE_OPENAI_API_BASE_URL=https://api.openai.com/v1
 VOICE_FILE_LOCATION=/tmp
 
 ```
+
+# useful links
+
+To create and operate your bot: https://t.me/BotFather  
+To obtain group/user ids etc: https://t.me/getidsbot  
+To obtain sticker ids: https://t.me/idstickerbot  
+To get familiar with basic OpenAI principles: https://openai.com  
+To find out more on models and multi-model api details: https://vsegpt.ru/Docs/Models  
+Website to text and other helpful tools https://toolsyep.com  
+Free image hosting: https://imgbb.com
+
+# other multi agent frameworks
+
+Google ADK https://github.com/google/adk-python   
+Open AI https://openai.github.io/openai-agents-python
