@@ -9,22 +9,24 @@ You can combine KiberniktoAgent instances to orchestrate your Kiberniktos behavi
 **Telegram**  
 Ready `aiogram` dispatcher with AI Executors connection and telegram message processors.
 
-- ✍️ conversations with AIs in groups or privately via OpenAI api spec
+- ✍️ conversations with AIs in groups or privately
 - 🔉 voice messages recognition
+- ⭐️ star payments [integration](/kibernikto/telegram/payment)
 - 🧐 user messages logging to service group
 - 📸 image recognition
 
-**LLM interaction**
+**Core**
 
 - 🐫 multi LLM agent framework
-- 🫡 openai function tools
+- 🫡 customizable LLM executors to extended
 - ⚙️ easy configuration
 
-**Examples**:  
+**Examples**
+
 ⚙️ [Environment](/env_examples/)  
 🔥 KiberniktoAgents (no Telegram): [demo](/kibernikto/agent/demo)   
 👵 Kibernikto tools usage with telegram bot
-connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search)  
+connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search)
 
 # install from pip
 
@@ -56,7 +58,8 @@ bot_class = Kibernikto
 
 from kibernikto.telegram import dispatcher
 from kibernikto.telegram import commands
-from kibernikto.telegram import service
+from kibernikto.telegram import middleware_service_group
+from kibernikto.telegram.payment import middleware_subscription
 
 dispatcher.start(bot_class=bot_class)
 ```
@@ -74,8 +77,8 @@ from kibernikto.interactors import DEFAULT_CONFIG, OpenAIExecutor
 
 config = DEFAULT_CONFIG  # <--- setting from env
 config.key = "yr_key"
-config.url = "https://api.openai.com/v1"
-config.model = "gpt-4.1"
+config.url = "https://api.deepseek.com"
+config.model = "deepseek-chat"
 config.max_tokens = 760
 config.who_am_i = "Your are mister Kibernikto"
 

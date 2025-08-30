@@ -24,13 +24,12 @@ class KiberniktoChatInfo:
 
 
 class TelegramBot(OpenAIExecutor):
-    def __init__(self, config: OpenAiExecutorConfig, master_id, username, key=NOT_GIVEN,
-                 chat_info: KiberniktoChatInfo = None, client: AsyncOpenAI = None):
+    def __init__(self, config: OpenAiExecutorConfig, username, key=NOT_GIVEN,
+                 chat_info: KiberniktoChatInfo = None, client: AsyncOpenAI = None, **kwargs):
         self.key = key
-        self.master_id = master_id
         self.username = username
         self.chat_info = chat_info
-        super().__init__(config=config, unique_id=key, client=client)
+        super().__init__(config=config, unique_id=key, client=client, **kwargs)
 
     def should_react(self, message_text):
         if not message_text:

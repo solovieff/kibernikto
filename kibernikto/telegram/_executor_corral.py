@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from kibernikto.interactors import OpenAiExecutorConfig
 from kibernikto.telegram.telegram_bot import TelegramBot, KiberniktoChatInfo
+from kibernikto.bots.telegram_agent import KiberniktoTelegramAgent
 
 
 class AIBotConfig(BaseModel):
@@ -17,12 +18,13 @@ class AIBotConfig(BaseModel):
     username: str
 
 
-__BOTS: Dict[int | str, TelegramBot] = {}
-__BOT_CLASS: Type[TelegramBot] = None
+__BOTS: Dict[int | str, TelegramBot | KiberniktoTelegramAgent] = {}
+__BOT_CLASS: Type[TelegramBot | KiberniktoTelegramAgent] = None
 __EXECUTOR_CONFIG: AIBotConfig = None
 
 
-def init(master_id: int, username: str, config: OpenAiExecutorConfig, smart_bot_class: Type[TelegramBot]):
+def init(master_id: int, username: str, config: OpenAiExecutorConfig,
+         smart_bot_class: Type[TelegramBot | KiberniktoTelegramAgent]):
     global __EXECUTOR_CONFIG
     global __BOT_CLASS
     """
@@ -89,7 +91,6 @@ def _new_executor(key_id: int | str, chat_info: KiberniktoChatInfo = None):
     """
     _configuration = __EXECUTOR_CONFIG.model_copy(deep=True)
     bot = __BOT_CLASS(username=_configuration.username,
-                      master_id=_configuration.master_id,
                       config=_configuration.config,
                       key=key_id, chat_info=chat_info)
     if chat_info is not None:

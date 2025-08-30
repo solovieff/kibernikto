@@ -57,16 +57,16 @@ class OpenAIRoles(str, Enum):
 
 class OpenAIExecutor:
     """
-    Basic Entity on the OpenAI library level.
-    Sends requests and receives responses. Can store chat summary.
+    Core entity on the OpenAI library level.
+    Sends requests and receives responses.
+    Deals with history, tool calling etc.
     Can process group chats at some point.
     """
 
     def __init__(self,
-                 bored_after=0,
-                 config=DEFAULT_CONFIG, unique_id=NOT_GIVEN,
-                 client: AsyncOpenAI = None):
-        self.bored_after = bored_after
+                 config=DEFAULT_CONFIG,
+                 unique_id=NOT_GIVEN,
+                 client: AsyncOpenAI = None, **kwargs):
         self.master_call = config.master_call
         self.reset_call = config.reset_call
         self.unique_id = unique_id

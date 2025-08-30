@@ -34,7 +34,7 @@ if S_SETTINGS.TG_SERVICE_GROUP_ID:
         try:
             await bot.send_message(S_SETTINGS.TG_SERVICE_GROUP_ID, service_message)
         except Exception as e:
-            print('failed to send the service error message')
+            print('failed to send the service message')
 
 
     # runs when message comes

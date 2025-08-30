@@ -24,9 +24,11 @@ def start(outer_env=False):
     print_banner()
 
     # for service messages
-    from kibernikto.telegram import service
+    from kibernikto.telegram import middleware_service_group
     # for default commands
     from kibernikto.telegram import commands
+    # for subscription
+    from kibernikto.telegram.payment import middleware_subscription
     from kibernikto.bots.cybernoone import Kibernikto
     dispatcher.start(bot_class=Kibernikto)
 

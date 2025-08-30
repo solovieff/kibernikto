@@ -15,19 +15,48 @@ class Kibernikto(TelegramBot):
     Basic implementation of Telegram bot.
     """
 
-    def __init__(self, master_id: str, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN,
+    def __init__(self, username: str, config: OpenAiExecutorConfig, key=NOT_GIVEN,
                  chat_info: KiberniktoChatInfo = None, hide_errors=True, add_chat_info: bool = True,
-                 client: AsyncOpenAI = None):
+                 client: AsyncOpenAI = None, **kwargs):
         """
-        :param master_id: telegram admin id
-        :param username: telegram username
-        :param config: ai bot config
+        Initializes the class with the given parameters. The initialization process
+        assigns values to specific attributes for further use within the class while
+        inheriting from a superclass.
+
+        :param username: The username of the telegram bot
+        :type username: str
+
+        :param config: The configuration instance of type OpenAiExecutorConfig. This
+            parameter is utilized to configure or customize the behavior and settings
+            of the llm dialogue.
+        :type config: OpenAiExecutorConfig
+
+        :param key: Serves as a main identifier of the executor.
+        :type key: Optional[Any]
+
+        :param chat_info: Optional parameter. Represents information related to
+            telegram chat details.
+        :type chat_info: Optional[KiberniktoChatInfo]
+
+        :param hide_errors: Determines whether to hide errors. Defaults to True.
+        :type hide_errors: bool
+
+        :param add_chat_info: Indicates whether to include chat-related information in system prompt.
+            Defaults to True.
+        :type add_chat_info: bool
+
+        :param client: Optional parameter. Represents an instance of AsyncOpenAI, used
+            for interaction with OpenAI. Defaults to None if not provided.
+        :type client: Optional[AsyncOpenAI]
+
+        :param kwargs: Additional keyword arguments that may be passed during initialization.
+        :type kwargs: dict
         """
         self.key = key
         self.hide_errors = hide_errors
         self.add_chat_info = add_chat_info
-        super().__init__(config=config, username=username, master_id=master_id, key=key, chat_info=chat_info,
-                         client=client)
+        super().__init__(config=config, username=username, key=key, chat_info=chat_info,
+                         client=client, **kwargs)
 
     async def heed_and_reply(self, message: str, author=NOT_GIVEN, save_to_history=True,
                              response_type: Literal['text', 'json_object'] = 'text', additional_content=None):
@@ -66,13 +95,13 @@ class Kibernikto(TelegramBot):
         wai = self.full_config.who_am_i.format(self.full_config.name)
         if self.chat_info and self.add_chat_info:
             conversation_information = self._get_telegram_chat_info()
-            wai += f"[{conversation_information}]"
+            wai += f"{conversation_information}"
         self.about_me = dict(role=OpenAIRoles.system.value, content=f"{wai}")
 
     def _get_telegram_chat_info(self):
         if self.chat_info is None:
             return ""
-        chat_descr_string = "[Static info from client app]\n"
+        chat_descr_string = "\n[Static client app info]\n"
         if self.chat_info.is_personal:
             chat_descr_string += f"Name: {self.chat_info.aiogram_user.full_name}."
             if self.chat_info.bio:
@@ -83,7 +112,7 @@ class Kibernikto(TelegramBot):
             chat_descr_string += f"Title: {self.chat_info.full_name}."
             if self.chat_info.description:
                 chat_descr_string += f"Description: {self.chat_info.description}."
-        chat_descr_string = f"{chat_descr_string}\n[End static info from client app]\n"
+        chat_descr_string = f"{chat_descr_string}\n"
 
         # print(f"{self.__class__.__name__}: {chat_descr_string}")
         return chat_descr_string

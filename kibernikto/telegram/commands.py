@@ -31,11 +31,11 @@ if PP_SETTINGS.TG_ADMIN_COMMANDS_ALLOWED:
                 if user_ai is None:
                     await message.reply(f"🥸 Похоже мне ещё никто не писал. Дам информацию после первого сообщения.")
                     return None
-                text = f"Меня зовут ```{user_ai.full_config.name}```"
+                text = (f"Меня зовут ```{user_ai.full_config.name}```"
                 f"Мой систем промт ```{user_ai.about_me['content']}```"
                 f"Моя модель ```{user_ai.full_config.model}```"
                 f"Моя температура ```{user_ai.full_config.temperature}```"
-                f"Откликаюсь на ```{str(user_ai.full_config.reaction_calls)}```"
+                f"Откликаюсь на ```{str(user_ai.full_config.reaction_calls)}```")
                 await reply(message, text)
 
             else:

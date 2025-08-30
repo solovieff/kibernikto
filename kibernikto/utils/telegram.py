@@ -106,7 +106,7 @@ async def _send_random_sticker(message: Message) -> None:
     from ..telegram.dispatcher import TELEGRAM_SETTINGS
 
     try:
-        sticker = random.choice(TELEGRAM_SETTINGS.TG_STICKERS)
+        sticker = random.choice(TELEGRAM_SETTINGS.TG_STICKER_LIST)
         await message.bot.send_sticker(message.chat.id, sticker)
     except Exception as e:
         logger.error(f"Error sending sticker: {e}")
