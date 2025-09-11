@@ -95,7 +95,7 @@ async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
 def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, tool_call_result):
     call_message = {
         "role": "assistant",
-        "content": None,
+        "content": "",
         "tool_calls": [
             {
                 "id": tool_call.id,
@@ -107,12 +107,19 @@ def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, too
             }
         ]
     }
+
+    if isinstance(tool_call_result, (dict, list)):
+        result_content = json.dumps(tool_call_result, ensure_ascii=False)
+    else:
+        result_content = str(tool_call_result)
+
     result_message = {
         # "role": "function",
         "role": "tool",
         "tool_call_id": tool_call.id,
-        "name": tool_call.function.name,
-        "content": f'{str(tool_call_result)}'}
+        # "name": tool_call.function.name,
+        "content": result_content
+    }
     return [call_message, result_message]
 
 
