@@ -102,6 +102,10 @@ class OpenAIExecutor:
         return None
 
     @property
+    def extra_body(self):
+        return None
+
+    @property
     def tools_names(self):
         return [toolbox.function_name for toolbox in self.tools]
 
@@ -156,6 +160,9 @@ class OpenAIExecutor:
             extra_headers=self.default_headers
         )
 
+        if self.extra_body:
+            completion_dict['extra_body'] = self.extra_body
+
         max_output_tokens = max_tokens if max_tokens else self.full_config.max_tokens
 
         system_prompt_enabled = use_system if use_system else self.use_system
@@ -199,6 +206,9 @@ class OpenAIExecutor:
             response_format=response_format,
             extra_headers=self.default_headers
         )
+
+        if self.extra_body:
+            completion_dict['extra_body'] = self.extra_body
 
         if self.use_system:
             final_prompt = system_message + filtered_messages
