@@ -109,7 +109,7 @@ def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, too
     }
 
     if isinstance(tool_call_result, (dict, list)):
-        result_content = json.dumps(tool_call_result, ensure_ascii=False)
+        result_content = json.dumps(tool_call_result, ensure_ascii=False, default=str)
     else:
         result_content = str(tool_call_result)
 
