@@ -277,7 +277,8 @@ class OpenAIExecutor:
         response_message: ChatCompletionMessage = choice.message
 
         if ai_tools.is_function_call(choice=choice):
-            return await self.process_tool_calls(choice, user_message, call_session_id=call_session_id)
+            return await self.process_tool_calls(choice, user_message, call_session_id=call_session_id,
+                                                 save_to_history=save_to_history)
 
         if save_to_history:
             self.save_to_history(this_message, usage_dict=usage, author=author)
@@ -353,8 +354,8 @@ class OpenAIExecutor:
 
         if message_dict and save_to_history:
             self.save_to_history(message_dict, usage_dict=usage)
-        for tool_call_message in tool_call_messages:
-            self.save_to_history(tool_call_message, usage_dict=usage)
+            for tool_call_message in tool_call_messages:
+                self.save_to_history(tool_call_message, usage_dict=usage)
         if response_message.content and save_to_history:
             response_message_dict = dict(content=f"{response_message.content}", role=OpenAIRoles.assistant.value)
             self.save_to_history(response_message_dict, usage_dict=usage)
