@@ -366,7 +366,14 @@ class OpenAIExecutor:
 
         if ai_tools.is_function_call(choice=choice):
             if response_message.content:
-                logging.warning(f"Preliminary tool call comment: {response_message.content}")
+                logging.warning(f"Preliminary tool call has a comment: {response_message.content}")
+
+                prem_response_message_dict = dict(content=f"{response_message.content}",
+                                                  role=OpenAIRoles.assistant.value)
+                if save_to_history:
+                    self.save_to_history(prem_response_message_dict, usage_dict=usage)
+                else:
+                    tool_call_messages.append(prem_response_message_dict)
             return await self.process_tool_calls(choice, None, iteration=iteration + 1,
                                                  recursive_results=tool_call_messages, save_to_history=save_to_history)
         elif response_message.content:
