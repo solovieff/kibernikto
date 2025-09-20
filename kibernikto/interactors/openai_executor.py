@@ -317,7 +317,7 @@ class OpenAIExecutor:
         return self.should_react(message)
 
     async def process_tool_calls(self, choice: Choice, original_request_text: str, save_to_history=True, iteration=0,
-                                 call_session_id: str = None):
+                                 call_session_id: str = None, recursive_results: list = ()):
         """
 
         :param call_session_id: current user call session id.
@@ -335,6 +335,9 @@ class OpenAIExecutor:
         # using or not using previous dialogue in a tool call
         if self.full_config.tools_with_history:
             prompt = list(self.messages)
+            # if previous tool call messages are not in prompt
+            if not save_to_history and recursive_results:
+                prompt = prompt + recursive_results
         else:
             prompt = []
 
@@ -354,6 +357,7 @@ class OpenAIExecutor:
 
         if message_dict and save_to_history:
             self.save_to_history(message_dict, usage_dict=usage)
+        if save_to_history:
             for tool_call_message in tool_call_messages:
                 self.save_to_history(tool_call_message, usage_dict=usage)
         if response_message.content and save_to_history:
@@ -363,7 +367,8 @@ class OpenAIExecutor:
         if ai_tools.is_function_call(choice=choice):
             if response_message.content:
                 logging.warning(f"Preliminary tool call comment: {response_message.content}")
-            return await self.process_tool_calls(choice, None, iteration=iteration + 1)
+            return await self.process_tool_calls(choice, None, iteration=iteration + 1,
+                                                 recursive_results=tool_call_messages, save_to_history=save_to_history)
         elif response_message.content:
             return response_message.content
         else:
