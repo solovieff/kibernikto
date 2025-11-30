@@ -74,7 +74,10 @@ async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
     fn_name = tool_call_function.name
     arguments: str = tool_call_function.arguments
 
-    dict_args = json.loads(arguments)
+    if arguments is None:
+        dict_args = {}
+    else:
+        dict_args = json.loads(arguments)
 
     impl_params = inspect.getfullargspec(function_impl)[0]
 
