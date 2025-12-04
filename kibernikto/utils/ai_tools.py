@@ -89,9 +89,12 @@ async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
         result = await function_impl(**dict_args)
     except Exception as e:
         logger.error(f"{e}", exc_info=True)
-        result = parse_json_garbage(
-            f"ERROR: {e} [TOOL CALL FAILED]"
-        )
+        try:
+            result = parse_json_garbage(
+                f"ERROR: {e} [TOOL CALL FAILED]"
+            )
+        except Exception as e:
+            result = f"ERROR: {e} [TOOL CALL FAILED]"
     return result
 
 

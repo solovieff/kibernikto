@@ -308,7 +308,10 @@ class OpenAIExecutor:
 
         self.messages = deque(maxlen=self.max_messages)
 
-        wai = self.full_config.who_am_i.format(self.full_config.name)
+        try:
+            wai = self.full_config.who_am_i.format(self.full_config.name)
+        except Exception as e:
+            wai = self.full_config.who_am_i
 
         self.about_me = dict(role=OpenAIRoles.system.value, content=f"{wai}")
 
@@ -330,7 +333,7 @@ class OpenAIExecutor:
 
         if iteration > self.full_config.tool_call_hole_deepness:
             # raise BrokenPipeError("RECURSION ALERT: Too much tool calls. Stop the boat!")
-            return "RECURSION ALERT: Too much recursive tool calls. Stop the boat!"
+            return "Looks like I work too much on my own. I need more time to think, can I continue?"
 
         # using or not using previous dialogue in a tool call
         if self.full_config.tools_with_history:

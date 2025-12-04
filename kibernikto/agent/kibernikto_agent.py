@@ -48,7 +48,10 @@ class KiberniktoAgent(OpenAIExecutor):
         gets called inside each request_llm to update system prompt if needed
         :return: system prompt dict to be used in OpenAI request as {role: 'system', content: 'our content'}.
         """
-        wai = self.full_config.who_am_i.format(self.full_config.name)
+        try:
+            wai = self.full_config.who_am_i.format(self.full_config.name)
+        except Exception as e:
+            wai = self.full_config.who_am_i
 
         # adding agents descriptions
         if self.agents:
@@ -72,7 +75,7 @@ class IrrelevantKiberniktoAgent(KiberniktoAgent):
     """
 
     async def process_tool_calls(self, choice: Choice, original_request_text: str, save_to_history=True, iteration=0,
-                                 call_session_id: str = None):
+                                 call_session_id: str = None, recursive_results: list = ()):
         tool_call_messages = await run_tool_calls(choice=choice, available_tools=self.tools,
                                                   unique_id=self.unique_id, call_session_id=call_session_id)
         content = tool_call_messages[1]['content']
