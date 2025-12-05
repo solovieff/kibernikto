@@ -56,7 +56,7 @@ async def run_tool_calls(choice: Choice, available_tools: list[Toolbox], unique_
         additional_params = dict(key=unique_id, call_session_id=call_session_id)
         tool_call_result = await execute_tool_call_function(tool_call, function_impl=function_impl,
                                                             additional_params=additional_params)
-        tool_call_messages += get_tool_call_serving_messages(tool_call, tool_call_result)
+        tool_call_messages += get_tool_call_serving_messages(tool_call, tool_call_result, choice=choice)
 
     return tool_call_messages
 
@@ -98,7 +98,7 @@ async def execute_tool_call_function(tool_call: ChatCompletionMessageToolCall,
     return result
 
 
-def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, tool_call_result):
+def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, tool_call_result, choice: Choice = None):
     call_message = {
         "role": "assistant",
         "content": "",
@@ -113,6 +113,13 @@ def get_tool_call_serving_messages(tool_call: ChatCompletionMessageToolCall, too
             }
         ]
     }
+
+    if choice and choice.message:
+        if choice.message.content:
+            call_message['content'] = choice.message.content
+
+        if hasattr(choice.message, 'reasoning_details'):
+            call_message['reasoning_details'] = choice.message.reasoning_details
 
     if isinstance(tool_call_result, (dict, list)):
         result_content = json.dumps(tool_call_result, ensure_ascii=False, default=str)
