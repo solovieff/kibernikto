@@ -121,6 +121,7 @@ def prepare_for_MARKDOWN_V2(text: str) -> str:
 
 def prepare_for_MARKDOWN(text: str) -> str:
     format_cleared_text = text.replace("**", "*")
+    format_cleared_text = format_cleared_text.replace("_", r"\_")
     return format_cleared_text
 
 
