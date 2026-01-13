@@ -1,0 +1,12 @@
+LICENSE
+MANIFEST.in
+README.md
+pyproject.toml
+setup.py
+kibernikto/__init__.py
+kibernikto.egg-info/PKG-INFO
+kibernikto.egg-info/SOURCES.txt
+kibernikto.egg-info/dependency_links.txt
+kibernikto.egg-info/entry_points.txt
+kibernikto.egg-info/requires.txt
+kibernikto.egg-info/top_level.txt

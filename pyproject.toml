@@ -1,0 +1,37 @@
+[project]
+name = "kibernikto"
+version = "2.0.1"
+description = "Kibernikto - Multi-agent AI framework with Telegram bot integration"
+requires-python = ">=3.11"
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent"
+]
+authors = [
+    { name = "Kibernikto Team", email = "info@kibernikto.com" },
+]
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic-ai==1.41.0",
+    "logfire==4.18.0",
+    "aiogram>=3.24.0",
+    "aiofiles>=24.1.0",
+    "certifi>=2026.1.4",
+    "python-dotenv>=1.2.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/solovieff/kibernikto"
+Repository = "https://github.com/solovieff/kibernikto"
+
+[project.scripts]
+kibernikto = "kibernikto.cmd.__start:start"
+
+[tool.setuptools]
+packages = ["kibernikto"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

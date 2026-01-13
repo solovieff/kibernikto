@@ -1,0 +1,2 @@
+[console_scripts]
+kibernikto = kibernikto.cmd.__start:start

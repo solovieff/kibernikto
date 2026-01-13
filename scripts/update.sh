@@ -6,9 +6,7 @@ fi
 # Запускаем сервис, имя которого передано в параметре
 SERVICE_NAME=$1
 echo "Updating kibernikto..."
-podman exec "$SERVICE_NAME" sh -c "cd /usr/src/kibernikto && git pull && pip install ."
-echo "Updating avatar..."
-output=$(podman exec "$SERVICE_NAME" sh -c "cd /usr/src/kibernikto-avatar && git pull")
+output=$(podman exec "$SERVICE_NAME" sh -c "cd /usr/src/kibernikto && git pull")
 if [[ $output == *"Already up to date."* ]]; then
   echo $output
 else

@@ -1,0 +1,6 @@
+pydantic-ai==1.41.0
+logfire==4.18.0
+aiogram>=3.24.0
+aiofiles>=24.1.0
+certifi>=2026.1.4
+python-dotenv>=1.2.1
