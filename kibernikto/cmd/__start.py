@@ -1,4 +1,3 @@
-import logging
 import argparse
 from dotenv import load_dotenv
 
@@ -18,19 +17,13 @@ def start(outer_env=False):
     if not outer_env:
         load_dotenv(dotenv_path=args.env_file_path)
 
-    from kibernikto.utils.environment import configure_logger, print_banner
-    from kibernikto.telegram import dispatcher
+    from config import print_banner
+    from kibernikto.utils.environment import configure_logger
+    from kibernikto.telegram import runner
     configure_logger()
     print_banner()
 
-    # for service messages
-    from kibernikto.telegram import middleware_service_group
-    # for default commands
-    from kibernikto.telegram import commands
-    # for subscription
-    from kibernikto.telegram.payment import middleware_subscription
-    from kibernikto.bots.cybernoone import Kibernikto
-    dispatcher.start(bot_class=Kibernikto)
+    runner.run_sync()
 
 
 # Initialize bot and dispatcher

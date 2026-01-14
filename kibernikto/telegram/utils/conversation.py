@@ -1,38 +1,25 @@
 import logging
 import random
-import time
-from contextlib import contextmanager
-from typing import Optional
+from random import choice
+from typing import List, Optional
 
+from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import Message, FSInputFile
-
-from .text import clear_text_format, split_text_by_sentences, prepare_for_MARKDOWN
-
-# Extracted constants
-STICKER_PROBABILITY = 0.13
-MAX_CAPTION_LENGTH = 1023
-DEFAULT_MAX_MESSAGE_LENGTH = 4096
+from kibernikto.utils.text import clear_text_format, split_text_by_sentences, prepare_for_MARKDOWN
 
 logger = logging.getLogger(__name__)
 
+MAX_CAPTION_LENGTH = 1023
+MAX_MESSAGE_LENGTH = 4096
 
-@contextmanager
-def timer(description: str = "Execution time") -> float:
-    """
-    Context manager to measure execution time of code blocks.
 
-    Args:
-        description: Description for the timer output
+async def send_random_sticker(chat_id: int, sticker_list: List[str], bot: Bot):
+    sticker_id = choice(sticker_list)
 
-    Returns:
-        float: The elapsed time in seconds
-    """
-    start = time.perf_counter()
-    yield
-    elapsed_time = time.perf_counter() - start
-    logger.info(f"{description}: {elapsed_time:.3f} seconds")
-    return elapsed_time
+    await bot.send_sticker(
+        sticker=sticker_id,
+        chat_id=chat_id)
 
 
 async def reply(
@@ -53,6 +40,7 @@ async def reply(
     Returns:
         str: The sent text content
     """
+
     if not file_attachment and not image_attachment:
         await _text_reply(message=message, reply_text=reply_text)
         return reply_text
@@ -77,8 +65,7 @@ async def _text_reply(message: Message, reply_text: str) -> None:
         message: The message to reply to
         reply_text: The text content of the reply
     """
-    max_length = DEFAULT_MAX_MESSAGE_LENGTH
-    chunks = split_text_by_sentences(reply_text, max_length)
+    chunks = split_text_by_sentences(reply_text, MAX_MESSAGE_LENGTH)
 
     for chunk in chunks:
         try:
@@ -90,23 +77,3 @@ async def _text_reply(message: Message, reply_text: str) -> None:
             logger.error(f"Error sending formatted message: {e}")
             logger.debug(f"Problematic chunk: {chunk}")
             await message.reply(text=clear_text_format(chunk))
-
-    # Maybe send a random sticker
-    if random.random() < STICKER_PROBABILITY:
-        await _send_random_sticker(message)
-
-
-async def _send_random_sticker(message: Message) -> None:
-    """
-    Send a random sticker from the configured sticker set.
-
-    Args:
-        message: The message to reply to with a sticker
-    """
-    from ..telegram.dispatcher import TELEGRAM_SETTINGS
-
-    try:
-        sticker = random.choice(TELEGRAM_SETTINGS.TG_STICKER_LIST)
-        await message.bot.send_sticker(message.chat.id, sticker)
-    except Exception as e:
-        logger.error(f"Error sending sticker: {e}")

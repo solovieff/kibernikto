@@ -5,7 +5,7 @@ from aiogram.filters import or_f, and_f
 from aiogram.fsm.state import default_state
 
 from kibernikto.utils.ai_executor import get_ready_executor
-from kibernikto.utils.permissions import admin_or_public
+from telegram.utils.permissions import admin_or_public
 from . import dispatcher as cd
 from ..utils.telegram import reply
 

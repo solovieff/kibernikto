@@ -1,10 +1,8 @@
-import json
 import logging
 import os
 import pprint
-from typing import BinaryIO, Literal, Callable, Tuple
+from typing import BinaryIO, Literal, Tuple
 
-import aiofiles
 from aiogram import types, enums, Bot as AIOGramBot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile
@@ -14,7 +12,7 @@ from pydantic_settings import BaseSettings
 
 from kibernikto.utils.image import publish_image_file
 from . import _gladia
-from kibernikto.utils import permissions
+from ..utils import permissions
 from ._gladia import CompositeAudioReply
 
 

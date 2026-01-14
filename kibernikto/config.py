@@ -1,27 +1,33 @@
-from typing import List
+import logging
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class AppSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix='APP_')
+    INSTANCE_NAME: str = 'kibernikto-app'
+    TAG_NAME: str = 'kibernikto'
+
+
 class KiberniktoSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='KIBERNIKTO_')
-    INSTANCE_NAME = 'kibernikto'
-    TAG_NAME = 'kibernikto'
+    """This is main AI params to be used by default kibernikto instance."""
+    model_config = SettingsConfigDict(env_prefix='AGENT_KIBERNIKTO_')
+    INSTANCE_NAME: str = 'kibernikto'
+    TAG_NAME: str = 'kibernikto'
+    API_KEY: str | None = None
+    BASE_URL = "https://api.vsegpt.ru:7090/v1/"
+    MAX_TOKENS: int = 760
+    SYSTEM_PROMPT: str = 'U are kibernikto'
+    FULL_MODEL_NAME = "openai/gpt-4.1"
+    TEMPERATURE = 0.7
+    # history size
+    MAX_MESSAGES = 6
 
 
-class TelegramSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='TG_')
-    BOT_KEY: str | None = None
-    MASTER_ID: int = 199740245
-    MASTER_IDS: List[int] = [199740245]
-    FRIEND_GROUP_IDS: List[int] | None = None
-    PRIVILEGED_USERS: List[int] | None = None
-    MAX_MESSAGE_LENGTH: int = 4096
-    TG_CHUNK_SENTENCES: int = 7
-    REACTION_CALLS: List[str] = ['honda', 'киберникто']
-    SAY_HI: bool = False
-    STICKER_LIST: List[str] = ["CAACAgIAAxkBAAEQPFJpZpza5ISCVgABh0uT6CYX9HgwevYAAu5KAAK-HmBK9OlWUNgz8-w4BA"]
-
-
+APP_SETTINGS = AppSettings()
 KIBERNIKTO_SETTINGS = KiberniktoSettings()
-TELEGRAM_SETTINGS = TelegramSettings()
+
+
+def print_banner():
+    logging.info(APP_SETTINGS.model_dump_json(indent=2))
+    logging.info(KIBERNIKTO_SETTINGS.model_dump_json(indent=2))

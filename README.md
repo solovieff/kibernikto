@@ -58,8 +58,7 @@ bot_class = Kibernikto
 
 from kibernikto.telegram import dispatcher
 from kibernikto.telegram import commands
-from kibernikto.telegram import middleware_service_group
-from kibernikto.telegram.payment import middleware_subscription
+from telegram.middleware import middleware_service_group, middleware_subscription
 
 dispatcher.start(bot_class=bot_class)
 ```

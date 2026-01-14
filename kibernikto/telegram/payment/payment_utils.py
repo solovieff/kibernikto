@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from aiogram import Bot
-from aiogram.types import StarTransaction
+from aiogram.types import StarTransaction, LabeledPrice
 
 DEFAULT_SUBSCRIPTION_PERIOD = 2592000
 
@@ -13,7 +13,7 @@ async def create_payment_link(bot: Bot, price=1,
                                                  description=descr,
                                                  payload='subscription_payload',
                                                  currency='XTR',
-                                                 prices=[{"label": "Subscription: 30 days", "amount": price}],
+                                                 prices=[LabeledPrice(label="Subscription", amount=price)],
                                                  provider_token='',
                                                  subscription_period=DEFAULT_SUBSCRIPTION_PERIOD, )
     return payment_link

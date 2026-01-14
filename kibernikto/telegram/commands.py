@@ -1,23 +1,12 @@
-import logging
-
-from aiogram import Bot, types, enums
+from aiogram import types, enums
 from aiogram.filters import Command, CommandObject
-from pydantic_settings import BaseSettings
-from kibernikto.telegram.telegram_bot import TelegramBot
+from telegram.utils.permissions import is_from_admin
+from telegram.utils.utils import reply
 
-from kibernikto.utils.permissions import is_from_admin
-from kibernikto.utils.telegram import reply
-
-
-class CommandSettings(BaseSettings):
-    TG_MASTER_ID: int
-    TG_MASTER_IDS: list = []
-    TG_ADMIN_COMMANDS_ALLOWED: bool = True
+from .config import TELEGRAM_SETTINGS
 
 
-PP_SETTINGS = CommandSettings()
-
-if PP_SETTINGS.TG_ADMIN_COMMANDS_ALLOWED:
+if TELEGRAM_SETTINGS.ADMIN_COMMANDS_ALLOWED:
     from kibernikto.telegram import dispatcher, get_ai_executor
 
     print('\t%-20s%-20s' % ("service commands:", '["/system_message"]'))
