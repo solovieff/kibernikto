@@ -2,7 +2,6 @@ import logging
 
 from aiogram.types import Message, Chat
 
-from avatar.utils.permissions import is_admin
 from kibernikto.telegram import executor_exists, get_ai_executor_full
 
 logger = logging.getLogger("kibernikto")

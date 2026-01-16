@@ -25,10 +25,10 @@ class SubscriptionSettings(BaseSettings):
 P_SETTINGS = SubscriptionSettings()
 
 if P_SETTINGS.ENABLED:
-    from avatar.telegram import avatar_dispatcher
+    from kibernikto.telegram import dispatcher
 
 
-    @avatar_dispatcher.dp.update.outer_middleware()
+    @dispatcher.dp.update.outer_middleware()
     async def subscription_middleware(handler, event: Update, data: Dict[str, Any]) -> Any:
 
         if event.message:
