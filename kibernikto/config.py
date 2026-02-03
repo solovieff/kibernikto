@@ -40,16 +40,18 @@ def configure_logger():
         fmt='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
         datefmt='%Y-%m-%d:%H:%M:%S'
     )
-    logfire.configure(service_name=APP_SETTINGS.INSTANCE_NAME, send_to_logfire=False)
+    logfire.configure(service_name=APP_SETTINGS.INSTANCE_NAME, send_to_logfire='if-token-present')
 
     logfire_handler = logfire.LogfireLoggingHandler()
+    # FIXME: does not work
     logfire_handler.setFormatter(formatter)
 
     # XXX: this will push all logging to logfire
     logging.basicConfig(
-        format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
-        datefmt='%Y-%m-%d:%H:%M:%S',
-        level=logging.WARN, handlers=[logfire_handler])
+        format=formatter._fmt,
+        datefmt=formatter.datefmt,
+        level=logging.WARN,
+        handlers=[logfire_handler])
 
     logger = logging.getLogger('kibernikto')
     logger.setLevel(logging.DEBUG)

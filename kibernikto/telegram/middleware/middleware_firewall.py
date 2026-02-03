@@ -64,5 +64,5 @@ class FirewallMiddleware(BaseMiddleware):
         middleware = FirewallMiddleware()
         dispatcher.message.outer_middleware(middleware)
         dispatcher.edited_message.outer_middleware(middleware)
-        logging.info(
-            f"firewall middleware: ✅:\n{TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'PUBLIC', 'MASTER_ID', 'MASTER_IDS', 'FRIEND_GROUP_IDS'})}")
+        logger.info(
+            f"firewall middleware: ✅ {TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'PUBLIC', 'MASTER_ID', 'MASTER_IDS', 'FRIEND_GROUP_IDS'})}")

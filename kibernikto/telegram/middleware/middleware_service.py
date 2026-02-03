@@ -42,7 +42,8 @@ class ServiceMiddleware(BaseMiddleware):
         if TELEGRAM_SETTINGS.SERVICE_GROUP_ID is not None:
             middleware = ServiceMiddleware()
             dispatcher.message.outer_middleware(middleware)
-            logger.info(f"service middleware: ✅. Service group id: {TELEGRAM_SETTINGS.SERVICE_GROUP_ID}")
+            logger.info(
+                f"service middleware: ✅ {TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'SERVICE_GROUP_ID'})}")
         else:
             logger.info(f"service middleware: 💤")
 
@@ -64,7 +65,7 @@ class ErrorsMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         service_message = f"🔥🔥🔥 {user_message.from_user.username} {user_message.content_type}: {user_message.md_text} {event.exception}"
-        asyncio.create_task(self.send_message_to_service_group(bot=event.update.bot, service_message=service_message))
+        asyncio.create_task(self.send_message_to_service_group(bot=user_message.bot, service_message=service_message))
 
         return await handler(event, data)
 
@@ -78,6 +79,7 @@ class ErrorsMiddleware(BaseMiddleware):
     def apply_if_needed(dispatcher: Dispatcher):
         if TELEGRAM_SETTINGS.SERVICE_GROUP_ID is not None:
             dispatcher.error.outer_middleware(ErrorsMiddleware())
-            logger.info(f"error middlewares: ✅. Service group id: {TELEGRAM_SETTINGS.SERVICE_GROUP_ID}")
+            logger.info(
+                f"error middleware: ✅ {TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'SERVICE_GROUP_ID'})}")
         else:
-            logger.info(f"messages and error middlewares: 💤")
+            logger.info(f"error middleware: 💤")

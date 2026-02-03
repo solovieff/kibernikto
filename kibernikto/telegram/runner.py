@@ -6,8 +6,10 @@ from aiogram.types import User
 from kibernikto.config import APP_SETTINGS
 from kibernikto.telegram.config import TELEGRAM_SETTINGS, print_banner
 from kibernikto.telegram.utils.conversation import send_random_sticker
-from kibernikto.telegram.middleware import apply_default_middlewares
 from kibernikto.telegram.handlers import conversation_router
+from kibernikto.telegram.middleware.middleware_firewall import FirewallMiddleware
+from kibernikto.telegram.middleware.middleware_service import ServiceMiddleware, ErrorsMiddleware
+from kibernikto.telegram.middleware.middleware_subscription import SubscriptionMiddleware
 
 tg_bot: Bot | None = None
 bot_me: User | None = None
@@ -28,7 +30,9 @@ def init():
     tg_dispatcher = Dispatcher(name=APP_SETTINGS.INSTANCE_NAME)
     tg_dispatcher.startup.register(on_startup)
 
-    apply_default_middlewares(tg_dispatcher)
+    middlewares = [ServiceMiddleware, ErrorsMiddleware, FirewallMiddleware, SubscriptionMiddleware]
+    for middleware in middlewares:
+        middleware.apply_if_needed(tg_dispatcher)
     tg_dispatcher.include_router(conversation_router)
 
 
