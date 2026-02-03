@@ -4,9 +4,10 @@ from aiogram.enums import ParseMode
 from aiogram.types import User
 
 from kibernikto.config import APP_SETTINGS
-from kibernikto.telegram.config import TELEGRAM_SETTINGS
-from kibernikto.telegram.middleware import middleware_auth, middleware_service, middleware_subscription
+from kibernikto.telegram.config import TELEGRAM_SETTINGS, print_banner
 from kibernikto.telegram.utils.conversation import send_random_sticker
+from kibernikto.telegram.middleware import apply_default_middlewares
+from telegram.handlers import conversation_router
 
 tg_bot: Bot | None = None
 bot_me: User | None = None
@@ -17,14 +18,18 @@ def init():
     global tg_bot
     global tg_dispatcher
 
-    tg_bot = Bot(token=TELEGRAM_SETTINGS.TG_BOT_KEY,
+    if tg_bot is not None:
+        raise RuntimeError('Bot already initialized')
+
+    print_banner()
+
+    tg_bot = Bot(token=TELEGRAM_SETTINGS.BOT_KEY,
                  default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     tg_dispatcher = Dispatcher(name=APP_SETTINGS.INSTANCE_NAME)
     tg_dispatcher.startup.register(on_startup)
 
-    middleware_service.apply_if_needed(tg_dispatcher)
-    middleware_auth.apply_if_needed(tg_dispatcher)
-    middleware_subscription.apply_if_needed(tg_dispatcher)
+    apply_default_middlewares(tg_dispatcher)
+    tg_dispatcher.include_router(conversation_router)
 
 
 def run_sync():
@@ -38,6 +43,6 @@ async def run_async():
 
 
 async def on_startup(bot: Bot):
-    if TELEGRAM_SETTINGS.TG_SAY_HI:
-        master_id = TELEGRAM_SETTINGS.TG_MASTER_ID
+    if TELEGRAM_SETTINGS.SAY_HI:
+        master_id = TELEGRAM_SETTINGS.MASTER_ID
         await send_random_sticker(chat_id=master_id, sticker_list=TELEGRAM_SETTINGS.STICKER_IDS, bot=bot)

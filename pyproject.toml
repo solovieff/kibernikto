@@ -1,7 +1,7 @@
 [project]
 name = "kibernikto"
 version = "2.0.1"
-description = "Kibernikto - Multi-agent AI framework with Telegram bot integration"
+description = "Kibernikto - best AI friend with Telegram bot integration"
 requires-python = ">=3.11"
 classifiers = [
     "Intended Audience :: Developers",
@@ -9,7 +9,7 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 authors = [
-    { name = "Kibernikto Team", email = "info@kibernikto.com" },
+    { name = "Kibernikto Team", email = "solovieff.nnov@gmail.com" },
 ]
 readme = "README.md"
 license = { text = "MIT" }
@@ -35,3 +35,7 @@ packages = ["kibernikto"]
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.logfire]
+ignore_no_config = true
+

@@ -1,5 +1,6 @@
 import logging
 
+import logfire
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,13 +16,13 @@ class KiberniktoSettings(BaseSettings):
     INSTANCE_NAME: str = 'kibernikto'
     TAG_NAME: str = 'kibernikto'
     API_KEY: str | None = None
-    BASE_URL = "https://api.vsegpt.ru:7090/v1/"
+    BASE_URL: str = "https://api.vsegpt.ru:7090/v1/"
     MAX_TOKENS: int = 760
     SYSTEM_PROMPT: str = 'U are kibernikto'
-    FULL_MODEL_NAME = "openai/gpt-4.1"
-    TEMPERATURE = 0.7
+    FULL_MODEL_NAME: str = "openai/gpt-4.1"
+    TEMPERATURE: float = 0.7
     # history size
-    MAX_MESSAGES = 6
+    MAX_MESSAGES: int = 6
 
 
 APP_SETTINGS = AppSettings()
@@ -29,5 +30,19 @@ KIBERNIKTO_SETTINGS = KiberniktoSettings()
 
 
 def print_banner():
-    logging.info(APP_SETTINGS.model_dump_json(indent=2))
-    logging.info(KIBERNIKTO_SETTINGS.model_dump_json(indent=2))
+    logger = logging.getLogger('kibernikto')
+    logger.info(APP_SETTINGS.model_dump_json(indent=2))
+    logger.info(KIBERNIKTO_SETTINGS.model_dump_json(indent=2))
+
+
+def configure_logger():
+    logfire.configure(service_name=APP_SETTINGS.INSTANCE_NAME, send_to_logfire=False)
+
+    # XXX: this will push all logging to logfire
+    logging.basicConfig(
+        format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
+        datefmt='%Y-%m-%d:%H:%M:%S',
+        level=logging.WARN, handlers=[logfire.LogfireLoggingHandler()])
+
+    logger = logging.getLogger('kibernikto')
+    logger.setLevel(logging.DEBUG)

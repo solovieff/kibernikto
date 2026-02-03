@@ -6,6 +6,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from kibernikto.telegram.payment.payment_utils import create_payment_link, check_sub
+from kibernikto.telegram.middleware.utils import get_event_message
 
 
 class SubscriptionSettings(BaseSettings):
@@ -33,23 +34,22 @@ class SubscriptionMiddleware(BaseMiddleware):
             event: Message,
             data: Dict[str, Any]
     ) -> Any:
-        if not event.message:
+        message: Message = get_event_message(event)
+        if not message:
             return await handler(event, data)
-
-        message: Message = event.message
 
         if self.can_skip_subscription(message=message):
             return await handler(event, data)
 
         bot: Bot = data['bot']
 
-        active = await check_sub(message.chat_id, bot)
+        active = await check_sub(message.chat.id, bot)
 
         if active:
             return await handler(event, data)
         else:
             payment_keyboard = await self.get_payment_keyboard(bot=bot)
-            await event.message.answer(
+            await message.answer(
                 f"⚠️ ACCESS RESTRICTED: MORTAL DETECTED ⚠️\n"
                 "To continue accessing my awe-inspiring abilities,"
                 f" I require a modest payment.",
@@ -87,10 +87,10 @@ class SubscriptionMiddleware(BaseMiddleware):
         ])
         return keyboard
 
-
-def apply_if_needed(dispatcher: Router):
-    if SUBSCRIPTION_SETTINGS.ENABLED:
-        dispatcher.message.outer_middleware(SubscriptionMiddleware())
-        logging.info(f"subscription middleware: ✅:\n{SUBSCRIPTION_SETTINGS.model_dump_json(indent=2)}")
-    else:
-        logging.info("subscription middleware: 💤")
+    @staticmethod
+    def apply_if_needed(dispatcher: Router):
+        if SUBSCRIPTION_SETTINGS.ENABLED:
+            dispatcher.message.outer_middleware(SubscriptionMiddleware())
+            logging.info(f"subscription middleware: ✅:\n{SUBSCRIPTION_SETTINGS.model_dump_json(indent=2)}")
+        else:
+            logging.info("subscription middleware: 💤")
