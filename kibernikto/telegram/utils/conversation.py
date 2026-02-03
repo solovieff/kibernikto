@@ -22,6 +22,17 @@ async def send_random_sticker(chat_id: int, sticker_list: List[str], bot: Bot):
         chat_id=chat_id)
 
 
+def is_reply(message: Message):
+    if message.reply_to_message and message.reply_to_message.from_user.id == message.bot.id:
+        return True
+    else:
+        return False
+
+
+def get_message_text(message: Message):
+    return message.text or message.caption or message.html_text or message.md_text
+
+
 async def reply(
         message: Message,
         reply_text: str,

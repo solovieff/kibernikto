@@ -36,13 +36,23 @@ def print_banner():
 
 
 def configure_logger():
+    formatter = logging.Formatter(
+        fmt='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
+        datefmt='%Y-%m-%d:%H:%M:%S'
+    )
     logfire.configure(service_name=APP_SETTINGS.INSTANCE_NAME, send_to_logfire=False)
+
+    logfire_handler = logfire.LogfireLoggingHandler()
+    logfire_handler.setFormatter(formatter)
 
     # XXX: this will push all logging to logfire
     logging.basicConfig(
         format='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
         datefmt='%Y-%m-%d:%H:%M:%S',
-        level=logging.WARN, handlers=[logfire.LogfireLoggingHandler()])
+        level=logging.WARN, handlers=[logfire_handler])
 
     logger = logging.getLogger('kibernikto')
     logger.setLevel(logging.DEBUG)
+
+    logger = logging.getLogger('aiogram')
+    logger.setLevel(logging.INFO)

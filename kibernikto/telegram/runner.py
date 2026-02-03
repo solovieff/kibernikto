@@ -7,7 +7,7 @@ from kibernikto.config import APP_SETTINGS
 from kibernikto.telegram.config import TELEGRAM_SETTINGS, print_banner
 from kibernikto.telegram.utils.conversation import send_random_sticker
 from kibernikto.telegram.middleware import apply_default_middlewares
-from telegram.handlers import conversation_router
+from kibernikto.telegram.handlers import conversation_router
 
 tg_bot: Bot | None = None
 bot_me: User | None = None
@@ -43,6 +43,9 @@ async def run_async():
 
 
 async def on_startup(bot: Bot):
+    global bot_me
+    bot_me = await tg_bot.get_me()
+
     if TELEGRAM_SETTINGS.SAY_HI:
         master_id = TELEGRAM_SETTINGS.MASTER_ID
         await send_random_sticker(chat_id=master_id, sticker_list=TELEGRAM_SETTINGS.STICKER_IDS, bot=bot)

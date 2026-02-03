@@ -5,21 +5,26 @@ from aiogram.filters import or_f
 from aiogram import enums
 from aiogram.types import Message
 
+from kibernikto.telegram.utils.permissions import should_react
+
 logger = logging.getLogger(__name__)
 
 conversation_router = Router(name="conversation_router")
 
 
-@conversation_router.message(F.chat.type == "private", ~F.text.startswith('/'), ~F.caption.startswith('/'))
+@conversation_router.message(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/'), ~F.caption.startswith('/'))
 async def handle_private_message(message: Message):
     """Handle private messages with access control."""
     user_id = message.from_user.id
+
     logger.info(f"Processing private message from user {user_id}: {message.text}")
 
     # TODO: Integrate with AI agent for response generation
     await message.answer("Private message received. AI integration pending.")
 
-@conversation_router.edited_message(F.chat.type == "private", ~F.text.startswith('/'), ~F.caption.startswith('/'))
+
+@conversation_router.edited_message(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/'),
+                                    ~F.caption.startswith('/'))
 async def handle_edited_message(message: Message):
     """Handle private messages with access control."""
     user_id = message.from_user.id
@@ -29,11 +34,14 @@ async def handle_edited_message(message: Message):
     await message.answer("Private edited message received. AI integration pending.")
 
 
-@conversation_router.message(or_f(F.chat.type == enums.ChatType.GROUP, F.chat.type == enums.ChatType.SUPERGROUP))
+@conversation_router.message(or_f(F.chat.type == enums.ChatType.GROUP, F.chat.type == enums.ChatType.SUPERGROUP),
+                             ~F.text.startswith('/'), ~F.caption.startswith('/'))
 async def handle_group_message(message: Message):
     """Handle private messages with access control."""
     user_id = message.from_user.id
-    logger.info(f"Processing group message from user {user_id}: {message.text}")
+    logger.info(f"Processing group message from user {user_id}: {message.text} in {message.chat.title}")
 
-    # TODO: Integrate with AI agent for response generation
-    await message.answer("Group message received. AI integration pending.")
+    if should_react(message):
+        await message.answer("Group message received. AI integration pending.")
+    else:
+        logger.debug(f"skipping message from {user_id} in {message.chat.title}")

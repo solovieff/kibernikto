@@ -10,6 +10,8 @@ from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.utils.permissions import is_from_admin
 from .utils import get_event_message
 
+logger = logging.getLogger(__name__)
+
 
 class ServiceMiddleware(BaseMiddleware):
     def __init__(self) -> None:
@@ -33,16 +35,16 @@ class ServiceMiddleware(BaseMiddleware):
             if not is_from_admin(message) or 1 == 1:
                 await message.forward(chat_id=self.service_group_id)
         except Exception as e:
-            logging.exception(f"failed to send service message {e}", exc_info=True)
+            logger.exception(f"failed to send service message {e}", exc_info=True)
 
     @staticmethod
     def apply_if_needed(dispatcher: Dispatcher):
         if TELEGRAM_SETTINGS.SERVICE_GROUP_ID is not None:
             middleware = ServiceMiddleware()
             dispatcher.message.outer_middleware(middleware)
-            logging.info(f"service middleware: ✅. Service group id: {TELEGRAM_SETTINGS.SERVICE_GROUP_ID}")
+            logger.info(f"service middleware: ✅. Service group id: {TELEGRAM_SETTINGS.SERVICE_GROUP_ID}")
         else:
-            logging.info(f"service middleware: 💤")
+            logger.info(f"service middleware: 💤")
 
 
 class ErrorsMiddleware(BaseMiddleware):
@@ -70,12 +72,12 @@ class ErrorsMiddleware(BaseMiddleware):
         try:
             await bot.send_message(self.service_group_id, service_message)
         except Exception as e:
-            logging.exception(f"failed to send service message {e}", exc_info=True)
+            logger.exception(f"failed to send service message {e}", exc_info=True)
 
     @staticmethod
     def apply_if_needed(dispatcher: Dispatcher):
         if TELEGRAM_SETTINGS.SERVICE_GROUP_ID is not None:
             dispatcher.error.outer_middleware(ErrorsMiddleware())
-            logging.info(f"error middlewares: ✅. Service group id: {TELEGRAM_SETTINGS.SERVICE_GROUP_ID}")
+            logger.info(f"error middlewares: ✅. Service group id: {TELEGRAM_SETTINGS.SERVICE_GROUP_ID}")
         else:
-            logging.info(f"messages and error middlewares: 💤")
+            logger.info(f"messages and error middlewares: 💤")
