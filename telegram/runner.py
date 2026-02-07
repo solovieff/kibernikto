@@ -6,7 +6,7 @@ from aiogram.types import User
 from kibernikto.config import APP_SETTINGS
 from kibernikto.telegram.config import TELEGRAM_SETTINGS, print_banner
 from kibernikto.telegram.utils.conversation import send_random_sticker
-from kibernikto.telegram.handlers import conversation_router
+from kibernikto.telegram.handlers import conversation_router, commands_router
 from kibernikto.telegram.middleware.middleware_firewall import FirewallMiddleware
 from kibernikto.telegram.middleware.middleware_service import ServiceMiddleware, ErrorsMiddleware
 from kibernikto.telegram.middleware.middleware_subscription import SubscriptionMiddleware
@@ -33,6 +33,7 @@ def init():
     middlewares = [ServiceMiddleware, ErrorsMiddleware, FirewallMiddleware, SubscriptionMiddleware]
     for middleware in middlewares:
         middleware.apply_if_needed(tg_dispatcher)
+    tg_dispatcher.include_router(commands_router)
     tg_dispatcher.include_router(conversation_router)
 
 
