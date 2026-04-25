@@ -25,10 +25,11 @@ class TelegramSettings(BaseSettings):
     MAX_MESSAGE_LENGTH: int = Field(default=4096, description="Do not change, telegram default")
     MAX_CAPTION_LENGTH: int = Field(default=1023, description="Do not change, telegram default")
     ADMIN_COMMANDS_ALLOWED: bool = Field(default=True, description="If to allow admin commands")
+    FILES_LOCATION: str = "/tmp"
 
 
 TELEGRAM_SETTINGS = TelegramSettings()
 
 
 def print_banner():
-    logger.info(f"TELEGRAM_SETTINGS: {TELEGRAM_SETTINGS.model_dump_json(indent=2)}")
+    logger.info(f"TELEGRAM_SETTINGS: {TELEGRAM_SETTINGS.model_dump_json(indent=2, exclude={'BOT_KEY'})}")

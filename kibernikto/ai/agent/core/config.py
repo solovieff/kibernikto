@@ -1,5 +1,5 @@
 import logging
-from typing import Literal
+from typing import Literal, List
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,12 +16,14 @@ class AgentKiberniktoSettings(BaseSettings):
         default="openrouter",
         description="API provider type"
     )
-    PROVIDER_API_KEY: str | None = Field(default=None, description="API key")
-    PROVIDER_API_BASE: str | None = Field(default=None, description="API base url")
+    HISTORY_SIZE: int = Field(default=6, description="History size")
     MODEL_NAME: str = Field(default="anthropic/claude-sonnet-4-5", description="Model name")
     MODEL_MAX_TOKENS: int = Field(default=760, description="Model max tokens")
     MODEL_TEMPERATURE: float = Field(default=0.7, description="Model temperature")
     MODEL_PARALLEL_TOOL_CALLS: bool = Field(default=True, description="Parallel tool calls")
+    MODEL_MODALITIES: List[Literal['text', 'photo', 'audio']] = Field(
+        default=['text'], description="Photo or audio modalities"
+    )
 
     WHO_AM_I: str = Field(default=DEFAULT_SYSTEM_PROMPT, description="Who am I")
 

@@ -1,8 +1,11 @@
 .idea
 .venv
+*.pyc
 *.iml
 venv
 env
 build
 tg_voices
 tg_files
+*/__pycache__/*
+.DS_Store
