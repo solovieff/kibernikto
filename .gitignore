@@ -1,12 +1,15 @@
 .idea
 .venv
+__pycache__/
+**/__pycache__/
 *.pyc
+*.pyo
+*.pyd
 *.iml
 venv
 env
 build
 tg_voices
 tg_files
-*/__pycache__/*
 .DS_Store
 /kibernikto.egg-info/
