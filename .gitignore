@@ -9,3 +9,4 @@ tg_voices
 tg_files
 */__pycache__/*
 .DS_Store
+/kibernikto.egg-info/

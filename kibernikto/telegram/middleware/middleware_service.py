@@ -32,7 +32,7 @@ class ServiceMiddleware(BaseMiddleware):
 
     async def forward_message_service_group(self, message: Message) -> None:
         try:
-            if not is_from_admin(message) or 1 == 1:
+            if not is_from_admin(message) or 1 == 1: # FIXME DEBUG
                 await message.forward(chat_id=self.service_group_id)
         except Exception as e:
             logger.exception(f"failed to send service message {e}", exc_info=True)
@@ -43,9 +43,9 @@ class ServiceMiddleware(BaseMiddleware):
             middleware = ServiceMiddleware()
             dispatcher.message.outer_middleware(middleware)
             logger.info(
-                f"service middleware: ✅ {TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'SERVICE_GROUP_ID'})}")
+                f"logging middleware: ✅ {TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'SERVICE_GROUP_ID'})}")
         else:
-            logger.info(f"service middleware: 💤")
+            logger.info(f"logging middleware: 💤")
 
 
 class ErrorsMiddleware(BaseMiddleware):

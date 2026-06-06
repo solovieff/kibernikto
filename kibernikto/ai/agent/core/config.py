@@ -17,7 +17,7 @@ class AgentKiberniktoSettings(BaseSettings):
         description="API provider type"
     )
     HISTORY_SIZE: int = Field(default=6, description="History size")
-    MODEL_NAME: str = Field(default="anthropic/claude-sonnet-4-5", description="Model name")
+    MODEL_NAME: str = Field(default="anthropic/claude-sonnet-4.6", description="Model name")
     MODEL_MAX_TOKENS: int = Field(default=760, description="Model max tokens")
     MODEL_TEMPERATURE: float = Field(default=0.7, description="Model temperature")
     MODEL_PARALLEL_TOOL_CALLS: bool = Field(default=True, description="Parallel tool calls")

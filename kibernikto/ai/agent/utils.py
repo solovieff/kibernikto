@@ -16,6 +16,9 @@ def infer_kibernikto_model(
     if provider_name == 'vsegpt':
         provider = vse_gpt_provider()
         model = OpenAIChatModel(model_name, provider=provider)
+    elif provider_name == 'routerai':
+        provider = vse_gpt_provider()
+        model = OpenAIChatModel(model_name, provider=provider)
     elif provider_name == 'openrouter':
         provider = openrouter_provider()
         model_settings = OpenRouterModelSettings(openrouter_reasoning=OpenRouterReasoning(effort='medium'))
@@ -31,6 +34,14 @@ def vse_gpt_provider() -> OpenAIProvider:
         'VSEGPT_API_KEY environment variable is not set. '
     )
     return OpenAIProvider(base_url='https://api.vsegpt.ru:7090/v1', api_key=vsegpt_key)
+
+
+def routerai_provider() -> OpenAIProvider:
+    routerai_key = getenv('ROUTERAI_API_KEY')
+    assert routerai_key is not None, (
+        'ROUTER_AI_KEY environment variable is not set. '
+    )
+    return OpenAIProvider(base_url='https://routerai.ru/api/v1', api_key=routerai_key)
 
 
 def openrouter_provider() -> OpenRouterProvider:
