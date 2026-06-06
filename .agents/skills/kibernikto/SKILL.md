@@ -163,15 +163,10 @@ async def get_time(ctx: RunContext) -> str:
     """Return current server time."""
     from datetime import datetime
     return datetime.now().isoformat()
-
-
-# Reuse the singleton's history storage so my_agent shares conversations with the bot.
-my_agent.run = my_agent.run.__class__(my_agent)  # see KiberniktoAgent.run for the pattern
 ```
 
-The `KiberniktoAgent.run` override is the only custom behaviour — it pulls
-`message_history` from `history_storage` by `chat_id` and pushes `new_messages()` back. Reuse
-`history_storage` (singleton) when you want conversations shared across agents.
+Both `my_agent` and `kibernikto_agent` share the module-level `history_storage` singleton — no extra
+wiring needed.
 
 ### Subclass `TelegramAgent` to customise the bot
 
@@ -227,7 +222,7 @@ via `--env_file_path`) to override defaults. See [Configuration](./references/CO
 APP_INSTANCE_NAME=my-kibernikto
 APP_URL=https://my.site
 AGENT_KIBERNIKTO_PROVIDER_TYPE=openrouter
-AGENT_KIBERNIKTO_MODEL_NAME=anthropic/claude-sonnet-4.5
+AGENT_KIBERNIKTO_MODEL_NAME=openrouter:anthropic/claude-sonnet-4-5
 AGENT_KIBERNIKTO_MODEL_MAX_TOKENS=760
 AGENT_KIBERNIKTO_MODEL_TEMPERATURE=0.7
 AGENT_KIBERNIKTO_HISTORY_SIZE=6
@@ -311,10 +306,10 @@ multiple areas.
 - **Telegram Stars subscription period is hard-coded** to 30 days
   (`DEFAULT_SUBSCRIPTION_PERIOD = 2592000` in `kibernikto/telegram/payment/payment_utils.py`).
   Change it together with the display copy in `SubscriptionMiddleware.get_payment_keyboard`.
-- **`PreprocessorSettings.TRANSCRIBE_*` is not under a prefix** in
-  `kibernikto/telegram/pre_processors/_default.py` — it reads
-  `TRANSCRIBE_OPENAI_API_KEY` etc. directly, while the env example uses both `VOICE_*` and
-  `TRANSCRIBE_*` names. Check which one is loaded before changing defaults.
+- **`PreprocessorSettings` prefix is `TRANSCRIBE_`** (not `TG_` or `VOICE_`). All
+  transcription-related env vars must be named `TRANSCRIBE_OPENAI_API_KEY`, `TRANSCRIBE_PROCESSOR`,
+  etc. Double-check if your `.env` file uses any legacy `VOICE_*` names — they will be silently
+  ignored.
 - **`pydantic-ai==1.106.0` is pinned exactly** in `pyproject.toml`. Don't bump it without testing
   the `KiberniktoAgent.run` override — pydantic-ai's `AgentRunResult.new_messages()` signature has
   shifted across versions.
