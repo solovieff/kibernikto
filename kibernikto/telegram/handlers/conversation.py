@@ -13,26 +13,24 @@ conversation_router = Router(name="conversation_router")
 
 
 async def _process_and_reply(message: Message) -> None:
-    """
-    Delegate the whole "Telegram message → agent → Telegram reply" loop to
-    the currently active :class:`TelegramAgent`.
+    """Run the active agent on ``message`` and send its reply.
 
-    Looking the agent up via ``_agent_module`` (not the imported name) means
-    that calls to :func:`set_telegram_agent` are picked up at runtime — the
-    bot can be reconfigured with a subclass without restarting Python.
+    The agent is resolved via ``_agent_module`` (not the imported name) so
+    that :func:`set_telegram_agent` is honoured at runtime without a restart.
+    A single "typing…" action is shown; Telegram keeps it up until the answer
+    arrives, so there is no need to refresh it on a loop.
     """
-    result = await _agent_module.kibernikto_telegram_agent.process_message(message)
-    if result is None:
-        return
-    await _agent_module.kibernikto_telegram_agent.reply_to(message, result)
+    agent = _agent_module.kibernikto_telegram_agent
+
+    await message.bot.send_chat_action(message.chat.id, "typing")
+    result = await agent.process_message(message)
+    await agent.reply_to(message, result)
 
 
 @conversation_router.message(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/'), ~F.caption.startswith('/'))
 async def handle_private_message(message: Message):
-    """Handle private messages with access control."""
-    user_id = message.from_user.id
-    logger.info(f"Processing private message from user {user_id}")
-
+    """Handle private messages."""
+    logger.info(f"Processing private message from user {message.from_user.id}")
     await _process_and_reply(message)
 
 
@@ -40,9 +38,7 @@ async def handle_private_message(message: Message):
                                     ~F.caption.startswith('/'))
 async def handle_edited_message(message: Message):
     """Handle edited private messages."""
-    user_id = message.from_user.id
-    logger.info(f"Processing edited private message from user {user_id}: {message.md_text}")
-
+    logger.info(f"Processing edited private message from user {message.from_user.id}: {message.md_text}")
     await _process_and_reply(message)
 
 
@@ -50,11 +46,9 @@ async def handle_edited_message(message: Message):
                              ~F.text.startswith('/'), ~F.caption.startswith('/'))
 async def handle_group_message(message: Message):
     """Handle group messages, reacting only when addressed or replied to."""
-    user_id = message.from_user.id
-    logger.info(f"Processing group message from user {user_id}: {message.text} in {message.chat.title}")
-
     if not should_react(message):
-        logger.debug(f"skipping message from {user_id} in {message.chat.title}")
+        logger.debug(f"skipping message from {message.from_user.id} in {message.chat.title}")
         return
 
+    logger.info(f"Processing group message from user {message.from_user.id} in {message.chat.title}")
     await _process_and_reply(message)

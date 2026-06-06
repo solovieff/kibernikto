@@ -1,7 +1,6 @@
-from typing import List
-
 from aiogram import types
 from aiogram.types import Message
+
 
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 
@@ -31,21 +30,22 @@ def group_allowed(message: types.Message):
         return message.chat.id in TELEGRAM_SETTINGS.FRIEND_GROUP_IDS
 
 
-def should_react(message: Message):
-    """
-    outer scope method to be used to understand if this instance should process the message
-    :param message_text:
-    :return:
+def should_react(message: Message) -> bool:
+    """Decide whether this bot should respond to ``message`` in a group.
+
+    Reacts when the message replies to the bot or mentions any of the
+    configured reaction calls (including the bot's own name and @username).
     """
     from kibernikto.telegram.runner import bot_me
-    from telegram.utils.conversation import is_reply, get_message_text
-    calls: List[str] = [] + TELEGRAM_SETTINGS.REACTION_CALLS
-    calls.append(bot_me.full_name)
-    calls.append(f"@{bot_me.username}")
+    from kibernikto.telegram.utils.conversation import is_reply, get_message_text
+
     message_text = get_message_text(message)
     if not message_text:
         return False
 
-    call_to_react = any(word.lower() in message_text.lower() for word in calls)
+    calls = [*TELEGRAM_SETTINGS.REACTION_CALLS, bot_me.full_name, f"@{bot_me.username}"]
+    haystack = message_text.lower()
+    mentioned = any(call.lower() in haystack for call in calls)
 
-    return is_reply(message) or call_to_react
+    return is_reply(message) or mentioned
+
