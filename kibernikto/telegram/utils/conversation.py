@@ -61,9 +61,10 @@ async def reply(
 
     ``content`` may be a plain ``str`` (the legacy path used by the firewall
     middleware) or an :class:`pydantic_ai.AgentRunResult`. In the latter case
-    the model's text is sent together with every image and file the model
-    generated. ``file_attachment`` / ``image_attachment`` keep the legacy
-    document/photo shortcuts working.
+    the model's text is sent together with every image and file present in the
+    response — including binaries that tools produced, which ``KiberniktoAgent``
+    folds into the response as ``FilePart``s. ``file_attachment`` /
+    ``image_attachment`` keep the legacy document/photo shortcuts working.
 
     Returns the text that was sent (empty when only media was delivered).
     """
@@ -99,7 +100,6 @@ class _Payload:
             return cls()
         if isinstance(content, str):
             return cls(text=content)
-
         response = getattr(content, "response", None)
         return cls(
             text=getattr(content, "output", "") or "",
@@ -136,13 +136,21 @@ async def _send_media(message: Message, payload: _Payload) -> str:
     else (multiple binaries, or non-image files) goes out as a media group,
     which has no shared caption — so the caption is sent as a separate text
     message first.
+
+    ``payload.images`` is filtered by pydantic_ai via ``isinstance(_, BinaryImage)``,
+    so a plain ``BinaryContent`` with an image media type never lands there.
+    We split the combined media into photos / others by media kind so the
+    image is delivered as a photo even if it didn't get narrowed upstream.
     """
     caption = payload.caption
-    media = payload.images + payload.files
+    combined = payload.images + payload.files
+    images = [b for b in combined if _media_kind(b) == "photo"]
+    others = [b for b in combined if _media_kind(b) != "photo"]
+    media = images + others
 
-    if len(media) == 1 and payload.images:
+    if len(media) == 1 and images:
         try:
-            await message.reply_photo(photo=_as_input_file(media[0]), caption=caption or None)
+            await message.reply_photo(photo=_as_input_file(images[0]), caption=caption or None)
         except Exception as error:
             logger.error(f"Failed to send generated image: {error}")
             if caption:
@@ -193,7 +201,6 @@ def _media_kind(content: "BinaryContent") -> str:
 
 
 def _as_input_file(content: "BinaryContent") -> BufferedInputFile:
-
     return BufferedInputFile(file=content.data, filename=_filename_for(content))
 
 
