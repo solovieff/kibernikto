@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 class TelegramSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='TG_')
     BOT_KEY: str | None = None
-    MASTER_ID: int = Field(default=199740245, description="Main admin tg id")
-    MASTER_IDS: List[int] = [199740245]
+    MASTER_ID: int = Field(default=199740245, description="Primary admin Telegram user id")
+    MASTER_IDS: List[int] = Field(default=[], description="Additional admin user ids (TG_MASTER_ID is always checked separately)")
     PUBLIC: bool = Field(default=True, description="If everyone can talk privately")
     FRIEND_GROUP_IDS: List[int] | None = Field(default=None, description="If present only these groups are allowed")
     PRIVILEGED_USERS: List[int] | None = Field(default=None, description="Special user ids")

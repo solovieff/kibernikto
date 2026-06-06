@@ -8,7 +8,6 @@ from typing import List, Optional, Union, TYPE_CHECKING
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import (
-    FSInputFile,
     InputMediaAudio,
     InputMediaDocument,
     InputMediaPhoto,
@@ -37,7 +36,7 @@ _MEDIA_CLASSES = {
 }
 
 
-async def send_random_sticker(chat_id: int, sticker_list: List[str], bot: Bot):
+async def send_random_sticker(chat_id: int, sticker_list: List[str], bot: Bot) -> None:
     await bot.send_sticker(sticker=choice(sticker_list), chat_id=chat_id)
 
 
@@ -54,26 +53,18 @@ def get_message_text(message: Message) -> Optional[str]:
 async def reply(
         message: Message,
         content: Union[str, "AgentRunResult", None] = None,
-        file_attachment: Optional[FSInputFile] = None,
-        image_attachment: Optional[FSInputFile] = None,
 ) -> str:
-    """Reply to a Telegram message with text and any attachments.
+    """Reply to a Telegram message with text and any tool-produced media.
 
-    ``content`` may be a plain ``str`` (the legacy path used by the firewall
-    middleware) or an :class:`pydantic_ai.AgentRunResult`. In the latter case
-    the model's text is sent together with every image and file present in the
-    response — including binaries that tools produced, which ``KiberniktoAgent``
-    folds into the response as ``FilePart``s. ``file_attachment`` /
-    ``image_attachment`` keep the legacy document/photo shortcuts working.
+    ``content`` may be a plain ``str`` (e.g. used by access-denied messages) or
+    an :class:`pydantic_ai.AgentRunResult`. In the latter case the model's text
+    is sent together with every image and file present in the response — including
+    binaries that tools produced, which ``KiberniktoAgent`` folds into the
+    response as ``FilePart``s.
 
-    Returns the text that was sent (empty when only media was delivered).
+    Returns the text portion that was sent (empty string when only media was delivered).
     """
     payload = _Payload.of(content)
-
-    if file_attachment or image_attachment:
-        return await _send_legacy_attachments(
-            message, payload.caption, file_attachment, image_attachment
-        )
 
     if payload.has_media:
         return await _send_media(message, payload)
@@ -82,9 +73,7 @@ async def reply(
     return payload.text
 
 
-# ─────────────────────────────────────────────────────────────────────
-#  Internals
-# ─────────────────────────────────────────────────────────────────────
+# ── Internals ─────────────────────────────────────────────────────────────────
 
 @dataclass
 class _Payload:
@@ -116,19 +105,6 @@ class _Payload:
         return bool(self.images or self.files)
 
 
-async def _send_legacy_attachments(
-        message: Message,
-        caption: str,
-        file_attachment: Optional[FSInputFile],
-        image_attachment: Optional[FSInputFile],
-) -> str:
-    if file_attachment:
-        await message.reply_document(document=file_attachment, caption=caption)
-    if image_attachment:
-        await message.reply_photo(photo=image_attachment, caption=caption)
-    return caption
-
-
 async def _send_media(message: Message, payload: _Payload) -> str:
     """Send generated media, carrying the caption where Telegram allows it.
 
@@ -152,7 +128,7 @@ async def _send_media(message: Message, payload: _Payload) -> str:
         try:
             await message.reply_photo(photo=_as_input_file(images[0]), caption=caption or None)
         except Exception as error:
-            logger.error(f"Failed to send generated image: {error}")
+            logger.error("Failed to send generated image: %s", error)
             if caption:
                 await _send_text(message, caption)
         return caption
@@ -165,7 +141,7 @@ async def _send_media(message: Message, payload: _Payload) -> str:
         try:
             await message.answer_media_group(media=group)
         except Exception as error:
-            logger.error(f"Failed to send media group: {error}")
+            logger.error("Failed to send media group: %s", error)
             await message.reply("[attachment delivery failed]")
     return caption
 
@@ -174,23 +150,22 @@ async def _send_text(message: Message, text: str) -> None:
     """Send text, chunked to Telegram's limit, with a plain-text fallback."""
     if not text:
         return
-
     for chunk in split_text_by_sentences(text, MAX_MESSAGE_LENGTH):
         try:
             await message.reply(text=prepare_for_MARKDOWN(chunk), parse_mode=ParseMode.MARKDOWN)
         except Exception as error:
-            logger.error(f"Error sending formatted message: {error}")
-            logger.debug(f"Problematic chunk: {chunk}")
+            logger.error("Error sending formatted message: %s", error)
+            logger.debug("Problematic chunk: %s", chunk)
             await message.reply(text=clear_text_format(chunk))
 
 
 def _non_image_files(files: List["BinaryContent"]) -> List["BinaryContent"]:
-    """Drop image-like binaries; those are delivered as photos, not files."""
+    """Drop image-like binaries — those are delivered as photos, not documents."""
     return [binary for binary in files if _media_kind(binary) != "photo"]
 
 
 def _media_kind(content: "BinaryContent") -> str:
-    """Map a pydantic_ai BinaryContent to an aiogram media-group kind."""
+    """Map a pydantic_ai ``BinaryContent`` to an aiogram media-group kind."""
     if content.is_audio:
         return "audio"
     if content.is_video:

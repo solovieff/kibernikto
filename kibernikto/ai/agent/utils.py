@@ -8,41 +8,73 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from kibernikto.config import APP_SETTINGS
 
-
-def infer_kibernikto_model(
-        model: str
-) -> Model:
-    provider_name, model_name = model.split(':', maxsplit=1)
-    if provider_name == 'vsegpt':
-        provider = vse_gpt_provider()
-        model = OpenAIChatModel(model_name, provider=provider)
-    elif provider_name == 'routerai':
-        provider = vse_gpt_provider()
-        model = OpenAIChatModel(model_name, provider=provider)
-    elif provider_name == 'openrouter':
-        provider = openrouter_provider()
-        model_settings = OpenRouterModelSettings(openrouter_reasoning=OpenRouterReasoning(effort='medium'))
-        model = OpenRouterModel(model_name, provider=provider, settings=model_settings)
-    else:
-        model = infer_model(model=model)
-    return model
+_KNOWN_PREFIXES = {"vsegpt", "routerai", "openrouter"}
 
 
-def vse_gpt_provider() -> OpenAIProvider:
-    vsegpt_key = getenv('VSEGPT_API_KEY')
-    assert vsegpt_key is not None, (
-        'VSEGPT_API_KEY environment variable is not set. '
-    )
-    return OpenAIProvider(base_url='https://api.vsegpt.ru:7090/v1', api_key=vsegpt_key)
+class RouterAiProvider(OpenAIProvider):
+    """routerai — OpenAI-compatible provider with an identifiable .name."""
+
+    @property
+    def name(self) -> str:
+        return "routerai"
 
 
-def routerai_provider() -> OpenAIProvider:
-    routerai_key = getenv('ROUTERAI_API_KEY')
-    assert routerai_key is not None, (
-        'ROUTER_AI_KEY environment variable is not set. '
-    )
-    return OpenAIProvider(base_url='https://routerai.ru/api/v1', api_key=routerai_key)
+def infer_kibernikto_model(model: str | None) -> Model | None:
+    """Resolve a provider-prefixed model string to a pydantic-ai Model.
+
+    Returns ``None`` when ``model`` is ``None`` or empty — callers that only
+    use the model optionally (e.g. image generation) must guard the result.
+
+    Supported prefixes:
+      * ``vsegpt:<name>``     — OpenAI-compatible via vsegpt.ru
+      * ``routerai:<name>``   — OpenAI-compatible via routerai.ru
+      * ``openrouter:<name>`` — OpenRouter with medium reasoning effort
+      * anything else         — delegated to ``pydantic_ai.infer_model``
+
+    Raises ``ValueError`` when the string is non-empty but has no ``:`` separator
+    (which would otherwise produce a confusing ``ValueError`` from ``split``).
+    """
+    if not model:
+        return None
+
+    if ":" not in model:
+        raise ValueError(
+            f"Model name {model!r} has no provider prefix.  "
+            f"Use one of: {', '.join(_KNOWN_PREFIXES)} or any pydantic-ai model string like 'openai:gpt-4o'."
+        )
+
+    provider_name, model_name = model.split(":", maxsplit=1)
+
+    if provider_name == "vsegpt":
+        return OpenAIChatModel(model_name, provider=_vse_gpt_provider())
+    if provider_name == "routerai":
+        return OpenAIChatModel(model_name, provider=_routerai_provider())
+    if provider_name == "openrouter":
+        settings = OpenRouterModelSettings(openrouter_reasoning=OpenRouterReasoning(effort="medium"))
+        return OpenRouterModel(model_name, provider=_openrouter_provider(), settings=settings)
+
+    return infer_model(model=model)
 
 
-def openrouter_provider() -> OpenRouterProvider:
+# ── Private provider factories ────────────────────────────────────────────────
+
+def _vse_gpt_provider() -> OpenAIProvider:
+    key = getenv("VSEGPT_API_KEY")
+    assert key, "VSEGPT_API_KEY environment variable is not set."
+    return OpenAIProvider(base_url="https://api.vsegpt.ru:7090/v1", api_key=key)
+
+
+def _routerai_provider() -> RouterAiProvider:
+    key = getenv("ROUTERAI_API_KEY")
+    assert key, "ROUTERAI_API_KEY environment variable is not set."
+    return RouterAiProvider(base_url="https://routerai.ru/api/v1", api_key=key)
+
+
+def _openrouter_provider() -> OpenRouterProvider:
     return OpenRouterProvider(app_url=APP_SETTINGS.URL, app_title=APP_SETTINGS.INSTANCE_NAME)
+
+
+# ── Public aliases (kept for backwards-compat) ────────────────────────────────
+vse_gpt_provider = _vse_gpt_provider
+routerai_provider = _routerai_provider
+openrouter_provider = _openrouter_provider

@@ -2,9 +2,9 @@ import asyncio
 import logging
 from typing import Dict, Any, Callable, Awaitable
 
-from aiogram import BaseMiddleware, Dispatcher
-from aiogram import enums, Bot, Router
-from aiogram.types import Message
+from aiogram import BaseMiddleware, Dispatcher, Bot
+from aiogram import enums
+from aiogram.types import ErrorEvent, Message
 
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.utils.permissions import is_from_admin
@@ -14,72 +14,93 @@ logger = logging.getLogger(__name__)
 
 
 class ServiceMiddleware(BaseMiddleware):
+    """Forward every non-admin private message to the configured service group."""
+
     def __init__(self) -> None:
         self.service_group_id = TELEGRAM_SETTINGS.SERVICE_GROUP_ID
         if not self.service_group_id:
-            raise EnvironmentError('Telegram Service Group ID not set')
+            raise EnvironmentError("Telegram SERVICE_GROUP_ID is not set.")
 
     async def __call__(
             self,
             handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
             event: Message,
-            data: Dict[str, Any]
+            data: Dict[str, Any],
     ) -> Any:
-        message: Message = get_event_message(event)
+        message: Message | None = get_event_message(event)
         if message and message.chat.type == enums.ChatType.PRIVATE:
-            asyncio.create_task(self.forward_message_service_group(message))
+            asyncio.create_task(self._forward(message))
         return await handler(event, data)
 
-    async def forward_message_service_group(self, message: Message) -> None:
+    async def _forward(self, message: Message) -> None:
+        if is_from_admin(message):
+            return  # skip admin messages — service group is for monitoring users
         try:
-            if not is_from_admin(message) or 1 == 1: # FIXME DEBUG
-                await message.forward(chat_id=self.service_group_id)
-        except Exception as e:
-            logger.exception(f"failed to send service message {e}", exc_info=True)
+            await message.forward(chat_id=self.service_group_id)
+        except Exception as exc:
+            logger.exception("Failed to forward service message: %s", exc)
 
     @staticmethod
-    def apply_if_needed(dispatcher: Dispatcher):
+    def apply_if_needed(dispatcher: Dispatcher) -> None:
         if TELEGRAM_SETTINGS.SERVICE_GROUP_ID is not None:
-            middleware = ServiceMiddleware()
-            dispatcher.message.outer_middleware(middleware)
+            dispatcher.message.outer_middleware(ServiceMiddleware())
             logger.info(
-                f"logging middleware: ✅ {TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'SERVICE_GROUP_ID'})}")
+                "service middleware: ✅ %s",
+                TELEGRAM_SETTINGS.model_dump_json(indent=2, include={"SERVICE_GROUP_ID"}),
+            )
         else:
-            logger.info(f"logging middleware: 💤")
+            logger.info("service middleware: 💤")
 
 
 class ErrorsMiddleware(BaseMiddleware):
+    """Send a brief error report to the service group on any unhandled exception.
+
+    Registered on ``dispatcher.error``, so ``event`` is an ``ErrorEvent``
+    with ``.update`` (the original aiogram ``Update``) and ``.exception``.
+    """
+
     def __init__(self) -> None:
         self.service_group_id = TELEGRAM_SETTINGS.SERVICE_GROUP_ID
         if not self.service_group_id:
-            raise EnvironmentError('Telegram Service Group ID not set')
+            raise EnvironmentError("Telegram SERVICE_GROUP_ID is not set.")
 
     async def __call__(
             self,
-            handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
-            event: Message,
-            data: Dict[str, Any]
+            handler: Callable[[ErrorEvent, Dict[str, Any]], Awaitable[Any]],
+            event: ErrorEvent,
+            data: Dict[str, Any],
     ) -> Any:
-        user_message: Message = get_event_message(event)
-        if not user_message:
-            return await handler(event, data)
+        # First let the default error handler run.
+        result = await handler(event, data)
 
-        service_message = f"🔥🔥🔥 {user_message.from_user.username} {user_message.content_type}: {user_message.md_text} {event.exception}"
-        asyncio.create_task(self.send_message_to_service_group(bot=user_message.bot, service_message=service_message))
+        # Then try to report to the service group asynchronously.
+        user_message: Message | None = get_event_message(event.update)
+        if user_message:
+            asyncio.create_task(
+                self._report(bot=user_message.bot, user_message=user_message, exc=event.exception)
+            )
 
-        return await handler(event, data)
+        return result
 
-    async def send_message_to_service_group(self, bot: Bot, service_message: str) -> None:
+    async def _report(self, bot: Bot, user_message: Message, exc: BaseException) -> None:
+        username = getattr(user_message.from_user, "username", "unknown") or "unknown"
+        text = (
+            f"🔥 {username} | {user_message.content_type}\n"
+            f"{user_message.md_text or ''}\n"
+            f"<{type(exc).__name__}: {exc}>"
+        )
         try:
-            await bot.send_message(self.service_group_id, service_message)
-        except Exception as e:
-            logger.exception(f"failed to send service message {e}", exc_info=True)
+            await bot.send_message(self.service_group_id, text)
+        except Exception as send_exc:
+            logger.exception("Failed to send error report to service group: %s", send_exc)
 
     @staticmethod
-    def apply_if_needed(dispatcher: Dispatcher):
+    def apply_if_needed(dispatcher: Dispatcher) -> None:
         if TELEGRAM_SETTINGS.SERVICE_GROUP_ID is not None:
             dispatcher.error.outer_middleware(ErrorsMiddleware())
             logger.info(
-                f"error middleware: ✅ {TELEGRAM_SETTINGS.model_dump_json(indent=2, include={'SERVICE_GROUP_ID'})}")
+                "error middleware: ✅ %s",
+                TELEGRAM_SETTINGS.model_dump_json(indent=2, include={"SERVICE_GROUP_ID"}),
+            )
         else:
-            logger.info(f"error middleware: 💤")
+            logger.info("error middleware: 💤")

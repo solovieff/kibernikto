@@ -79,11 +79,12 @@ class SubscriptionMiddleware(BaseMiddleware):
         payment_link_max = await create_payment_link(bot, SUBSCRIPTION_SETTINGS.RICH_CREDITS,
                                                      descr="Make a payment to enjoy my unmatched power!")
 
-        keyboard = InlineKeyboardMarkup(row_width=1, inline_keyboard=[
-            [InlineKeyboardButton(text="||", url=payment_link_base),
-             InlineKeyboardButton(text="|||", url=payment_link_medium),
-             InlineKeyboardButton(text="|||||", url=payment_link_max)
-             ]
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="||", url=payment_link_base),
+                InlineKeyboardButton(text="|||", url=payment_link_medium),
+                InlineKeyboardButton(text="|||||", url=payment_link_max),
+            ]
         ])
         return keyboard
 
