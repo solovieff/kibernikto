@@ -375,7 +375,8 @@ class OpenAIExecutor:
                                                   role=OpenAIRoles.assistant.value)
                 tool_call_messages.append(prem_response_message_dict)
             return await self.process_tool_calls(choice, None, iteration=iteration + 1,
-                                                 recursive_results=tool_call_messages, save_to_history=save_to_history)
+                                                 recursive_results=tool_call_messages, save_to_history=save_to_history,
+                                                 call_session_id=call_session_id)
         elif response_message.content:
             return response_message.content
         else:
