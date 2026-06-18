@@ -43,6 +43,7 @@ class OpenAiExecutorConfig(BaseModel):
     hide_errors: bool = False
     app_id: str = AI_SETTINGS.OPENAI_INSTANCE_ID
     tools_with_history: bool = True
+    parallel_tool_call: bool = False
 
 
 DEFAULT_CONFIG = OpenAiExecutorConfig()
@@ -352,7 +353,7 @@ class OpenAIExecutor:
             prompt.append(message_dict)
 
         tool_call_messages = await run_tool_calls(choice=choice, available_tools=self.tools, unique_id=self.unique_id,
-                                                  call_session_id=call_session_id)
+                                                  call_session_id=call_session_id, parallel=self.full_config.parallel_tool_call)
 
         choice, usage = await self._run_for_messages(
             full_prompt=[self.get_cur_system_message()] + prompt + tool_call_messages)
