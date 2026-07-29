@@ -2,12 +2,12 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from aiogram.enums import ChatType
 from aiogram.types import Message
-from pydantic_ai import AgentRunResult, ModelHTTPError, WebSearchTool
+from pydantic_ai import AgentRunResult, ModelHTTPError
 from pydantic_ai.capabilities import NativeTool
 
-
-from kibernikto.ai.agent import kibernikto_agent
+from kibernikto.ai.agent import kibernikto_agent, kibernikto_model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.image import generate_image
@@ -27,9 +27,14 @@ class TelegramDeps(KiberniktoDeps):
     react to the originating chat/user.
     """
 
-    message: Optional[Message] = None
+    is_personal: bool = True
     chat_id: Optional[int] = None
     user_id: Optional[int] = None
+    username: Optional[str] = None
+    user_full_name: Optional[str] = None
+    app_chat_info: Optional[str] = None
+    app_chat_name: Optional[str] = None
+    message: Optional[Message] = None
 
 
 class TelegramAgent(KiberniktoAgent):
@@ -72,9 +77,14 @@ class TelegramAgent(KiberniktoAgent):
         ``attachments`` are folded into the response by ``KiberniktoAgent.run``.
         """
         return TelegramDeps(
-            message=message,
+            is_personal=message.chat.type == ChatType.PRIVATE,
             chat_id=message.chat.id,
+            app_chat_info=message.chat.description,
+            app_chat_name=message.chat.title,
             user_id=message.from_user.id if message.from_user else None,
+            username=message.from_user.username if message.from_user else None,
+            user_full_name=message.from_user.full_name if message.from_user else None,
+            message=message,
         )
 
     async def process_message(self, message: Message) -> AgentRunResult | str | None:
@@ -112,11 +122,19 @@ class TelegramAgent(KiberniktoAgent):
         if result is not None:
             await reply(message, result)
 
+    def to_telegram(self):  # noqa: ANN201 — returns TelegramApp
+        """Build a runnable Telegram bot wired to this agent (``to_web`` analog).
+
+        Returns :class:`TelegramApp` — call ``.run_polling()`` to start.
+        """
+        from kibernikto.telegram.agent.telegram_app import TelegramApp
+        return TelegramApp.from_agent(self)
+
 
 #: Default agent used by the conversation handlers, built from the same
 #: env-derived config as the core ``kibernikto_agent`` singleton.
 kibernikto_telegram_agent: TelegramAgent = TelegramAgent(
-    model=kibernikto_agent.model,
+    model=kibernikto_model,
     model_settings=kibernikto_agent.model_settings,
     name=AGENT_KIBERNIKTO_SETTINGS.NAME,
     system_prompt=AGENT_KIBERNIKTO_SETTINGS.WHO_AM_I,

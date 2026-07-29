@@ -9,6 +9,7 @@ class AppSettings(BaseSettings):
     INSTANCE_NAME: str = 'kibernikto-app'
     URL: str = 'https://none.com'
     TAG_NAME: str = 'kibernikto'
+    FILESTORE_LOCATION: str = '~/.kibernikto'
 
 
 APP_SETTINGS = AppSettings()

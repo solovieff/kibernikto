@@ -4,7 +4,7 @@ from aiogram import Router, F, enums
 from aiogram.filters import or_f
 from aiogram.types import Message
 
-from kibernikto.telegram.agent import telegram_agent as _agent_module
+import kibernikto.ai.agent.telegram_agent as _agent_module
 from kibernikto.telegram.utils.permissions import should_react
 
 logger = logging.getLogger(__name__)

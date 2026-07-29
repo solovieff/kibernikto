@@ -2,11 +2,12 @@ from pydantic_ai import Agent, ModelSettings, AgentRunResult
 from pydantic_ai.messages import BinaryImage, FilePart
 from pydantic_ai.models import Model
 
+from typing import Optional
+
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
-from kibernikto.ai.agent.core.history import history_storage
+from kibernikto.ai.agent.core.history import MemoryHistoryStorage, history_storage
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-
 
 model: Model = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
 
@@ -17,16 +18,20 @@ model_settings: ModelSettings = ModelSettings(max_tokens=AGENT_KIBERNIKTO_SETTIN
 
 
 class KiberniktoAgent(Agent):
+    def __init__(self, *, history_storage: Optional[MemoryHistoryStorage] = history_storage, **kwargs):
+        super().__init__(**kwargs)
+        self._history_storage = history_storage
+
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
-        if chat_id is not None and 'message_history' not in kwargs:
-            kwargs['message_history'] = history_storage.get_conversation(chat_id)
+        if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:
+            kwargs['message_history'] = self._history_storage.get_conversation(chat_id)
 
         run_result: AgentRunResult = await super().run(*args, **kwargs)
 
         self._materialize_attachments(run_result, kwargs.get('deps'))
 
-        if chat_id is not None:
-            history_storage.add_messages(chat_id=chat_id, messages=run_result.new_messages())
+        if self._history_storage is not None and chat_id is not None:
+            self._history_storage.add_messages(chat_id=chat_id, messages=run_result.new_messages())
 
         return run_result
 

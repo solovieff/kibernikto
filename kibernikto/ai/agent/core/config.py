@@ -17,20 +17,28 @@ class AgentKiberniktoSettings(BaseSettings):
         description="API provider type"
     )
     HISTORY_SIZE: int = Field(default=6, description="History size")
-    MODEL_NAME: str = Field(default="openrouter:anthropic/claude-sonnet-4.6", description="Model name")
+    MODEL_NAME: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model name")
     IMAGE_MODEL_NAME: str | None = Field(
         default=None,
         description="Provider-prefixed model used by the image-generation sub-agent",
     )
 
-    MODEL_MAX_TOKENS: int = Field(default=760, description="Model max tokens")
-    MODEL_TEMPERATURE: float = Field(default=0.7, description="Model temperature")
+    MODEL_MAX_TOKENS: int = Field(default=1300, description="Model max tokens")
+    MODEL_TEMPERATURE: float = Field(default=0.3, description="Model temperature")
     MODEL_PARALLEL_TOOL_CALLS: bool = Field(default=True, description="Parallel tool calls")
     MODEL_MODALITIES: List[Literal['text', 'photo', 'audio']] = Field(
         default=['text'], description="Photo or audio modalities"
     )
 
     WHO_AM_I: str = Field(default=DEFAULT_SYSTEM_PROMPT, description="Who am I")
+
+    # Credits & model balancing for KiberniktoExtended
+    TRIAL_CREDITS: int = Field(default=260, description="Initial credits for a new user")
+    POOR_CREDITS: int = Field(default=30, description="Below this — poor model")
+    RICH_CREDITS: int = Field(default=500, description="Above this — rich model")
+    POOR_MODEL: str = Field(default="openrouter:google/gemini-2.5-flash", description="Model when credits are low")
+    MEDIUM_MODEL: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model when credits are medium")
+    RICH_MODEL: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model when credits are high")
 
 
 AGENT_KIBERNIKTO_SETTINGS = AgentKiberniktoSettings()

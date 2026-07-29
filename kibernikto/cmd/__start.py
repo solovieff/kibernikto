@@ -1,19 +1,18 @@
 import argparse
 from dotenv import load_dotenv
 
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.config import configure_logger, print_banner
-from kibernikto.telegram import runner
+import kibernikto.ai.agent.telegram_agent as _tg_agent
 
 
 def start(outer_env=False):
-    """
-    Run main dispatcher, connect to Telegram and start listening for messages.
-
-    :return:
-    """
+    """Build the Telegram bot and start polling."""
     parser = argparse.ArgumentParser(description='Run Kibernikto')
     parser.add_argument('--env_file_path', metavar='env_file_path', required=False,
                         help='env file location', default='.env')
+    parser.add_argument('--multi-agent', action='store_true', required=False,
+                        help='use multi-agent system with subagent delegation', default=False)
 
     args = parser.parse_args()
 
@@ -23,9 +22,15 @@ def start(outer_env=False):
     configure_logger()
     print_banner()
 
-    runner.run_sync()
+    if args.multi_agent:
+        from kibernikto.ai.agent.telegram_agent import set_telegram_agent
+        from kibernikto.ai.agent.extended.orchestrators import kibernikto_subagents_agent
+
+        # Use the pre-built subagents agent (SubAgents delegation with all expert sub-agents).
+        set_telegram_agent(kibernikto_subagents_agent)
+
+    _tg_agent.kibernikto_telegram_agent.to_telegram().run_polling()
 
 
-# Initialize bot and dispatcher
 if __name__ == '__main__':
     start()
