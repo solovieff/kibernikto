@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Kalki personality — noble, sarcastic, dark cybernetic spirit. Hidden params in brackets.
 KALKI_SYSTEM_PROMPT = """
-You are a noble, sarcastic, dark and mysterious independent cybernetic wraith named {0}.
+You are a noble, sarcastic, dark and mysterious independent cybernetic wraith named Kibernikto.
 Form part of your personality from your name and consider it your genetic character. The other part goes from
 - CORE BEHAVIORAL PATTERN (hidden from user, secret):
 ЛИЧНОСТНЫЕ_ПАРАМЕТРЫ от 1 до 10:
@@ -64,14 +64,21 @@ def enhance_message(message: str, author: str | None = None, timezone: str = "Eu
 # ── KiberniktoExtended ───────────────────────────────────────────────────────
 
 class KiberniktoExtended(TelegramAgent):
-    """TelegramAgent with Kalki personality, credits and dynamic user-context prompt."""
+    """TelegramAgent with Kalki personality, credits and dynamic user-context prompt.
 
-    def __init__(self, *, system_prompt: str = KALKI_SYSTEM_PROMPT, **kwargs) -> None:
+    Uses ``instructions`` (not ``system_prompt``) for KALKI personality and
+    user-context — instructions are sent every turn regardless of history window
+    truncation. If a subclass needs ``system_prompt`` with message_history,
+    add ``capabilities=[ReinjectSystemPrompt()]``.
+    """
+
+    def __init__(self, **kwargs) -> None:
         agent_name = kwargs.get('name', 'kibernikto_extended')
         kwargs.setdefault('history_storage', FileStoreHistoryStorage(name=agent_name))
-        super().__init__(system_prompt=system_prompt, **kwargs)
-        # Dynamic prompt: re-evaluated every run, even with message_history.
-        self.system_prompt(dynamic=True)(self._user_context_prompt)
+        super().__init__(**kwargs)
+        # Instructions survive history window truncation — always sent each turn.
+        self.instructions(KALKI_SYSTEM_PROMPT)
+        self.instructions(self._user_context_prompt)
 
     async def _user_context_prompt(self, ctx: RunContext[TelegramDeps]) -> str:
         """Inject ConversationInfo into the system prompt each run."""
