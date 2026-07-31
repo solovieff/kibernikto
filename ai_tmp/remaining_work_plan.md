@@ -40,12 +40,6 @@ Telegram-интеграция (`kibernikto/telegram/`): TelegramAgent, TelegramA
 
 **Файлы:** `kibernikto/telegram/pre_processors/_default.py`
 
-### 2. Уведомление о смене модели
-
-В `kibernikto_extended.py` только `logger.info`, а нужно сообщение пользователю: «Мои способности изменились вслед за вашим балансом».
-
-**Файлы:** `kibernikto/ai/agent/extended/kibernikto_extended.py`
-
 ### 3. prepare_request в ReportExpert
 
 В старом ReportExpert длинные запросы (>200 символов) сокращались через gpt-4o-mini до 1 предложения. В новом не реализовано.

@@ -24,7 +24,6 @@ Ready `aiogram` dispatcher with AI Executors connection and telegram message pro
 **Examples**
 
 ⚙️ [Environment](/env_examples/)  
-🔥 KiberniktoAgents (no Telegram): [demo](/kibernikto/agent/demo)   
 👵 Kibernikto tools usage with telegram bot
 connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search)
 

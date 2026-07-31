@@ -14,12 +14,13 @@ authors = [
 readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
-    "pydantic-ai==1.106.0",
-    "logfire==4.18.0",
-    "aiogram>=3.24.0",
+    "pydantic-ai==2.13.0",
+    "logfire==4.38.0",
+    "aiogram>=3.30.0",
     "aiofiles>=24.1.0",
     "certifi>=2026.1.4",
     "python-dotenv>=1.2.2",
+    "pydantic-ai-harness[dynamic-workflow]>=0.7.1",
 ]
 
 [project.urls]

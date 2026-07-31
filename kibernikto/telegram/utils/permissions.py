@@ -36,7 +36,7 @@ def should_react(message: Message) -> bool:
     Reacts when the message replies to the bot or mentions any of the
     configured reaction calls (including the bot's own name and @username).
     """
-    from kibernikto.telegram.runner import bot_me
+    from kibernikto.telegram.agent.telegram_app import bot_me
     from kibernikto.telegram.utils.conversation import is_reply, get_message_text
 
     message_text = get_message_text(message)

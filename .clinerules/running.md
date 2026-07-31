@@ -1,2 +1,2 @@
-Write code as an expert top level senior mega cto developer. Cold and effective pro. One line good comments!
-Do not forget to use existing skills!
+Do not run code much, only basic checks.
+However if you want to run the code/tests very much, first find out in .idea/runConfigurations
