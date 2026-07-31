@@ -38,7 +38,7 @@ Telegram-интеграция (`kibernikto/telegram/`): TelegramAgent, TelegramA
 - `storage/file/media.py` — `MediaFileStore`: durable `media/{chat_id}/`, транзит `tmp/`, реестр генераций `generated.json`
 - `storage/file/history.py` — `_sanitize`: история больше не хранит бинарники (`FilePart`) и подписи (`ThinkingPart.signature`) — на диске и в памяти
 - `utils/image_hosting.py` — `ImageHosting` (ABC) + `ImgbbImageHosting`, выбор по `IMAGE_HOSTING_PROVIDER`; `utils/image.py` — compat shim
-- Генерации бота: локальная копия в `media/` + публикация на imgbb + URL в реестре; на следующем ходе последний URL подмешивается в user-контент (`_with_generated_context`) — модель «видит» свою прошлую генерацию без хранения байтов
+- Генерации бота: локальная копия в `media/` + публикация на imgbb + URL в реестре; в копию финального ответа для истории дописывается TextPart с URL (`_annotate_generation`) — модель «видит» свою прошлую генерацию в собственном ответе (провайдер фетчит URL из текста), без хранения байтов
 - imgbb TTL: `IMAGE_STORAGE_EXPIRATION` (секунды), по умолчанию 0 = без TTL
 - Фото пользователя: durable-копия в `media/` (ключ — Telegram `file_unique_id`)
 - Голос: транзит через `{FILESTORE}/tmp/` с очисткой после транскрипции

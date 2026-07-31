@@ -1,9 +1,10 @@
+import dataclasses
 import logging
 import uuid
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic_ai import Agent, ModelSettings, AgentRunResult
-from pydantic_ai.messages import BinaryImage, FilePart, ImageUrl
+from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
@@ -31,49 +32,56 @@ class KiberniktoAgent(Agent):
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
         if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:
             kwargs['message_history'] = self._history_storage.get_conversation(chat_id)
-            # Honest dialogue: let the model re-see its last generation on later turns.
-            if args:
-                args = (self._with_generated_context(chat_id, args[0]), *args[1:])
 
         run_result: AgentRunResult = await super().run(*args, **kwargs)
 
         self._materialize_attachments(run_result, kwargs.get('deps'))
 
+        messages = run_result.new_messages()
         if chat_id is not None:
-            await self._persist_generated_images(run_result, chat_id)
+            published = await self._persist_generated_images(run_result, chat_id)
+            # The model sees its generation in its own response: append the
+            # public URL as a TextPart to the history copy. The live response
+            # stays untouched so the user doesn't see the note; providers that
+            # fetch URLs from text will let the model re-see the image.
+            if published:
+                messages = self._annotate_generation(messages, published)
 
         if self._history_storage is not None and chat_id is not None:
-            self._history_storage.add_messages(chat_id=chat_id, messages=run_result.new_messages())
+            self._history_storage.add_messages(chat_id=chat_id, messages=messages)
 
         return run_result
 
     @staticmethod
-    def _with_generated_context(chat_id: int, user_content: Any) -> Any:
-        """Append the most recent generated image URL to the user content.
+    def _annotate_generation(messages: list[ModelMessage], urls: list[str]) -> list[ModelMessage]:
+        """Append a ``TextPart`` with the published URLs to the final response.
 
-        Generated images are delivered to the user but stripped from the
-        persisted history (they'd bloat it as base64), so on the next turn we
-        re-inject the latest one as an ``ImageUrl`` — the provider fetches it
-        itself, keeping the dialogue honest without storing bytes.
+        ``ImageUrl`` can only live in request parts in pydantic-ai's schema, so
+        the URL is recorded as plain text inside the model's own response —
+        semantically correct, and the model can fetch it on later turns.
         """
-        urls = media_store.last_generated(chat_id)
-        if not urls:
-            return user_content
-        images: list[ImageUrl] = [ImageUrl(url=urls[-1])]
-        if isinstance(user_content, str):
-            return [user_content, *images]
-        if isinstance(user_content, list):
-            return [*user_content, *images]
-        return user_content
+        text = "[Bot generated " + ("an image" if len(urls) == 1 else f"{len(urls)} images") + "]: " + ", ".join(urls)
+        last_response = next(
+            (i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], ModelResponse)),
+            None,
+        )
+        if last_response is None:
+            return messages
+        result = list(messages)
+        response = result[last_response]
+        result[last_response] = dataclasses.replace(response, parts=[*response.parts, TextPart(content=text)])
+        return result
 
     @staticmethod
-    async def _persist_generated_images(run_result: AgentRunResult, chat_id: int) -> None:
+    async def _persist_generated_images(run_result: AgentRunResult, chat_id: int) -> list[str]:
         """Keep generated binaries out of history: durable copy + public URL.
 
         The ``FilePart`` stays in ``run_result.response`` for delivery; here we
         archive the bytes locally and publish a public URL so the model can
-        re-see the image on later turns (see :meth:`_with_generated_context`).
+        re-see the image on later turns (see :meth:`_generation_marker`).
+        Returns the published URLs.
         """
+        urls: list[str] = []
         for image in run_result.response.images:
             ext = (image.media_type or "image/png").split("/")[-1].split(";")[0] or "png"
             try:
@@ -84,8 +92,10 @@ class KiberniktoAgent(Agent):
                 url = await image_hosting.publish(image.data, f"kibernikto-{uuid.uuid4().hex[:8]}.{ext}")
                 if url:
                     media_store.remember_generated(chat_id, url)
+                    urls.append(url)
             except Exception as exc:
                 logger.warning("Failed to publish generated image for chat %s: %s", chat_id, exc)
+        return urls
 
     @staticmethod
     def _materialize_attachments(run_result: AgentRunResult, deps) -> None:
