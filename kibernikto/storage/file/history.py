@@ -1,9 +1,10 @@
+import dataclasses
 import logging
 from pathlib import Path
 from typing import List
 
 from pydantic import TypeAdapter
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import FilePart, ModelMessage, ModelResponse, ThinkingPart
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.config import APP_SETTINGS
@@ -12,6 +13,30 @@ from kibernikto.storage.base import MemoryHistoryStorage
 logger = logging.getLogger(__name__)
 
 _model_message_adapter: TypeAdapter = TypeAdapter(list[ModelMessage])
+
+
+def _sanitize(messages: List[ModelMessage]) -> List[ModelMessage]:
+    """Drop binaries and provider signatures so history JSON stays small.
+
+    Generated images are delivered to the user and archived in the media
+    store; persisting them here as base64 would bloat the file and re-send
+    the bytes to the provider on every turn. ``ThinkingPart.signature`` is a
+    provider watermark that is not needed to continue the dialogue.
+    """
+    cleaned: List[ModelMessage] = []
+    for msg in messages:
+        if isinstance(msg, ModelResponse):
+            parts = []
+            for part in msg.parts:
+                if isinstance(part, FilePart):
+                    continue  # bytes live in the media store, not history
+                if isinstance(part, ThinkingPart) and part.signature:
+                    part = dataclasses.replace(part, signature=None)
+                parts.append(part)
+            if len(parts) != len(msg.parts):
+                msg = dataclasses.replace(msg, parts=parts)
+        cleaned.append(msg)
+    return cleaned
 
 
 class FileStoreHistoryStorage(MemoryHistoryStorage):
@@ -38,7 +63,7 @@ class FileStoreHistoryStorage(MemoryHistoryStorage):
         if messages is None:
             return
         try:
-            data = _model_message_adapter.dump_json(messages)
+            data = _model_message_adapter.dump_json(_sanitize(messages))
             self._path(chat_id).write_text(data.decode("utf-8"), encoding="utf-8")
         except Exception as exc:
             logger.error("Failed to save history for chat %s: %s", chat_id, exc)
@@ -67,4 +92,7 @@ class FileStoreHistoryStorage(MemoryHistoryStorage):
         if chat_id not in self._storage:
             self._load(chat_id)
         super().add_messages(chat_id, messages)
+        # Purge binaries/signatures from memory too, so a long-lived process
+        # doesn't accumulate megabyte-scale FileParts in RAM.
+        self._storage[chat_id] = _sanitize(self._storage[chat_id])
         self._save(chat_id)

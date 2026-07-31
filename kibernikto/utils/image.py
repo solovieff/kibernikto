@@ -1,35 +1,20 @@
-import logging
-import os
+"""Image hosting helpers (legacy module).
 
-import aiohttp
+Prefer :mod:`kibernikto.utils.image_hosting` — this module keeps the old
+function signatures as a thin compatibility shim.
+"""
 
-URL = 'https://api.imgbb.com/1/upload'
+from kibernikto.utils.image_hosting import image_hosting
 
-IMAGE_STORAGE_API_KEY = os.environ.get('IMAGE_STORAGE_API_KEY', "d581d52610fc664c1d632cbeb8362686")
+URL = "https://api.imgbb.com/1/upload"
 
 
 async def post(filename, name):
-    """Post using a filename like 'image.jpg'"""
-    with open(filename, 'rb') as img:
-        payload = {"key": IMAGE_STORAGE_API_KEY, "image": img.read(), "name": name}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(URL, data=payload) as response:
-                resp = await response.json()
-    return resp
+    """Post using a filename like 'image.jpg' (legacy, reads the file)."""
+    with open(filename, "rb") as img:
+        return await publish_image_file(img.read(), name)
 
 
-async def publish_image_file(image_bytes, name):
-    try:
-        url = "https://api.imgbb.com/1/upload"
-        payload = {'key': IMAGE_STORAGE_API_KEY, 'image': image_bytes, 'name': name, 'expiration': '3000'}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=payload) as response:
-                resp = await response.json()
-                if response.status == 200:
-                    return resp['data']['url']
-                else:
-                    logging.error(f"Image upload failed: {resp}")
-                    return None
-    except Exception as e:
-        logging.error(f"Image upload failed: {str(e)}")
-        return None
+async def publish_image_file(image_bytes, name, expiration: int | None = None):
+    """Publish image bytes via the configured hosting provider."""
+    return await image_hosting.publish(image_bytes, name)

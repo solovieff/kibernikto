@@ -7,9 +7,9 @@ from aiogram.enums import MessageOriginType
 from aiogram.exceptions import TelegramBadRequest
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from kibernikto.utils.image import publish_image_file
+from kibernikto.storage.file.media import media_store
+from kibernikto.utils.image_hosting import image_hosting
 from kibernikto.telegram.utils import permissions
-from kibernikto.telegram.config import TELEGRAM_SETTINGS
 
 from pydantic_ai.messages import ImageUrl, UserContent
 
@@ -90,7 +90,14 @@ class TelegramMessagePreprocessor:
             photo = message.photo[-1]
             file = await message.bot.get_file(photo.file_id)
             photo_file = await message.bot.download_file(file.file_path)
-            url = await publish_image_file(photo_file, photo.file_unique_id)
+            # Durable local copy so agents can read the original later.
+            try:
+                photo_bytes = photo_file.getvalue() if hasattr(photo_file, "getvalue") else photo_file
+                ext = os.path.splitext(file.file_path)[1] or ".jpg"
+                media_store.save(message.chat.id, photo_bytes, ext=ext, name=f"{photo.file_unique_id}{ext}")
+            except Exception as exc:
+                logging.error("Error saving photo to media store: %s", exc)
+            url = await image_hosting.publish(photo_file.getvalue() if hasattr(photo_file, "getvalue") else photo_file, photo.file_unique_id)
             if not url:
                 return ["[Image processing: failed to publish image]"]
             logging.info("published image: %s", url)
@@ -117,17 +124,16 @@ class TelegramMessagePreprocessor:
         try:
             file_name = os.path.basename(file.file_path)
             ext = os.path.splitext(file_name)[1]
-            local_path = f"{TELEGRAM_SETTINGS.FILES_LOCATION}/{file.file_unique_id}{ext}"
-            await message.bot.download_file(file.file_path, local_path)
+            local_path = media_store.tmp_path(f"{file.file_unique_id}{ext}")
+            await message.bot.download_file(file.file_path, str(local_path))
         except Exception as exc:
             logging.error("Error downloading voice file: %s", exc)
             return [f"[Voice transcription error: failed to download — {exc}]"]
 
         try:
-            transcription = await self._transcribe_openai(local_path)
-        except Exception as exc:
-            logging.error("Error transcribing audio: %s", exc)
-            return [f"[Voice transcription error: {exc}]"]
+            transcription = await self._transcribe_openai(str(local_path))
+        finally:
+            media_store.cleanup_tmp(local_path)
 
         if not transcription:
             return ["[Voice transcription error: empty result]"]
