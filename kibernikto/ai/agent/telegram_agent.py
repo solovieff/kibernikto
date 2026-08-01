@@ -53,7 +53,7 @@ _CHAT_REFRESH_SECONDS = 600.0
 def _format_chat_context(chat: ChatFullInfo) -> Optional[str]:
     """Compact one-line chat facts (title/description/bio/members/birthday) from a full Chat."""
     if chat.type in (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL):
-        parts = [f"group chat in {chat.title or 'unknown'}"]
+        parts = [f"group chat in '{chat.title}'"]
         if chat.username:
             parts.append(f"username: @{chat.username}")
         if chat.description:
@@ -174,10 +174,15 @@ class TelegramAgent(KiberniktoAgent):
         Tools queue binaries on ``deps.attachments``; ``KiberniktoAgent.run``
         folds them into the response so :meth:`reply_to` delivers them as media.
         """
-        # Throttle bot-to-bot traffic: a bot sender gets a random delay in
-        # [configured, 13s] so two bots replying to each other don't spin in a loop.
-        if message.from_user and message.from_user.is_bot and TELEGRAM_SETTINGS.BOT_MESSAGE_DELAY > 0:
-            await asyncio.sleep(random.uniform(TELEGRAM_SETTINGS.BOT_MESSAGE_DELAY, 13.0))
+        # Bot-to-bot traffic rules:
+        #  - private: nobody reads it, don't even run the model.
+        #  - group: post flat (no reply chain) and add a random delay in
+        #    [configured, 13s] so two bots talking don't spin in a loop.
+        if message.from_user and message.from_user.is_bot:
+            if message.chat.type == ChatType.PRIVATE:
+                return None
+            if TELEGRAM_SETTINGS.BOT_MESSAGE_DELAY > 0:
+                await asyncio.sleep(random.uniform(TELEGRAM_SETTINGS.BOT_MESSAGE_DELAY, 13.0))
 
         user_message = await self._pre_processor.process_tg_message(message)
         if not user_message:
@@ -186,8 +191,10 @@ class TelegramAgent(KiberniktoAgent):
         deps = await self.build_deps(message)
         deps.user_message_parts = list(user_message)
         # Annotate group messages with author + local time so the model knows who said what.
-        if not deps.is_personal and deps.user_full_name:
-            user_message = _annotate_group_message(list(user_message), deps.user_full_name, deps.timezone or "Europe/Moscow")
+        # Bots are identified by @username (so peers can mention them), humans by full name.
+        if not deps.is_personal and (deps.user_full_name or deps.username):
+            author = deps.username if message.from_user and message.from_user.is_bot else deps.user_full_name
+            user_message = _annotate_group_message(list(user_message), author, deps.timezone or "Europe/Moscow")
             deps.user_message_parts = list(user_message)
 
         try:

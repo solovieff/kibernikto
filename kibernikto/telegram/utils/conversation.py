@@ -6,7 +6,7 @@ from random import choice
 from typing import List, Optional, Union, TYPE_CHECKING
 
 from aiogram import Bot
-from aiogram.enums import ParseMode
+from aiogram.enums import ChatType, ParseMode
 from aiogram.types import (
     InputMediaAudio,
     InputMediaDocument,
@@ -16,7 +16,13 @@ from aiogram.types import (
 )
 from aiogram.types.input_file import BufferedInputFile
 
-from kibernikto.utils.text import clear_text_format, split_text_by_sentences, prepare_for_MARKDOWN
+from kibernikto.telegram.config import TELEGRAM_SETTINGS
+from kibernikto.utils.text import (
+    clear_text_format,
+    markdown_to_html,
+    prepare_for_MARKDOWN,
+    split_text_by_sentences,
+)
 
 if TYPE_CHECKING:
     from pydantic_ai import AgentRunResult
@@ -64,13 +70,32 @@ async def reply(
 
     Returns the text portion that was sent (empty string when only media was delivered).
     """
+    # Bot-to-bot in private: nothing reads it — don't respond at all.
+    if _is_private_bot(message):
+        return ""
+
     payload = _Payload.of(content)
+    reply_mode = _uses_reply(message)
 
     if payload.has_media:
-        return await _send_media(message, payload)
+        return await _send_media(message, payload, reply_mode)
 
-    await _send_text(message, payload.text)
+    await _send_text(message, payload.text, reply_mode)
     return payload.text
+
+
+def _is_private_bot(message: Message) -> bool:
+    """True when the sender is a bot in a private chat (skip entirely)."""
+    return bool(
+        message.from_user
+        and message.from_user.is_bot
+        and message.chat.type == ChatType.PRIVATE
+    )
+
+
+def _uses_reply(message: Message) -> bool:
+    """Anchor replies for humans; bots in groups post flat to avoid reply loops."""
+    return not (message.from_user and message.from_user.is_bot)
 
 
 # ── Internals ─────────────────────────────────────────────────────────────────
@@ -105,7 +130,7 @@ class _Payload:
         return bool(self.images or self.files)
 
 
-async def _send_media(message: Message, payload: _Payload) -> str:
+async def _send_media(message: Message, payload: _Payload, reply_mode: bool) -> str:
     """Send generated media, carrying the caption where Telegram allows it.
 
     A single image rides along with the caption via ``reply_photo``. Anything
@@ -126,37 +151,75 @@ async def _send_media(message: Message, payload: _Payload) -> str:
 
     if len(media) == 1 and images:
         try:
-            await message.reply_photo(photo=_as_input_file(images[0]), caption=caption or None)
+            await _deliver_photo(message, images[0], caption, reply_mode)
         except Exception as error:
             logger.error("Failed to send generated image: %s", error)
             if caption:
-                await _send_text(message, caption)
+                await _send_text(message, caption, reply_mode)
         return caption
 
     if caption:
-        await _send_text(message, caption)
+        await _send_text(message, caption, reply_mode)
 
-    group = [_as_input_media(binary) for binary in media]
-    if group:
+    if media:
         try:
-            await message.answer_media_group(media=group)
+            await _deliver_media_group(message, media, reply_mode)
         except Exception as error:
             logger.error("Failed to send media group: %s", error)
-            await message.reply("[attachment delivery failed]")
+            await _deliver_text(message, "[attachment delivery failed]", reply_mode, parse_mode=None)
     return caption
 
 
-async def _send_text(message: Message, text: str) -> None:
+async def _send_text(message: Message, text: str, reply_mode: bool) -> None:
     """Send text, chunked to Telegram's limit, with a plain-text fallback."""
     if not text:
         return
     for chunk in split_text_by_sentences(text, MAX_MESSAGE_LENGTH):
         try:
-            await message.reply(text=prepare_for_MARKDOWN(chunk), parse_mode=ParseMode.MARKDOWN)
+            formatted = markdown_to_html(chunk) if TELEGRAM_SETTINGS.MARKDOWN_TO_HTML else prepare_for_MARKDOWN(chunk)
+            parse_mode = ParseMode.HTML if TELEGRAM_SETTINGS.MARKDOWN_TO_HTML else ParseMode.MARKDOWN
+            await _deliver_text(message, formatted, reply_mode, parse_mode)
         except Exception as error:
             logger.error("Error sending formatted message: %s", error)
             logger.debug("Problematic chunk: %s", chunk)
-            await message.reply(text=clear_text_format(chunk))
+            await _deliver_text(message, clear_text_format(chunk), reply_mode, parse_mode=None)
+
+
+async def _deliver_text(
+        message: Message, text: str, reply_mode: bool, parse_mode: Optional[ParseMode]
+) -> None:
+    """Send one text chunk, replying to the message or posting flat."""
+    if reply_mode:
+        await message.reply(text=text, parse_mode=parse_mode)
+    else:
+        await message.bot.send_message(chat_id=message.chat.id, text=text, parse_mode=parse_mode)
+
+
+async def _deliver_photo(
+        message: Message, photo: "BinaryContent", caption: Optional[str], reply_mode: bool
+) -> None:
+    """Send a single photo, replying to the message or posting flat."""
+    text = caption or None
+    parse_mode = None
+    if text and TELEGRAM_SETTINGS.MARKDOWN_TO_HTML:
+        text = markdown_to_html(text)
+        parse_mode = ParseMode.HTML
+    if reply_mode:
+        await message.reply_photo(photo=_as_input_file(photo), caption=text, parse_mode=parse_mode)
+    else:
+        await message.bot.send_photo(
+            chat_id=message.chat.id, photo=_as_input_file(photo), caption=text, parse_mode=parse_mode
+        )
+
+
+async def _deliver_media_group(message: Message, media: List["BinaryContent"], reply_mode: bool) -> None:
+    """Send a media group, replying to the message or posting flat."""
+    if reply_mode:
+        await message.answer_media_group(media=[_as_input_media(binary) for binary in media])
+    else:
+        await message.bot.send_media_group(
+            chat_id=message.chat.id, media=[_as_input_media(binary) for binary in media]
+        )
 
 
 def _non_image_files(files: List["BinaryContent"]) -> List["BinaryContent"]:

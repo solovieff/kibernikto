@@ -1,3 +1,4 @@
+import html
 import json
 import typing
 import re
@@ -18,7 +19,7 @@ def split_text(text: str, length: int = 4096) -> typing.List[str]:
 
 
 def remove_text_in_brackets_and_parentheses(text):
-    return re.sub("[\(\[].*?[\)\]]", "", text)
+    return re.sub(r"[\(\[].*?[\)\]]", "", text)
 
 
 def split_text_by_sentences(text, max_length):
@@ -121,8 +122,72 @@ def prepare_for_MARKDOWN_V2(text: str) -> str:
 
 def prepare_for_MARKDOWN(text: str) -> str:
     format_cleared_text = text.replace("**", "*")
-    format_cleared_text = format_cleared_text.replace("_", r"\_")
+    # No blind underscore escaping: it doubles already-escaped \_ from the model
+    # and turns @swarm_host_bot into a visible @swarm\_host\_bot.
     return format_cleared_text
+
+
+def markdown_to_html(text: str) -> str:
+    """Convert a CommonMark subset (typical LLM output) to Telegram HTML.
+
+    Handles fenced code blocks, headings (``#``..``######``), blockquotes,
+    inline code, ``**bold**``, ``*italic*`` / ``_italic_`` and ``[text](url)``
+    links. Everything else is HTML-escaped, so ``@swarm_host_bot`` stays safe.
+    """
+    placeholders: dict[str, str] = {}
+
+    def _fence(match):
+        lang = match.group(1)
+        code = html.escape(match.group(2).strip("\n"), quote=False)
+        block = f'<pre><code class="language-{lang}">{code}</code></pre>' if lang else f"<pre><code>{code}</code></pre>"
+        key = f"\u0000CODE{len(placeholders)}\u0000"
+        placeholders[key] = block
+        return key
+
+    # Fenced code blocks first -> placeholders so inline rules skip them.
+    text = re.sub(r"```([\w+-]*)\n?(.*?)```", _fence, text, flags=re.DOTALL)
+
+    lines = text.split("\n")
+    out: list[str] = []
+    for line in lines:
+        line = line.rstrip()
+        quote = re.match(r"^>\s?(.*)$", line)
+        if quote:
+            out.append(f"<blockquote>{_inline_to_html(html.escape(quote.group(1), quote=False))}</blockquote>")
+            continue
+        heading = re.match(r"^(#{1,6})\s+(.*)$", line)
+        if heading:
+            out.append(f"<b>{_inline_to_html(html.escape(heading.group(2), quote=False))}</b>")
+            continue
+        out.append(_inline_to_html(html.escape(line, quote=False)))
+    result = "\n".join(out)
+
+    for key, block in placeholders.items():
+        result = result.replace(key, block)
+    return result
+
+
+def _inline_to_html(text: str) -> str:
+    """Apply inline markdown rules to an already HTML-escaped string."""
+    text = re.sub(r"`([^`\n]+)`", lambda m: f"<code>{m.group(1)}</code>", text)
+    text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", _link_repl, text)
+    text = re.sub(r"\*\*(.+?)\*\*", _bold_repl, text)
+    text = re.sub(r"(?<!\w)\*(?!\*)([^*\n]+)\*(?!\*)|(?<!\w)_([^_\n]+)_(?!\w)", _italic_repl, text)
+    return text
+
+
+def _link_repl(match):
+    # href is already HTML-escaped by the caller; escaping again doubles &amp;.
+    return f'<a href="{match.group(2)}">{_inline_to_html(match.group(1))}</a>'
+
+
+def _bold_repl(match):
+    return f"<b>{_inline_to_html(match.group(1))}</b>"
+
+
+def _italic_repl(match):
+    body = match.group(1) if match.group(1) is not None else match.group(2)
+    return f"<i>{_inline_to_html(body)}</i>"
 
 
 def text_to_html(text: str) -> str:
