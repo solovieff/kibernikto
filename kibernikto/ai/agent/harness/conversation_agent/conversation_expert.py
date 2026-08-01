@@ -20,7 +20,7 @@ from kibernikto.storage.file.chat_data import chat_data
 logger = logging.getLogger(__name__)
 
 CONVERSATION_SYSTEM_PROMPT = (
-    "You are a conversation expert. You store and update information about the user. "
+    "You are a conversation expert. You store and update information about the conversation (group or private). "
     "You can add new facts, replace stored info, and answer questions based on the full chat history. "
     "Default language is Russian."
 )
@@ -33,8 +33,8 @@ MODEL = os.getenv("AGENT_KIBERNIKTO_READ_MODEL", "openrouter:google/gemini-3.5-f
 
 conversation_agent = KiberniktoAgent(
     model=infer_kibernikto_model(MODEL),
-    name="conversation_agent",
-    description="Stores and updates user info. As you communicate, silently enrich or change your understanding of the interlocutor using the conversation agent.",
+    name=NAME,
+    description=f"Stores and updates conversation info: important facts/observations. Can refer full conversation logs. Smartly use {NAME} as you communicate, from time to tome silently enrich or change your understanding of the interlocutor(s) or chat atmosphere.",
     system_prompt=CONVERSATION_SYSTEM_PROMPT,
     deps_type=KiberniktoDeps,
 )
