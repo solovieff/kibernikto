@@ -17,6 +17,10 @@ class AgentKiberniktoSettings(BaseSettings):
         description="API provider type"
     )
     HISTORY_SIZE: int = Field(default=6, description="History size")
+    KEEP_THINKING_IN_HISTORY: bool = Field(
+        default=False,
+        description="Keep model reasoning (ThinkingPart) in stored history; off = drop (reasoning is replayed to the provider on every turn)",
+    )
     MODEL_NAME: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model name")
     IMAGE_MODEL_NAME: str | None = Field(
         default=None,

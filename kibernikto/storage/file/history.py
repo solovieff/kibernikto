@@ -15,13 +15,15 @@ logger = logging.getLogger(__name__)
 _model_message_adapter: TypeAdapter = TypeAdapter(list[ModelMessage])
 
 
-def _sanitize(messages: List[ModelMessage]) -> List[ModelMessage]:
-    """Drop binaries and provider signatures so history JSON stays small.
+def _sanitize(messages: List[ModelMessage], *, keep_thinking: bool = False) -> List[ModelMessage]:
+    """Drop binaries, reasoning and provider signatures so history JSON stays small.
 
     Generated images are delivered to the user and archived in the media
     store; persisting them here as base64 would bloat the file and re-send
-    the bytes to the provider on every turn. ``ThinkingPart.signature`` is a
-    provider watermark that is not needed to continue the dialogue.
+    the bytes to the provider on every turn. ``ThinkingPart`` reasoning is
+    replayed to the provider with each request, burning tokens for nothing;
+    ``signature`` is a provider watermark that is not needed to continue the
+    dialogue.
     """
     cleaned: List[ModelMessage] = []
     for msg in messages:
@@ -30,8 +32,11 @@ def _sanitize(messages: List[ModelMessage]) -> List[ModelMessage]:
             for part in msg.parts:
                 if isinstance(part, FilePart):
                     continue  # bytes live in the media store, not history
-                if isinstance(part, ThinkingPart) and part.signature:
-                    part = dataclasses.replace(part, signature=None)
+                if isinstance(part, ThinkingPart):
+                    if not keep_thinking:
+                        continue  # reasoning is replayed to the provider — don't store it
+                    if part.signature:
+                        part = dataclasses.replace(part, signature=None)
                 parts.append(part)
             if len(parts) != len(msg.parts):
                 msg = dataclasses.replace(msg, parts=parts)
@@ -63,7 +68,7 @@ class FileStoreHistoryStorage(MemoryHistoryStorage):
         if messages is None:
             return
         try:
-            data = _model_message_adapter.dump_json(_sanitize(messages))
+            data = _model_message_adapter.dump_json(_sanitize(messages, keep_thinking=AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY))
             self._path(chat_id).write_text(data.decode("utf-8"), encoding="utf-8")
         except Exception as exc:
             logger.error("Failed to save history for chat %s: %s", chat_id, exc)
@@ -94,5 +99,5 @@ class FileStoreHistoryStorage(MemoryHistoryStorage):
         super().add_messages(chat_id, messages)
         # Purge binaries/signatures from memory too, so a long-lived process
         # doesn't accumulate megabyte-scale FileParts in RAM.
-        self._storage[chat_id] = _sanitize(self._storage[chat_id])
+        self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY)
         self._save(chat_id)

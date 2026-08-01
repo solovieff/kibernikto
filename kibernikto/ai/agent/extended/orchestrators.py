@@ -9,12 +9,12 @@ from pydantic_ai.capabilities import WebSearch
 from pydantic_ai_harness.subagents import SubAgent, SubAgents
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.ai.agent.extended.conversation_expert import conversation_agent
-from kibernikto.ai.agent.extended.image_expert import image_agent
 from kibernikto.ai.agent.extended.kibernikto_extended import KiberniktoExtended
-from kibernikto.ai.agent.extended.report_expert import report_agent
-from kibernikto.ai.agent.extended.scheduler_expert import scheduler_agent
-from kibernikto.ai.agent.extended.web_expert import web_agent
+from kibernikto.ai.agent.harness.conversation_agent import conversation_agent
+from kibernikto.ai.agent.harness.image_agent import image_agent
+from kibernikto.ai.agent.harness.report_agent import report_agent
+from kibernikto.ai.agent.harness.scheduler_agent import scheduler_agent
+from kibernikto.ai.agent.harness.web_agent import web_agent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 
 logger = logging.getLogger(__name__)
