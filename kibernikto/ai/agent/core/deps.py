@@ -12,7 +12,7 @@ layers subclass it to attach their own context — see
 """
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 from pydantic_ai.messages import BinaryContent, UserContent
 
@@ -40,6 +40,13 @@ class KiberniktoDeps:
 
     extra: dict[str, Any] = field(default_factory=dict)
     """Free-form bag for any additional run-scoped data tools want to share."""
+
+    conversation_context: Optional[str] = None
+    """Pre-built one-line string about the current conversation (user/chat facts).
+
+    Populated by the transport layer (e.g. the Telegram agent) before each run;
+    sub-agents and tools read it to know who/where they are talking.
+    """
 
     def add_attachment(self, content: BinaryContent) -> None:
         """Queue a single binary for delivery to the user."""

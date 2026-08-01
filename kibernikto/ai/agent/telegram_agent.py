@@ -1,19 +1,23 @@
 import logging
+import time
 from dataclasses import dataclass
 from typing import Optional
 
 from aiogram.enums import ChatType
-from aiogram.types import Message
+from aiogram.types import Chat, ChatFullInfo, Message
 from pydantic_ai import AgentRunResult, ModelHTTPError
 from pydantic_ai.capabilities import NativeTool
+from pydantic_ai.messages import UserContent
 
 from kibernikto.ai.agent import kibernikto_agent, kibernikto_model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.image import generate_image
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.storage.file.chat_data import chat_data
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.telegram.utils.conversation import reply
+from kibernikto.utils.time_utils import enhance_message, get_user_time
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,64 @@ class TelegramDeps(KiberniktoDeps):
     app_chat_info: Optional[str] = None
     app_chat_name: Optional[str] = None
     message: Optional[Message] = None
+    timezone: Optional[str] = None
+
+
+# ── Chat enrichment ───────────────────────────────────────────────────────────
+
+_CHAT_REFRESH_SECONDS = 600.0
+
+
+def _format_chat_context(chat: ChatFullInfo) -> Optional[str]:
+    """Compact one-line chat facts (title/description/bio/members/birthday) from a full Chat."""
+    if chat.type in (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL):
+        parts = [f"group chat in {chat.title or 'unknown'}"]
+        if chat.username:
+            parts.append(f"username: @{chat.username}")
+        if chat.description:
+            parts.append(f"chat_info: {chat.description}")
+        if getattr(chat, "member_count", None):
+            parts.append(f"members: {chat.member_count}")
+        return " | ".join(parts)
+    name = " ".join(filter(None, [chat.first_name, chat.last_name])) or "unknown"
+    parts = [f"private chat with {name}"]
+    if chat.username:
+        parts.append(f"username: @{chat.username}")
+    if getattr(chat, "bio", None):
+        parts.append(f"bio: {chat.bio}")
+    birthdate = getattr(chat, "birthdate", None)
+    if birthdate:
+        bd = f"{birthdate.day:02d}.{birthdate.month:02d}"
+        if getattr(birthdate, "year", None):
+            bd += f".{birthdate.year}"
+        parts.append(f"birthday: {bd}")
+    return " | ".join(parts)
+
+
+async def _refresh_chat_context(message: Message) -> None:
+    """Persist full getChat facts into the chat bucket, refreshing when missing or stale."""
+    info = chat_data.load(message.chat.id)
+    updated_at = info.client_app_info_updated_at or 0
+    if info.client_app_info and time.time() - updated_at < _CHAT_REFRESH_SECONDS:
+        return
+    try:
+        chat = await message.bot.get_chat(message.chat.id)
+    except Exception as error:
+        logger.warning("Failed to fetch full chat %s: %s", message.chat.id, error)
+        return
+    info.client_app_info = _format_chat_context(chat) or info.client_app_info
+    info.client_app_info_updated_at = time.time()
+    chat_data.save(message.chat.id, info)
+
+
+def _annotate_group_message(parts: list[UserContent], author: str, timezone: str) -> list[UserContent]:
+    """Prefix the message with the author and local time — [{author} at {time}]."""
+    stamp = f"[{author} at {get_user_time(timezone)}]"
+    for i, part in enumerate(parts):
+        if isinstance(part, str) and part.strip():
+            parts[i] = enhance_message(part, author, timezone)
+            return parts
+    return [stamp, *parts]
 
 
 class TelegramAgent(KiberniktoAgent):
@@ -69,14 +131,14 @@ class TelegramAgent(KiberniktoAgent):
     def pre_processor(self, value: TelegramMessagePreprocessor) -> None:
         self._pre_processor = value
 
-    def build_deps(self, message: Message) -> TelegramDeps:
-        """Create the run-scoped deps for ``message``.
+    async def build_deps(self, message: Message) -> TelegramDeps:
+        """Create the run-scoped deps for ``message``, enriched with chat context.
 
-        Override to enrich the deps (extra context, services, ...) before the
-        run. Tools mutate this object in place; binaries they queue on
-        ``attachments`` are folded into the response by ``KiberniktoAgent.run``.
+        Refreshes the persisted per-chat facts (getChat on a TTL), then sets
+        ``conversation_context`` and ``timezone`` from the bucket. Override to
+        enrich the deps further — keep ``await super().build_deps(message)``.
         """
-        return TelegramDeps(
+        deps = TelegramDeps(
             is_personal=message.chat.type == ChatType.PRIVATE,
             chat_id=message.chat.id,
             app_chat_info=message.chat.description,
@@ -86,6 +148,11 @@ class TelegramAgent(KiberniktoAgent):
             user_full_name=message.from_user.full_name if message.from_user else None,
             message=message,
         )
+        await _refresh_chat_context(message)
+        info = chat_data.load(message.chat.id)
+        deps.conversation_context = f"[Current conversation context] {info.as_string()}"
+        deps.timezone = info.timezone
+        return deps
 
     async def process_message(self, message: Message) -> AgentRunResult | str | None:
         """Run the agent on ``message`` with per-chat history.
@@ -99,8 +166,12 @@ class TelegramAgent(KiberniktoAgent):
         if not user_message:
             return None
 
-        deps = self.build_deps(message)
+        deps = await self.build_deps(message)
         deps.user_message_parts = list(user_message)
+        # Annotate group messages with author + local time so the model knows who said what.
+        if not deps.is_personal and deps.user_full_name:
+            user_message = _annotate_group_message(list(user_message), deps.user_full_name, deps.timezone or "Europe/Moscow")
+            deps.user_message_parts = list(user_message)
 
         try:
             return await self.run(

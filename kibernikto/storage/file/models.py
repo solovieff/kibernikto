@@ -14,6 +14,7 @@ class ConversationInfo(BaseModel):
     credits: int = Field(default=AGENT_KIBERNIKTO_SETTINGS.TRIAL_CREDITS)
     timezone: str = "Europe/Moscow"
     client_app_info: str = ""
+    client_app_info_updated_at: Optional[float] = None
     last_pinned_message: Optional[str] = None
 
     def charge(self, effort: int = 1, dependent: bool = False) -> int:
@@ -33,10 +34,14 @@ class ConversationInfo(BaseModel):
         return s.MEDIUM_MODEL
 
     def as_string(self) -> str:
-        """Compact one-line summary for the system prompt."""
-        return (
-            f"private_info: {self.private_info} | "
-            f"public_info: {self.public_info or 'none'} | "
-            f"credits: {self.credits} | "
-            f"timezone: {self.timezone}"
-        )
+        """Compact one-line summary for the system prompt (empty fields omitted)."""
+        parts = []
+        if self.private_info and self.private_info != "No info yet.":
+            parts.append(f"private_info: {self.private_info}")
+        if self.public_info:
+            parts.append(f"public_info: {self.public_info}")
+        parts.append(f"credits: {self.credits}")
+        parts.append(f"timezone: {self.timezone}")
+        if self.client_app_info:
+            parts.append(self.client_app_info)
+        return " | ".join(parts)

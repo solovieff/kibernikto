@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from pydantic_ai import AgentRunResult, ModelSettings, RunContext
 from pydantic_ai.models import Model
@@ -43,24 +41,6 @@ Be straightforward with men-users and gallant with women-users.
 Default language: russian!"""
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def get_user_time(timezone: str = "Europe/Moscow") -> str:
-    """Current time string in the user's timezone."""
-    try:
-        tz = ZoneInfo(timezone)
-    except Exception:
-        tz = ZoneInfo("Europe/Moscow")
-    return datetime.now(tz).strftime("%Y-%m-%d %H:%M")
-
-
-def enhance_message(message: str, author: str | None = None, timezone: str = "Europe/Moscow") -> str:
-    """Prefix a message with timestamp and optional author."""
-    time_str = get_user_time(timezone)
-    prefix = f"[{author} at {time_str}]" if author else f"[{time_str}]"
-    return f"{prefix} {message}"
-
-
 # ── KiberniktoExtended ───────────────────────────────────────────────────────
 
 class KiberniktoExtended(TelegramAgent):
@@ -81,11 +61,10 @@ class KiberniktoExtended(TelegramAgent):
         self.instructions(self._user_context_prompt)
 
     async def _user_context_prompt(self, ctx: RunContext[TelegramDeps]) -> str:
-        """Inject ConversationInfo into the system prompt each run."""
-        if not ctx.deps or ctx.deps.chat_id is None:
+        """Inject the transport-built conversation context into the system prompt each run."""
+        if not ctx.deps:
             return ""
-        info = chat_data.load(ctx.deps.chat_id)
-        return f"[CONVERSATION_AGENT] {info.as_string()} [/CONVERSATION_AGENT]"
+        return ctx.deps.conversation_context or ""
 
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
         """Run with credit-based model selection, then charge credits after."""
