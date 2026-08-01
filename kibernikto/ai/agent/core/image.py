@@ -66,8 +66,13 @@ def _get_image_agent() -> Agent:
 
 # ── Input helpers ─────────────────────────────────────────────────────────────
 
+def _is_valid_image_url(url: str) -> bool:
+    """True for http(s) / data: URLs; provider-internal filenames are rejected."""
+    return url.startswith(("http://", "https://", "data:"))
+
+
 def _extract_input_images(deps: KiberniktoDeps) -> list[ImageUrl]:
-    return [p for p in deps.user_message_parts if isinstance(p, ImageUrl)]
+    return [p for p in deps.user_message_parts if isinstance(p, ImageUrl) and _is_valid_image_url(p.url)]
 
 
 def _image_url_to_openrouter_part(image: ImageUrl) -> dict[str, Any]:
@@ -83,7 +88,10 @@ def _build_openrouter_messages(request: str | list[UserContent]) -> list[dict[st
     parts: list[dict[str, Any]] = []
     for item in request:
         if isinstance(item, ImageUrl):
-            parts.append(_image_url_to_openrouter_part(item))
+            # Skip provider-internal filenames (e.g. input_file_0.png) — the
+            # model can't see real URLs, so garbage must never reach the API.
+            if _is_valid_image_url(item.url):
+                parts.append(_image_url_to_openrouter_part(item))
         else:
             text = getattr(item, "content", None) or str(item)
             parts.append({"type": "text", "text": text})

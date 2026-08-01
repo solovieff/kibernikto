@@ -43,7 +43,7 @@ def _get_vision_agent() -> Agent:
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
 image_agent = KiberniktoAgent(
-    model=infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.IMAGE_MODEL_NAME or AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME),
+    model=infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.POOR_MODEL),
     name="image_expert",
     description="Describes, generates and edits images.",
     system_prompt=IMAGE_SYSTEM_PROMPT,
@@ -53,11 +53,25 @@ image_agent = KiberniktoAgent(
 
 @image_agent.tool
 async def describe_image(ctx: RunContext[KiberniktoDeps], image_url: str, request: str) -> str:
-    """Recognize and describe an image by its URL."""
+    """Recognize and describe an image by its URL.
+
+    For images attached to the user's message, the real URL is picked up from
+    deps automatically — do not pass the provider's internal file name
+    (e.g. input_file_0.png); it is not a usable URL.
+    """
     logger.info("describe_image: url=%s request=%r", image_url, request[:100])
     try:
         agent = _get_vision_agent()
-        result = await agent.run([ImageUrl(url=image_url), request])
+        from kibernikto.ai.agent.core.image import _extract_input_images, _is_valid_image_url
+
+        if _is_valid_image_url(image_url):
+            parts: list = [ImageUrl(url=image_url), request]
+        else:
+            attached = _extract_input_images(ctx.deps)
+            if not attached:
+                return "Image recognition failed: no valid image URL provided."
+            parts = [*attached, request]
+        result = await agent.run(parts)
         return result.output
     except Exception as exc:
         logger.exception("Image recognition failed: %s", exc)
@@ -65,11 +79,18 @@ async def describe_image(ctx: RunContext[KiberniktoDeps], image_url: str, reques
 
 
 @image_agent.tool
-async def edit_image(ctx: RunContext[KiberniktoDeps], image_url: str, request: str) -> str:
-    """Edit an image by URL according to the request; result is delivered to the user."""
-    logger.info("edit_image: url=%s request=%r", image_url, request[:100])
-    from kibernikto.ai.agent.core.image import generate_image
+async def edit_image(ctx: RunContext[KiberniktoDeps], image_url: str = "", request: str = "") -> str:
+    """Edit an image according to the request; result is delivered to the user.
 
-    # Inject the source image into deps so generate_image picks it up as img2img input.
-    ctx.deps.user_message_parts.append(ImageUrl(url=image_url))
+    Images attached to the user's message are picked up automatically from
+    deps — do NOT pass the provider's internal file name (e.g. input_file_0.png),
+    it is not a usable URL. Provide image_url only for an external http(s)
+    image, or leave it empty when editing an attached photo.
+    """
+    logger.info("edit_image: url=%s request=%r", image_url, request[:100])
+    from kibernikto.ai.agent.core.image import _is_valid_image_url, generate_image
+
+    # Trust only a real URL from the model; attached images ride in deps anyway.
+    if _is_valid_image_url(image_url):
+        ctx.deps.user_message_parts.append(ImageUrl(url=image_url))
     return await generate_image(ctx, request)

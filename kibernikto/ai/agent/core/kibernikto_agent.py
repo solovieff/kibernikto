@@ -105,8 +105,13 @@ class KiberniktoAgent(Agent):
         flows back to the model), so they stash binaries on ``deps.attachments``.
         We append them to the final ``ModelResponse`` as genuine ``FilePart``s —
         the same public shape a model uses to return files — so they surface via
-        ``response.images`` / ``response.files`` and serialize into history as if
-        the model had produced them. The buffer is cleared to avoid double-send.
+        ``response.images`` / ``response.files`` and are delivered by the reply
+        layer. The buffer is intentionally left intact: sub-agent runs share
+        the parent's deps, and only the top-level run's response is delivered,
+        so the parent must be able to pick up binaries queued by delegated
+        tools. History storage strips ``FilePart``s anyway
+        (``FileStoreHistoryStorage._sanitize``), so nothing leaks into the
+        model's context.
         """
         if not isinstance(deps, KiberniktoDeps) or not deps.attachments:
             return
@@ -121,7 +126,6 @@ class KiberniktoAgent(Agent):
             # the Telegram reply layer never sees the image.
             content = BinaryImage.narrow_type(binary) if not isinstance(binary, BinaryImage) else binary
             response.parts.append(FilePart(content=content))
-        deps.attachments.clear()
 
 
 agent = KiberniktoAgent(

@@ -6,7 +6,9 @@ Result is saved as .txt and delivered to the user via deps.attachments.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from datetime import datetime
 
 import httpx
@@ -30,8 +32,8 @@ _JINA_DEEPSEARCH_URL = "https://deepsearch.jina.ai/v1/chat/completions"
 # Effort-based model selection for VseGPT fallback.
 _EFFORT_MODELS = {
     "base": "vsegpt:meta-llama/llama-4-maverick-online-hq",
-    "pro": "vsegpt:anthropic/claude-3.7-sonnet-deep-online",
-    "extra": "vsegpt:anthropic/claude-3.7-sonnet-deep-research-1.0",
+    "pro": "vsegpt:anthropic/claude-sonnet-4.6-online-hq",
+    "extra": "vsegpt:anthropic/claude-sonnet-4.6-deep-research-1.0",
 }
 
 
@@ -45,20 +47,40 @@ def _pick_effort_model(effort_level: int) -> str:
 
 
 async def _jina_deepsearch(request: str) -> str:
-    """Run deepsearch via Jina AI."""
+    """Run deepsearch via Jina AI (streaming keeps long searches alive)."""
+    api_key = os.getenv("JINA_AI_API_KEY")
+    if not api_key:
+        raise RuntimeError("JINA_AI_API_KEY environment variable is not set.")
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(
-                _JINA_DEEPSEARCH_URL,
-                json={
-                    "model": "jina-deepsearch-v1",
-                    "messages": [{"role": "user", "content": request}],
-                },
-                headers={"Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        payload = {
+            "model": "jina-deepsearch-v1",
+            "messages": [{"role": "user", "content": request}],
+            "stream": True,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+            "Authorization": f"Bearer {api_key}",
+        }
+        parts: list[str] = []
+        async with httpx.AsyncClient(timeout=600) as client:
+            async with client.stream("POST", _JINA_DEEPSEARCH_URL, json=payload, headers=headers) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    # Final answer is streamed as type=text; type=think is reasoning.
+                    if delta.get("type") == "text":
+                        parts.append(delta.get("content", ""))
+        return "".join(parts)
     except Exception as exc:
         logger.warning("Jina deepsearch failed: %s", exc)
         raise
