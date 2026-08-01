@@ -20,7 +20,7 @@ from kibernikto.ai.agent.utils import infer_kibernikto_model
 logger = logging.getLogger(__name__)
 
 # All expert sub-agents available to the orchestrator.
-_EXPERT_AGENTS = [web_agent, image_agent, conversation_agent, scheduler_agent, report_agent]
+_EXPERT_AGENTS = [web_agent, image_agent, conversation_agent] #, report_agent
 
 
 def _common_model_settings() -> ModelSettings:

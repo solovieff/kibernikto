@@ -27,7 +27,7 @@ class KiberniktoExtended(TelegramAgent):
     """
 
     def __init__(self, **kwargs) -> None:
-        agent_name = kwargs.get('name', 'kibernikto_extended')
+        agent_name = kwargs.get('name', AGENT_KIBERNIKTO_SETTINGS.NAME)
         kwargs.setdefault('history_storage', FileStoreHistoryStorage(name=agent_name))
         super().__init__(**kwargs)
 
