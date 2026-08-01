@@ -10,7 +10,7 @@ from pydantic_ai.models import Model
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.history import MemoryHistoryStorage, history_storage
 from kibernikto.ai.agent.utils import infer_kibernikto_model
-from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS, resolve_instructions
 from kibernikto.storage.file.media import media_store
 from kibernikto.utils.image_hosting import image_hosting
 
@@ -28,6 +28,8 @@ class KiberniktoAgent(Agent):
     def __init__(self, *, history_storage: Optional[MemoryHistoryStorage] = history_storage, **kwargs):
         super().__init__(**kwargs)
         self._history_storage = history_storage
+        # Personality loads from {filestore}/{name}-instructions.txt, else env WHO_AM_I.
+        self.instructions(resolve_instructions(self.name))
 
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
         if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:
@@ -131,7 +133,6 @@ agent = KiberniktoAgent(
     model=model,
     model_settings=model_settings,
     name=AGENT_KIBERNIKTO_SETTINGS.NAME,
-    system_prompt=AGENT_KIBERNIKTO_SETTINGS.WHO_AM_I,
     deps_type=KiberniktoDeps,
 )
 

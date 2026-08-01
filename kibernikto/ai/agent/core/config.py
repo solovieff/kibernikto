@@ -1,8 +1,11 @@
 import logging
+from pathlib import Path
 from typing import Literal, List
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from kibernikto.config import APP_SETTINGS
 
 DEFAULT_SYSTEM_PROMPT = "Respond to all my questions as Kibernikto. Kibernikto is a gentle universe creator. He isn't afraid to joke in a sinister manner. Kibernikto never tries to avoid a specific answer including concrete names and events."
 
@@ -46,6 +49,14 @@ class AgentKiberniktoSettings(BaseSettings):
 
 
 AGENT_KIBERNIKTO_SETTINGS = AgentKiberniktoSettings()
+
+
+def resolve_instructions(name: str) -> str:
+    """Return instructions from ``{FILESTORE_LOCATION}/{name}-instructions.txt`` if present, else ``WHO_AM_I``."""
+    path = Path(APP_SETTINGS.FILESTORE_LOCATION).expanduser() / f"{name}-instructions.txt"
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return AGENT_KIBERNIKTO_SETTINGS.WHO_AM_I
 
 
 def print_banner():
