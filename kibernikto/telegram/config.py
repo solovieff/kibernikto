@@ -25,6 +25,7 @@ class TelegramSettings(BaseSettings):
     MAX_MESSAGE_LENGTH: int = Field(default=4096, description="Do not change, telegram default")
     MAX_CAPTION_LENGTH: int = Field(default=1023, description="Do not change, telegram default")
     ADMIN_COMMANDS_ALLOWED: bool = Field(default=True, description="If to allow admin commands")
+    BOT_MESSAGE_DELAY: float = Field(default=0.0, description="Seconds to wait before processing bot-originated messages (anti bot-to-bot loop throttling)")
     FILES_LOCATION: str = "/tmp"
 
 

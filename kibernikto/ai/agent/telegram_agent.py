@@ -1,11 +1,13 @@
+import asyncio
 import logging
+import random
 import time
 from dataclasses import dataclass
 from typing import Optional
 
 from aiogram.enums import ChatType
 from aiogram.types import Chat, ChatFullInfo, Message
-from pydantic_ai import AgentRunResult, ModelHTTPError
+from pydantic_ai import AgentRunResult, ModelHTTPError, RunContext
 from pydantic_ai.capabilities import NativeTool
 from pydantic_ai.messages import UserContent
 
@@ -15,6 +17,7 @@ from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.image import generate_image
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.storage.file.chat_data import chat_data
+from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.telegram.utils.conversation import reply
 from kibernikto.utils.time_utils import enhance_message, get_user_time
@@ -118,9 +121,18 @@ class TelegramAgent(KiberniktoAgent):
         kwargs.setdefault("deps_type", TelegramDeps)
         super().__init__(**kwargs)
         self._pre_processor = pre_processor or TelegramMessagePreprocessor()
+        # Instructions survive history window truncation — always sent each turn.
+        # Base KiberniktoAgent injects personality; here we add per-run user/chat context.
+        self.instructions(self._user_context_prompt)
         # Reusable image-generation tool: delivers its result via deps.attachments.
         if AGENT_KIBERNIKTO_SETTINGS.IMAGE_MODEL_NAME:
             self.tool(generate_image)
+
+    async def _user_context_prompt(self, ctx: RunContext[TelegramDeps]) -> str:
+        """Inject the transport-built conversation context into the system prompt each run."""
+        if not ctx.deps:
+            return ""
+        return ctx.deps.conversation_context or ""
 
     @property
     def pre_processor(self) -> TelegramMessagePreprocessor:
@@ -162,6 +174,11 @@ class TelegramAgent(KiberniktoAgent):
         Tools queue binaries on ``deps.attachments``; ``KiberniktoAgent.run``
         folds them into the response so :meth:`reply_to` delivers them as media.
         """
+        # Throttle bot-to-bot traffic: a bot sender gets a random delay in
+        # [configured, 13s] so two bots replying to each other don't spin in a loop.
+        if message.from_user and message.from_user.is_bot and TELEGRAM_SETTINGS.BOT_MESSAGE_DELAY > 0:
+            await asyncio.sleep(random.uniform(TELEGRAM_SETTINGS.BOT_MESSAGE_DELAY, 13.0))
+
         user_message = await self._pre_processor.process_tg_message(message)
         if not user_message:
             return None
@@ -208,7 +225,6 @@ kibernikto_telegram_agent: TelegramAgent = TelegramAgent(
     model=kibernikto_model,
     model_settings=kibernikto_agent.model_settings,
     name=AGENT_KIBERNIKTO_SETTINGS.NAME,
-    system_prompt=AGENT_KIBERNIKTO_SETTINGS.WHO_AM_I,
 )
 
 
