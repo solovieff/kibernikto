@@ -91,7 +91,6 @@ class KiberniktoAgent(Agent):
             try:
                 url = await image_hosting.publish(image.data, f"kibernikto-{uuid.uuid4().hex[:8]}.{ext}")
                 if url:
-                    media_store.remember_generated(chat_id, url)
                     urls.append(url)
             except Exception as exc:
                 logger.warning("Failed to publish generated image for chat %s: %s", chat_id, exc)

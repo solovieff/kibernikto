@@ -1,4 +1,4 @@
-"""Mini-filestore: durable media, tmp transit and the generated-image registry.
+"""Mini-filestore: durable media and tmp transit.
 
 Everything lives under ``{APP_FILESTORE_LOCATION}``:
 
@@ -6,11 +6,8 @@ Everything lives under ``{APP_FILESTORE_LOCATION}``:
   later documents). History JSON only stores small references to these.
 * ``tmp/...`` — transient files (e.g. voice before transcription), cleaned
   after use.
-* ``media/{chat_id}/generated.json`` — public URLs of the last few bot-made
-  images so the agent can re-inject them into context on later turns.
 """
 
-import json
 import logging
 import uuid
 from pathlib import Path
@@ -60,29 +57,6 @@ class MediaFileStore:
             path.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning("Failed to clean tmp file %s: %s", path, exc)
-
-    # ── generated-image registry ───────────────────────────────────────────
-
-    def remember_generated(self, chat_id: int, url: str, limit: int = 3) -> None:
-        """Remember a generated image's public URL (most recent kept last)."""
-        urls = [u for u in self.last_generated(chat_id) if u != url]
-        urls.append(url)
-        chat_dir = self._media_dir / str(chat_id)
-        chat_dir.mkdir(parents=True, exist_ok=True)
-        (chat_dir / "generated.json").write_text(json.dumps(urls[-limit:]), encoding="utf-8")
-
-    def last_generated(self, chat_id: int) -> list[str]:
-        """Public URLs of recently generated images for a chat (oldest first)."""
-        path = self._media_dir / str(chat_id) / "generated.json"
-        if not path.exists():
-            return []
-        try:
-            urls = json.loads(path.read_text(encoding="utf-8"))
-            return urls if isinstance(urls, list) else []
-        except Exception as exc:
-            logger.warning("Failed to read generated registry %s: %s", path, exc)
-            return []
-
 
 #: Module-level singleton — shared by the preprocessor and the agent.
 media_store = MediaFileStore()
