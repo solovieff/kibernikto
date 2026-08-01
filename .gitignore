@@ -1,6 +1,7 @@
 .idea
 .venv
 .kbnkt_filestore
+.swmphst_filestore
 ai_tmp
 __pycache__/
 **/__pycache__/
