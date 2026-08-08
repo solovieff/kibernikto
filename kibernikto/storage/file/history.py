@@ -1,57 +1,41 @@
-import dataclasses
 import logging
+from collections import defaultdict
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from pydantic import TypeAdapter
-from pydantic_ai.messages import FilePart, ModelMessage, ModelResponse, ThinkingPart
+from pydantic_ai.messages import ModelMessage
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.config import APP_SETTINGS
-from kibernikto.storage.base import MemoryHistoryStorage
+from kibernikto.storage.base import _sanitize, _window
 
 logger = logging.getLogger(__name__)
 
 _model_message_adapter: TypeAdapter = TypeAdapter(list[ModelMessage])
 
 
-def _sanitize(messages: List[ModelMessage], *, keep_thinking: bool = False) -> List[ModelMessage]:
-    """Drop binaries, reasoning and provider signatures so history JSON stays small.
+class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
+    """Durable JSON storage under ``{FILESTORE_LOCATION}/history/{name}/{chat_id}.json``.
 
-    Generated images are delivered to the user and archived in the media
-    store; persisting them here as base64 would bloat the file and re-send
-    the bytes to the provider on every turn. ``ThinkingPart`` reasoning is
-    replayed to the provider with each request, burning tokens for nothing;
-    ``signature`` is a provider watermark that is not needed to continue the
-    dialogue.
+    Standalone ``HistoryStorage`` impl — does **not** inherit ``MemoryHistoryStorage``.
+    Keeps its own in-memory cache (same ``defaultdict``) so any future backend
+    (postgres/redis) can do the same without dragging memory semantics via inheritance.
     """
-    cleaned: List[ModelMessage] = []
-    for msg in messages:
-        if isinstance(msg, ModelResponse):
-            parts = []
-            for part in msg.parts:
-                if isinstance(part, FilePart):
-                    continue  # bytes live in the media store, not history
-                if isinstance(part, ThinkingPart):
-                    if not keep_thinking:
-                        continue  # reasoning is replayed to the provider — don't store it
-                    if part.signature:
-                        part = dataclasses.replace(part, signature=None)
-                parts.append(part)
-            if len(parts) != len(msg.parts):
-                msg = dataclasses.replace(msg, parts=parts)
-        cleaned.append(msg)
-    return cleaned
-
-
-class FileStoreHistoryStorage(MemoryHistoryStorage):
-    """In-memory + JSON persistence under ``{FILESTORE_LOCATION}/history/{name}/{chat_id}.json``."""
 
     _FILESTORE_ROOT = Path(APP_SETTINGS.FILESTORE_LOCATION).expanduser()
 
-    def __init__(self, *, name: str, history_size: int = AGENT_KIBERNIKTO_SETTINGS.HISTORY_SIZE) -> None:
-        super().__init__(history_size)
+    def __init__(
+        self,
+        *,
+        name: str,
+        history_size: int = AGENT_KIBERNIKTO_SETTINGS.HISTORY_SIZE,
+        keep_thinking: bool = AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY,
+    ) -> None:
         self._name = name
+        self._history_size = history_size
+        self._keep_thinking = keep_thinking
+        self._storage: Dict[int, List[ModelMessage]] = defaultdict(list)
 
     # ── file helpers ───────────────────────────────────────────────────────
 
@@ -68,7 +52,9 @@ class FileStoreHistoryStorage(MemoryHistoryStorage):
         if messages is None:
             return
         try:
-            data = _model_message_adapter.dump_json(_sanitize(messages, keep_thinking=AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY))
+            # Belts-and-suspenders: storage is already sanitized in add_messages,
+            # but re-sanitize here so direct _storage mutations can't leak to disk.
+            data = _model_message_adapter.dump_json(_sanitize(messages, keep_thinking=self._keep_thinking))
             self._path(chat_id).write_text(data.decode("utf-8"), encoding="utf-8")
         except Exception as exc:
             logger.error("Failed to save history for chat %s: %s", chat_id, exc)
@@ -82,22 +68,22 @@ class FileStoreHistoryStorage(MemoryHistoryStorage):
             return
         try:
             messages = _model_message_adapter.validate_json(path.read_text(encoding="utf-8"))
+            # Migrate old files that still contain instructions / binaries.
+            messages = _sanitize(messages, keep_thinking=self._keep_thinking)
             self._storage[chat_id] = messages
         except Exception as exc:
             logger.warning("Failed to load history for chat %s: %s", chat_id, exc)
             self._storage[chat_id] = []
 
-    # ── overrides ──────────────────────────────────────────────────────────
+    # ── HistoryStorage ─────────────────────────────────────────────────────
 
     def get_conversation(self, chat_id: int) -> List[ModelMessage]:
         self._load(chat_id)
-        return super().get_conversation(chat_id)
+        return _window(self._storage[chat_id], self._history_size)
 
     def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
         if chat_id not in self._storage:
             self._load(chat_id)
-        super().add_messages(chat_id, messages)
-        # Purge binaries/signatures from memory too, so a long-lived process
-        # doesn't accumulate megabyte-scale FileParts in RAM.
-        self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY)
+        self._storage[chat_id].extend(messages)
+        self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)
         self._save(chat_id)

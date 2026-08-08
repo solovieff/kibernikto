@@ -8,7 +8,8 @@ from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelRespo
 from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
-from kibernikto.ai.agent.core.history import MemoryHistoryStorage, history_storage
+from kibernikto.storage.base import HistoryStorage
+from kibernikto.ai.agent.core.history import history_storage
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS, resolve_instructions
 from kibernikto.storage.file.media import media_store
@@ -25,7 +26,7 @@ model_settings: ModelSettings = ModelSettings(max_tokens=AGENT_KIBERNIKTO_SETTIN
 
 
 class KiberniktoAgent(Agent):
-    def __init__(self, *, history_storage: Optional[MemoryHistoryStorage] = history_storage, **kwargs):
+    def __init__(self, *, history_storage: Optional[HistoryStorage] = history_storage, **kwargs):
         super().__init__(**kwargs)
         self._history_storage = history_storage
         # Personality loads from {filestore}/{name}-instructions.txt, else env WHO_AM_I.
