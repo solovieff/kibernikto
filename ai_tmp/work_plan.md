@@ -14,48 +14,40 @@
 
 ## Осталось (по приоритету)
 
-### 1. Telegram Bot Agents — вызов внешних TG ботов как тулов
-Kibernikto оркеструет других Telegram-ботов через bot-to-bot. Тул `ask_bot(@username, text)` → отправка через Bot API → диспатчер ловит reply → форвардит в основной чат. Это главная фича-дифференциатор.
-- Whitelist для bot-to-bot (сейчас всё игнорится в `ServiceMiddleware`)
-- Pending-запросы: корреляция `(chat_id, target_bot, sent_msg_id)` → `reply_to_message_id`
-- DeferredTools или fire-and-forget с callback — решить при реализации
-**Файлы:** `telegram/middleware/middleware_service.py`, новый `ai/agent/tools/ask_bot.py`, `telegram/handlers/`
+### 1. Telegram Bot Agents — оркестрация внешних TG ботов
+Kibernikto вызывает других Telegram-ботов через bot-to-bot как sub-agents. Главная фича-дифференциатор.
 
 ### 2. Logfire как storage backend
-Logfire уже пишет все LLM вызовы. Сделать `LogfireHistoryStorage` по аналогии с file/pg/sqlite — читать историю из Logfire вместо дублирования.
-- Маппинг Logfire spans → `ModelMessage`
-- Latency: Logfire не локальный, под вопросом для hot-path
-- MVP: read-only история, write остаётся через существующие бэкенды
-**Файлы:** новый `storage/logfire/history.py`
+Читать историю диалогов из Logfire напрямую.
 
 ### 3. Документы: PDF/txt
 `_process_document` — заглушка. Извлечение текста, сохранение в `media/`, тул чтения по `media_ref`.
 **Файлы:** `telegram/pre_processors/_default.py`, `ai/agent/core/`
 
-### 2. smart_reply — буферизация сообщений
+### 4. smart_reply — буферизация сообщений
 Склеивать подряд идущие сообщения в один запрос (было в Kiberkalki).
 **Файлы:** `telegram/pre_processors/_default.py`
 
-### 3. prepare_request в ReportExpert
+### 5. prepare_request в ReportExpert
 Длинные запросы (>200 символов) сокращать через модель до 1 предложения.
 **Файлы:** `ai/agent/harness/report_agent/report_expert.py`
 
-### 4. KnowledgeExpert — новый RAG
+### 6. KnowledgeExpert — новый RAG
 Вместо ChromaDB: SQLite FTS5 или fastembed. Инструменты: answer_on_file, answer_on_whole_db, delete_file, list_documents.
 **Файлы:** новый `ai/agent/harness/knowledge_agent/`
 
-### 5. Scheduler daemon
+### 7. Scheduler daemon
 Процесс, читающий события и шлющий уведомления в TG.
 **Файлы:** новый `telegram/scheduler_daemon.py`
 
-### 6. Стриминг ответов — sendMessageDraft
+### 8. Стриминг ответов — sendMessageDraft
 Слать черновик и обновлять по мере генерации.
 **Файлы:** `telegram/utils/conversation.py`, `ai/agent/telegram/`
 
-### 7. Уборка
+### 9. Уборка
 - Пустые `__init__.py` в `storage/` и `storage/file/` (безвредны, можно оставить)
 - `post()` в `utils/image.py` — legacy shim
 - Старые env-переменные из env-файлов
 
-### 8. Демоны (опционально, отложено)
+### 10. Демоны (опционально, отложено)
 `_summon_daemons` / `moral_infiltrate_response` из старого Kiberkalki.
