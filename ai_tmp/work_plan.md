@@ -21,7 +21,14 @@ Kibernikto оркеструет других Telegram-ботов через bot-
 - DeferredTools или fire-and-forget с callback — решить при реализации
 **Файлы:** `telegram/middleware/middleware_service.py`, новый `ai/agent/tools/ask_bot.py`, `telegram/handlers/`
 
-### 2. Документы: PDF/txt
+### 2. Logfire как storage backend
+Logfire уже пишет все LLM вызовы. Сделать `LogfireHistoryStorage` по аналогии с file/pg/sqlite — читать историю из Logfire вместо дублирования.
+- Маппинг Logfire spans → `ModelMessage`
+- Latency: Logfire не локальный, под вопросом для hot-path
+- MVP: read-only история, write остаётся через существующие бэкенды
+**Файлы:** новый `storage/logfire/history.py`
+
+### 3. Документы: PDF/txt
 `_process_document` — заглушка. Извлечение текста, сохранение в `media/`, тул чтения по `media_ref`.
 **Файлы:** `telegram/pre_processors/_default.py`, `ai/agent/core/`
 
