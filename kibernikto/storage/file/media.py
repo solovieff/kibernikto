@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 class MediaFileStore:  # satisfies MediaStore (structural)
-    """Per-chat file storage under ``{FILESTORE_LOCATION}/media`` plus ``tmp`` transit."""
+    """Per-chat file storage under ``{FILESTORE_LOCATION}/media/{name}`` plus ``tmp`` transit."""
 
-    def __init__(self, root: Path | None = None) -> None:
+    def __init__(self, root: Path | None = None, *, name: str = "default") -> None:
         root = root or Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser()
-        self._media_dir = root / "media"
+        self._media_dir = root / "media" / name
         self._tmp_dir = root / "tmp"
 
     # ── durable media ──────────────────────────────────────────────────────

@@ -15,13 +15,14 @@ _S3_MAX_ATTEMPTS = 3
 class S3MediaStore:  # satisfies MediaStore (structural)
     """Per-chat media storage in S3-compatible bucket.
 
-    Same interface as ``MediaFileStore``: ``save`` / ``path`` / ``read`` / ``tmp_path`` / ``cleanup_tmp``.
-    ``media_ref`` is ``{chat_id}/{file}`` — the S3 key is ``media/{media_ref}``.
+    Same interface as ``MediaFileStore``: ``save`` / ``read`` / ``tmp_path`` / ``cleanup_tmp``.
+    ``media_ref`` is ``{chat_id}/{file}`` — the S3 key is ``media/{name}/{media_ref}``.
     Tmp is still local filesystem (transient voice data doesn't need S3).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, name: str = "default") -> None:
         s = STORAGE_SETTINGS
+        self._name = name
         self._bucket = s.S3_BUCKET
         self._endpoint = s.S3_ENDPOINT
         self._region = s.S3_REGION
@@ -30,10 +31,9 @@ class S3MediaStore:  # satisfies MediaStore (structural)
         self._tmp_dir = Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser() / "tmp"
         self._client = None
 
-    @staticmethod
-    def _key(media_ref: str) -> str:
+    def _key(self, media_ref: str) -> str:
         """Map a backend-agnostic media ref to an S3 object key."""
-        return f"{_S3_PREFIX}/{media_ref}"
+        return f"{_S3_PREFIX}/{self._name}/{media_ref}"
 
     async def _get_client(self):
         """Lazy aioboto3 client with retry config."""

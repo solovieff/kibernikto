@@ -55,5 +55,8 @@ history_storage = _LazySingleton(get_history_storage, "default")
 #: Shared per-chat data (credits, private_info) — one bucket across agents.
 chat_data = _LazySingleton(get_chat_data_storage, "")
 
-#: Media store (durable media + tmp transit).
-media_store = _LazySingleton(get_media_store, "")
+#: Agent-produced media (generations, reports, documents).
+media_store = _LazySingleton(get_media_store, "default")
+
+#: Telegram-uploaded media (user photos, voice, documents from TG).
+tg_media_store = _LazySingleton(get_media_store, "telegram")
