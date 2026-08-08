@@ -1,4 +1,4 @@
-# Kibernikto — migration plan
+# Kibernikto — work plan
 
 > 2026-08-08. Актуальные задачи, коротко.
 
@@ -14,7 +14,14 @@
 
 ## Осталось (по приоритету)
 
-### 1. Документы: PDF/txt
+### 1. Telegram Bot Agents — вызов внешних TG ботов как тулов
+Kibernikto оркеструет других Telegram-ботов через bot-to-bot. Тул `ask_bot(@username, text)` → отправка через Bot API → диспатчер ловит reply → форвардит в основной чат. Это главная фича-дифференциатор.
+- Whitelist для bot-to-bot (сейчас всё игнорится в `ServiceMiddleware`)
+- Pending-запросы: корреляция `(chat_id, target_bot, sent_msg_id)` → `reply_to_message_id`
+- DeferredTools или fire-and-forget с callback — решить при реализации
+**Файлы:** `telegram/middleware/middleware_service.py`, новый `ai/agent/tools/ask_bot.py`, `telegram/handlers/`
+
+### 2. Документы: PDF/txt
 `_process_document` — заглушка. Извлечение текста, сохранение в `media/`, тул чтения по `media_ref`.
 **Файлы:** `telegram/pre_processors/_default.py`, `ai/agent/core/`
 
