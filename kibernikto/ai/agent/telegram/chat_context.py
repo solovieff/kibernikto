@@ -7,7 +7,7 @@ from typing import Optional
 from aiogram.enums import ChatType
 from aiogram.types import ChatFullInfo, Message
 
-from kibernikto.storage.file.chat_data import chat_data
+from kibernikto.storage.singletons import chat_data
 
 logger = logging.getLogger(__name__)
 

@@ -1,3 +1,5 @@
+"""Backend-agnostic storage models — shared by file/sql chat_data stores."""
+
 from typing import Optional
 
 from pydantic import BaseModel, Field

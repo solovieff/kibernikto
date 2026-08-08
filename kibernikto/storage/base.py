@@ -1,10 +1,28 @@
 import dataclasses
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, List, Protocol, runtime_checkable
 
+from pydantic import TypeAdapter
 from pydantic_ai.messages import FilePart, ModelMessage, ModelRequest, ModelResponse, ThinkingPart
 
+from kibernikto.storage.models import ConversationInfo
+
 _DEFAULT_HISTORY_SIZE = 6
+
+# Single canonical adapter for ModelMessage persistence — shared by all backends
+# so serialized payloads are byte-compatible across file/sql stores.
+_model_message_adapter: TypeAdapter = TypeAdapter(list[ModelMessage])
+
+
+def serialize_messages(messages: List[ModelMessage]) -> list[dict]:
+    """Serialize messages to a JSON-compatible list of dicts (canonical storage form)."""
+    return _model_message_adapter.dump_python(messages, mode="json")
+
+
+def deserialize_messages(raw) -> List[ModelMessage]:
+    """Validate messages from a JSON-compatible payload (canonical storage form)."""
+    return _model_message_adapter.validate_python(raw)
 
 
 def _sanitize(messages: List[ModelMessage], *, keep_thinking: bool = False) -> List[ModelMessage]:
@@ -65,6 +83,37 @@ class HistoryStorage(Protocol):
     async def get_conversation(self, chat_id: int) -> List[ModelMessage]: ...
 
     async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
+
+
+@runtime_checkable
+class MediaStore(Protocol):
+    """Any media backend — local filestore, S3, etc.
+
+    ``media_ref`` is backend-agnostic: ``{chat_id}/{file}``. Implementations
+    resolve it to a local path (file) or an object key (s3) internally.
+
+    The interface is async-only: local-file backends use ``asyncio.to_thread``,
+    remote backends (S3) are naturally async. No sync convenience methods —
+    they create a false sense of compatibility across backends.
+    """
+
+    async def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str: ...
+
+    async def read(self, media_ref: str) -> bytes: ...
+
+    def tmp_path(self, name: str) -> Path: ...
+
+    @staticmethod
+    def cleanup_tmp(path: Path) -> None: ...
+
+
+@runtime_checkable
+class ChatDataStore(Protocol):
+    """Any per-chat data backend (credits, private_info) — file, postgres, etc."""
+
+    async def load(self, chat_id: int) -> ConversationInfo: ...
+
+    async def save(self, chat_id: int, info: ConversationInfo) -> None: ...
 
 
 class MemoryHistoryStorage:

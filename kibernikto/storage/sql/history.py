@@ -4,16 +4,14 @@ import logging
 from collections import defaultdict
 from typing import Dict, List
 
-from pydantic import TypeAdapter
 from pydantic_ai.messages import ModelMessage
+
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.storage.base import _sanitize, _window
-from kibernikto.storage.sql.engine import get_session, init_db
+from kibernikto.storage.base import _sanitize, _window, deserialize_messages, serialize_messages
+from kibernikto.storage.sql.engine import ensure_db_initialized, get_session
 from kibernikto.storage.sql.models import ChatHistoryRow
 
 logger = logging.getLogger(__name__)
-
-_model_message_adapter: TypeAdapter = TypeAdapter(list[ModelMessage])
 
 
 class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
@@ -34,20 +32,17 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
         self._history_size = history_size
         self._keep_thinking = keep_thinking
         self._storage: Dict[int, List[ModelMessage]] = defaultdict(list)
-        self._loaded: set[int] = set()  # track which chat_ids are already in cache
-
-    async def _ensure_table(self) -> None:
-        await init_db()
+        self._loaded: set[int] = set()
 
     async def _load(self, chat_id: int) -> None:
         if chat_id in self._loaded:
             return
-        await self._ensure_table()
+        await ensure_db_initialized()
         async with await get_session() as session:
             row = await session.get(ChatHistoryRow, chat_id)
             if row is not None and row.messages:
                 try:
-                    messages = _model_message_adapter.validate_python(row.messages)
+                    messages = deserialize_messages(row.messages)
                     messages = _sanitize(messages, keep_thinking=self._keep_thinking)
                     self._storage[chat_id] = messages
                 except Exception as exc:
@@ -61,10 +56,8 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
         messages = self._storage.get(chat_id)
         if messages is None:
             return
-        await self._ensure_table()
-        raw = _model_message_adapter.dump_python(
-            _sanitize(messages, keep_thinking=self._keep_thinking), mode="json"
-        )
+        await ensure_db_initialized()
+        raw = serialize_messages(_sanitize(messages, keep_thinking=self._keep_thinking))
         async with await get_session() as session:
             row = await session.get(ChatHistoryRow, chat_id)
             if row is None:

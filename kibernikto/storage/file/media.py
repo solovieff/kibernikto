@@ -8,6 +8,7 @@ Everything lives under ``{APP_FILESTORE_LOCATION}``:
   after use.
 """
 
+import asyncio
 import logging
 import uuid
 from pathlib import Path
@@ -17,7 +18,7 @@ from kibernikto.config import APP_SETTINGS
 logger = logging.getLogger(__name__)
 
 
-class MediaFileStore:
+class MediaFileStore:  # satisfies MediaStore (structural)
     """Per-chat file storage under ``{FILESTORE_LOCATION}/media`` plus ``tmp`` transit."""
 
     def __init__(self, root: Path | None = None) -> None:
@@ -29,7 +30,6 @@ class MediaFileStore:
 
     async def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str:
         """Persist bytes under ``media/{chat_id}/``; returns a media ref ``"{chat_id}/{file}"``."""
-        import asyncio
         chat_dir = self._media_dir / str(chat_id)
         chat_dir.mkdir(parents=True, exist_ok=True)
         file_name = name or f"{uuid.uuid4().hex[:12]}.{ext.lstrip('.')}"
@@ -40,9 +40,9 @@ class MediaFileStore:
         """Resolve a media ref to a local path."""
         return self._media_dir / media_ref
 
-    def read(self, media_ref: str) -> bytes:
-        """Read the bytes of a media ref."""
-        return self.path(media_ref).read_bytes()
+    async def read(self, media_ref: str) -> bytes:
+        """Read the bytes of a media ref (async, off-loaded to a thread)."""
+        return await asyncio.to_thread(self.path(media_ref).read_bytes)
 
     # ── tmp transit ────────────────────────────────────────────────────────
 
@@ -58,16 +58,3 @@ class MediaFileStore:
             path.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning("Failed to clean tmp file %s: %s", path, exc)
-
-#: Lazily resolved module-level singleton (PEP 562).
-_media_store = None
-
-
-def __getattr__(name: str):
-    if name == "media_store":
-        global _media_store
-        if _media_store is None:
-            from kibernikto.storage.factory import get_media_store
-            _media_store = get_media_store()
-        return _media_store
-    raise AttributeError(name)

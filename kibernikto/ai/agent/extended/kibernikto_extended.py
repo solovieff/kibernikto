@@ -9,7 +9,7 @@ from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.utils import infer_kibernikto_model
-from kibernikto.storage.file.chat_data import chat_data
+from kibernikto.storage.singletons import chat_data
 from kibernikto.storage.factory import get_history_storage
 from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
 from kibernikto.ai.agent.telegram.deps import TelegramDeps

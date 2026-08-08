@@ -9,10 +9,10 @@ from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.storage.base import HistoryStorage
-from kibernikto.ai.agent.core.history import history_storage
+from kibernikto.storage.singletons import history_storage
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS, resolve_instructions
-from kibernikto.storage.file.media import media_store
+from kibernikto.storage.singletons import media_store
 from kibernikto.utils.image_hosting import image_hosting
 
 logger = logging.getLogger(__name__)

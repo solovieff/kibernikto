@@ -14,7 +14,7 @@ from kibernikto.ai.agent.core.kibernikto_agent import agent as kibernikto_agent
 from kibernikto.ai.agent.core.kibernikto_agent import model as kibernikto_model
 from kibernikto.ai.agent.core.image import generate_image
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
-from kibernikto.storage.file.chat_data import chat_data
+from kibernikto.storage.singletons import chat_data
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.telegram.utils.conversation import reply

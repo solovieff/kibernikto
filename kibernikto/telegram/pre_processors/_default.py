@@ -7,7 +7,7 @@ from aiogram.enums import MessageOriginType
 from aiogram.exceptions import TelegramBadRequest
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from kibernikto.storage.file.media import media_store
+from kibernikto.storage.singletons import media_store
 from kibernikto.utils.image_hosting import image_hosting
 from kibernikto.telegram.utils import permissions
 

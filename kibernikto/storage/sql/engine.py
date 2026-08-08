@@ -1,5 +1,6 @@
 """SQLAlchemy async engine + sessionmaker — resolves DSN from StorageSettings."""
 
+import asyncio
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -11,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 _engine = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
+_db_initialized = False
+_init_lock: asyncio.Lock | None = None
 
 
 def _dsn() -> str:
@@ -25,24 +28,35 @@ def _dsn() -> str:
     raise RuntimeError(f"Unsupported DATA_BACKEND for SQL engine: {s.DATA_BACKEND}")
 
 
-def _create_engine():
+def _create_engine() -> None:
     global _engine, _sessionmaker
     url = _dsn()
+    # Log DSN without credentials.
     logger.info("Creating SQLAlchemy async engine: %s", url.split("@")[-1] if "@" in url else url)
     _engine = create_async_engine(url, echo=False)
     _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
 
 
-async def init_db() -> None:
-    """Create tables if they don't exist (safe to call on every startup)."""
-    if _engine is None:
-        _create_engine()
-    async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def ensure_db_initialized() -> None:
+    """Create tables once per process. Safe to call from any async context."""
+    global _db_initialized, _init_lock
+    if _db_initialized:
+        return
+    if _init_lock is None:
+        _init_lock = asyncio.Lock()
+    async with _init_lock:
+        if _db_initialized:  # double-check after acquiring the lock
+            return
+        if _engine is None:
+            _create_engine()
+        async with _engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        _db_initialized = True
+        logger.info("Database tables ensured (create_all).")
 
 
 async def get_session() -> AsyncSession:
-    """Return an async session (caller must close/use as context manager)."""
+    """Return an async session (caller must use as context manager)."""
     if _sessionmaker is None:
         _create_engine()
     return _sessionmaker()
@@ -50,8 +64,10 @@ async def get_session() -> AsyncSession:
 
 async def shutdown_db() -> None:
     """Dispose the engine pool (call on app shutdown)."""
-    global _engine, _sessionmaker
+    global _engine, _sessionmaker, _db_initialized
     if _engine is not None:
         await _engine.dispose()
         _engine = None
         _sessionmaker = None
+        _db_initialized = False
+        logger.info("SQL engine disposed.")

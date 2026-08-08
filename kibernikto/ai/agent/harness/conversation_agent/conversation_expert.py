@@ -12,10 +12,9 @@ import os
 from pydantic_ai import RunContext
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
-from kibernikto.ai.agent.core.history import history_storage
+from kibernikto.storage.singletons import chat_data, history_storage
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
-from kibernikto.storage.file.chat_data import chat_data
 
 logger = logging.getLogger(__name__)
 
