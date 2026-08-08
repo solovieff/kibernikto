@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.storage.base import _sanitize, _window
 from kibernikto.storage.config import STORAGE_SETTINGS
-from kibernikto.storage.sql.engine import ensure_db_initialized, get_session
+from kibernikto.storage.sql.engine import get_session
 from kibernikto.storage.sql.models import ChatMessageRow
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,6 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
 
     async def _read_tail(self, chat_id: int, limit: int) -> List[ModelMessage]:
         """Read the last ``limit`` messages for *chat_id*, oldest-first."""
-        await ensure_db_initialized()
         async with await get_session() as session:
             stmt = (
                 select(ChatMessageRow.payload)
@@ -83,7 +82,6 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
         if not messages:
             return
         clean = _sanitize(messages, keep_thinking=self._keep_thinking)
-        await ensure_db_initialized()
         async with await get_session() as session:
             seq = await self._next_seq(session, chat_id)
             for msg in clean:

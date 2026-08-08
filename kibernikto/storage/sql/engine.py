@@ -40,7 +40,16 @@ def _create_engine() -> None:
 
 
 async def ensure_db_initialized() -> None:
-    """Create tables once per process. Safe to call from any async context."""
+    """Create tables once per process. Safe to call from any async context.
+
+    Telegram: вызывается в ``_on_startup`` (telegram_app.py) — engine создаётся
+    в том же event loop что и polling.
+
+    Standalone (без Telegram): вызови один раз перед ``agent.run()``:
+
+        await ensure_db_initialized()
+        result = await agent.run('...', chat_id=123)
+    """
     global _db_initialized, _init_lock
     if _db_initialized:
         return
@@ -58,9 +67,9 @@ async def ensure_db_initialized() -> None:
 
 
 async def get_session() -> AsyncSession:
-    """Return an async session (caller must use as context manager)."""
+    """Return an async session. Engine must be initialized via ensure_db_initialized() first."""
     if _sessionmaker is None:
-        _create_engine()
+        raise RuntimeError("DB not initialized — call ensure_db_initialized() first")
     return _sessionmaker()
 
 
