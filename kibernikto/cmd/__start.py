@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.config import configure_logger, print_banner
-import kibernikto.ai.agent.telegram_agent as _tg_agent
+import kibernikto.ai.agent.telegram.telegram_agent as _tg_agent
 
 
 def start(outer_env=False):
@@ -23,7 +23,7 @@ def start(outer_env=False):
     print_banner()
 
     if args.multi_agent:
-        from kibernikto.ai.agent.telegram_agent import set_telegram_agent
+        from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
         from kibernikto.ai.agent.extended.orchestrators import kibernikto_subagents_agent
 
         # Use the pre-built subagents agent (SubAgents delegation with all expert sub-agents).

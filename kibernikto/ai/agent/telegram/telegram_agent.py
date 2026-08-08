@@ -1,105 +1,30 @@
+"""TelegramAgent — KiberniktoAgent with Telegram transport (deps, preprocess, reply)."""
+
 import asyncio
 import logging
 import random
-import time
-from dataclasses import dataclass
 from typing import Optional
 
 from aiogram.enums import ChatType
-from aiogram.types import Chat, ChatFullInfo, Message
+from aiogram.types import Message
 from pydantic_ai import AgentRunResult, ModelHTTPError, RunContext
-from pydantic_ai.capabilities import NativeTool
-from pydantic_ai.messages import UserContent
 
-from kibernikto.ai.agent import kibernikto_agent, kibernikto_model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.core.kibernikto_agent import agent as kibernikto_agent
+from kibernikto.ai.agent.core.kibernikto_agent import model as kibernikto_model
 from kibernikto.ai.agent.core.image import generate_image
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.storage.file.chat_data import chat_data
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.telegram.utils.conversation import reply
-from kibernikto.utils.time_utils import enhance_message, get_user_time
+
+from .chat_context import refresh_chat_context
+from .deps import TelegramDeps
+from .group_message import annotate_group_message
+from .identity import get_bot_identity
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class TelegramDeps(KiberniktoDeps):
-    """Run-scoped deps for the Telegram agent.
-
-    Inherits the transport-agnostic side-channel (``attachments`` / ``extra``)
-    from :class:`KiberniktoDeps` and adds Telegram-specific context so tools can
-    react to the originating chat/user.
-    """
-
-    is_personal: bool = True
-    chat_id: Optional[int] = None
-    user_id: Optional[int] = None
-    username: Optional[str] = None
-    user_full_name: Optional[str] = None
-    app_chat_info: Optional[str] = None
-    app_chat_name: Optional[str] = None
-    message: Optional[Message] = None
-    timezone: Optional[str] = None
-
-
-# ── Chat enrichment ───────────────────────────────────────────────────────────
-
-_CHAT_REFRESH_SECONDS = 600.0
-
-
-def _format_chat_context(chat: ChatFullInfo) -> Optional[str]:
-    """Compact one-line chat facts (title/description/bio/members/birthday) from a full Chat."""
-    if chat.type in (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL):
-        parts = [f"group chat in '{chat.title}'"]
-        if chat.username:
-            parts.append(f"username: @{chat.username}")
-        if chat.description:
-            parts.append(f"chat_info: {chat.description}")
-        if getattr(chat, "member_count", None):
-            parts.append(f"members: {chat.member_count}")
-        return " | ".join(parts)
-    name = " ".join(filter(None, [chat.first_name, chat.last_name])) or "unknown"
-    parts = [f"private chat with {name}"]
-    if chat.username:
-        parts.append(f"username: @{chat.username}")
-    if getattr(chat, "bio", None):
-        parts.append(f"bio: {chat.bio}")
-    birthdate = getattr(chat, "birthdate", None)
-    if birthdate:
-        bd = f"{birthdate.day:02d}.{birthdate.month:02d}"
-        if getattr(birthdate, "year", None):
-            bd += f".{birthdate.year}"
-        parts.append(f"birthday: {bd}")
-    return " | ".join(parts)
-
-
-async def _refresh_chat_context(message: Message) -> None:
-    """Persist full getChat facts into the chat bucket, refreshing when missing or stale."""
-    info = chat_data.load(message.chat.id)
-    updated_at = info.client_app_info_updated_at or 0
-    if info.client_app_info and time.time() - updated_at < _CHAT_REFRESH_SECONDS:
-        return
-    try:
-        chat = await message.bot.get_chat(message.chat.id)
-    except Exception as error:
-        logger.warning("Failed to fetch full chat %s: %s", message.chat.id, error)
-        return
-    info.client_app_info = _format_chat_context(chat) or info.client_app_info
-    info.client_app_info_updated_at = time.time()
-    chat_data.save(message.chat.id, info)
-
-
-def _annotate_group_message(parts: list[UserContent], author: str, timezone: str) -> list[UserContent]:
-    """Prefix the message with the author and local time — [{author} at {time}]."""
-    stamp = f"[{author} at {get_user_time(timezone)}]"
-    for i, part in enumerate(parts):
-        if isinstance(part, str) and part.strip():
-            parts[i] = enhance_message(part, author, timezone)
-            return parts
-    return [stamp, *parts]
 
 
 class TelegramAgent(KiberniktoAgent):
@@ -122,11 +47,16 @@ class TelegramAgent(KiberniktoAgent):
         super().__init__(**kwargs)
         self._pre_processor = pre_processor or TelegramMessagePreprocessor()
         # Instructions survive history window truncation — always sent each turn.
-        # Base KiberniktoAgent injects personality; here we add per-run user/chat context.
+        # Base KiberniktoAgent injects personality; here we add bot identity + per-run user/chat context.
+        self.instructions(self._bot_identity_prompt)
         self.instructions(self._user_context_prompt)
         # Reusable image-generation tool: delivers its result via deps.attachments.
         if AGENT_KIBERNIKTO_SETTINGS.IMAGE_MODEL_NAME:
             self.tool(generate_image)
+
+    async def _bot_identity_prompt(self, ctx: RunContext[TelegramDeps]) -> str:
+        """Inject bot identity (getMe + descriptions) — set once at startup."""
+        return get_bot_identity() or ""
 
     async def _user_context_prompt(self, ctx: RunContext[TelegramDeps]) -> str:
         """Inject the transport-built conversation context into the system prompt each run."""
@@ -160,7 +90,7 @@ class TelegramAgent(KiberniktoAgent):
             user_full_name=message.from_user.full_name if message.from_user else None,
             message=message,
         )
-        await _refresh_chat_context(message)
+        await refresh_chat_context(message)
         info = chat_data.load(message.chat.id)
         deps.conversation_context = f"[Current conversation context] {info.as_string()}"
         deps.timezone = info.timezone
@@ -194,7 +124,7 @@ class TelegramAgent(KiberniktoAgent):
         # Bots are identified by @username (so peers can mention them), humans by full name.
         if not deps.is_personal and (deps.user_full_name or deps.username):
             author = deps.username if message.from_user and message.from_user.is_bot else deps.user_full_name
-            user_message = _annotate_group_message(list(user_message), author, deps.timezone or "Europe/Moscow")
+            user_message = annotate_group_message(list(user_message), author, deps.timezone or "Europe/Moscow")
             deps.user_message_parts = list(user_message)
 
         try:
@@ -223,6 +153,7 @@ class TelegramAgent(KiberniktoAgent):
         Returns :class:`TelegramApp` — call ``.run_polling()`` to start.
         """
         from kibernikto.telegram.agent.telegram_app import TelegramApp
+
         return TelegramApp.from_agent(self)
 
 

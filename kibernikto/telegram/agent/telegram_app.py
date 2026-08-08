@@ -12,7 +12,7 @@ from aiogram.enums import ParseMode
 if TYPE_CHECKING:
     from aiogram.types import User
 
-    from kibernikto.ai.agent.telegram_agent import TelegramAgent
+    from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,35 @@ class TelegramApp:
             global bot_me
             bot_me = await bot.get_me()
             logger.info("Bot started as @%s", bot_me.username)
+            # Populate global bot identity for system-prompt injection.
+            try:
+                from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+                from kibernikto.ai.agent.telegram.identity import format_bot_identity, set_bot_identity
+
+                short_desc = None
+                desc = None
+                try:
+                    sd = await bot.get_my_short_description()
+                    short_desc = getattr(sd, "short_description", None) or getattr(sd, "description", None)
+                except Exception:
+                    pass
+                try:
+                    d = await bot.get_my_description()
+                    desc = getattr(d, "description", None)
+                except Exception:
+                    pass
+                identity = format_bot_identity(
+                    username=bot_me.username,
+                    first_name=getattr(bot_me, "first_name", None),
+                    short_description=short_desc,
+                    description=desc,
+                    name=AGENT_KIBERNIKTO_SETTINGS.NAME,
+                )
+                if identity:
+                    set_bot_identity(identity)
+                    logger.info("Bot identity: %s", identity)
+            except Exception as exc:
+                logger.warning("Failed to build bot identity: %s", exc)
             if TELEGRAM_SETTINGS.SAY_HI:
                 from kibernikto.telegram.utils.conversation import send_random_sticker
 
