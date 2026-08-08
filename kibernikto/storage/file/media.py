@@ -13,7 +13,7 @@ import logging
 import uuid
 from pathlib import Path
 
-from kibernikto.config import APP_SETTINGS
+from kibernikto.storage.config import STORAGE_SETTINGS
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class MediaFileStore:  # satisfies MediaStore (structural)
     """Per-chat file storage under ``{FILESTORE_LOCATION}/media`` plus ``tmp`` transit."""
 
     def __init__(self, root: Path | None = None) -> None:
-        root = root or Path(APP_SETTINGS.FILESTORE_LOCATION).expanduser()
+        root = root or Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser()
         self._media_dir = root / "media"
         self._tmp_dir = root / "tmp"
 

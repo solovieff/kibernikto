@@ -4,7 +4,6 @@ import logging
 import uuid
 from pathlib import Path
 
-from kibernikto.config import APP_SETTINGS
 from kibernikto.storage.config import STORAGE_SETTINGS
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ class S3MediaStore:  # satisfies MediaStore (structural)
         self._region = s.S3_REGION
         self._access_key = s.S3_ACCESS_KEY
         self._secret_key = s.S3_SECRET_KEY
-        self._tmp_dir = Path(APP_SETTINGS.FILESTORE_LOCATION).expanduser() / "tmp"
+        self._tmp_dir = Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser() / "tmp"
         self._client = None
 
     @staticmethod

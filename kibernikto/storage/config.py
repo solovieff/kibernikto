@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class StorageSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_STORAGE_")
 
+    FILESTORE_LOCATION: str = Field(default="~/.kibernikto", description="Root directory for file-based storage")
     DATA_BACKEND: Literal["file", "pg", "sqlite"] = Field(default="file")
     MEDIA_BACKEND: Literal["file", "s3"] = Field(default="file")
 

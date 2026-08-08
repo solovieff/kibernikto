@@ -2,7 +2,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from kibernikto.config import APP_SETTINGS
+from kibernikto.storage.config import STORAGE_SETTINGS
 from kibernikto.storage.models import ConversationInfo
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ class ChatDataStorage:  # satisfies ChatDataStore (structural)
     """Per-chat JSON storage under ``{FILESTORE_LOCATION}/chat_data/{chat_id}.json``."""
 
     def __init__(self, root: Path | None = None) -> None:
-        self._root = root or Path(APP_SETTINGS.FILESTORE_LOCATION).expanduser()
+        self._root = root or Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser()
 
     def _dir(self) -> Path:
         p = self._root / "chat_data"

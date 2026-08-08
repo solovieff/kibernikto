@@ -8,8 +8,8 @@ from typing import Dict, List
 from pydantic_ai.messages import ModelMessage
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.config import APP_SETTINGS
 from kibernikto.storage.base import _sanitize, _window, deserialize_messages, serialize_messages
+from kibernikto.storage.config import STORAGE_SETTINGS
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
         keep_thinking: bool = AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY,
         root: Path | None = None,
     ) -> None:
-        self._root = root or Path(APP_SETTINGS.FILESTORE_LOCATION).expanduser()
+        self._root = root or Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser()
         self._name = name
         self._history_size = history_size
         self._keep_thinking = keep_thinking
