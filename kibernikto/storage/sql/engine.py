@@ -1,6 +1,7 @@
 """SQLAlchemy async engine + sessionmaker — resolves DSN from StorageSettings."""
 
 import asyncio
+import json
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -17,11 +18,9 @@ _init_lock: asyncio.Lock | None = None
 
 
 def _dsn() -> str:
-    """Resolve DSN based on DATA_BACKEND."""
+    """Resolve DSN based on DATA_BACKEND. Settings are already validated at import time."""
     s = STORAGE_SETTINGS
     if s.DATA_BACKEND == "pg":
-        if not s.PG_DSN:
-            raise RuntimeError("APP_STORAGE_DATA_BACKEND=pg but APP_STORAGE_PG_DSN is not set")
         return s.PG_DSN
     if s.DATA_BACKEND == "sqlite":
         return f"sqlite+aiosqlite:///{s.SQLITE_PATH}"
@@ -33,7 +32,10 @@ def _create_engine() -> None:
     url = _dsn()
     # Log DSN without credentials.
     logger.info("Creating SQLAlchemy async engine: %s", url.split("@")[-1] if "@" in url else url)
-    _engine = create_async_engine(url, echo=False)
+    _engine = create_async_engine(
+        url, echo=False,
+        json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
+    )
     _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
 
 

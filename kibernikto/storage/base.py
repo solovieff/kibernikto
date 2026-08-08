@@ -82,6 +82,8 @@ class HistoryStorage(Protocol):
 
     async def get_conversation(self, chat_id: int) -> List[ModelMessage]: ...
 
+    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]: ...
+
     async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
 
 
@@ -128,6 +130,9 @@ class MemoryHistoryStorage:
 
     async def get_conversation(self, chat_id: int) -> List[ModelMessage]:
         return _window(self._storage[chat_id], self._history_size)
+
+    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]:
+        return self._storage[chat_id][-limit:]
 
     async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
         self._storage[chat_id].extend(messages)

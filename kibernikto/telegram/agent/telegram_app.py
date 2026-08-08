@@ -68,8 +68,13 @@ class TelegramApp:
 
         app = cls(bot, dispatcher)
 
-        # Startup hook: fetch bot identity + optional greeting.
+        # Startup hook: DB tables + bot identity + optional greeting.
         async def _on_startup(bot: Bot) -> None:
+            from kibernikto.storage.config import STORAGE_SETTINGS
+            if STORAGE_SETTINGS.DATA_BACKEND in ("pg", "sqlite"):
+                from kibernikto.storage.sql.engine import ensure_db_initialized
+                await ensure_db_initialized()
+
             global bot_me
             bot_me = await bot.get_me()
             logger.info("Bot started as @%s", bot_me.username)

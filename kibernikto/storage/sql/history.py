@@ -1,25 +1,33 @@
-"""SqlHistoryStorage — HistoryStorage backed by SQLAlchemy async (PG or SQLite)."""
+"""SqlHistoryStorage — per-message HistoryStorage via SQLAlchemy async (PG or SQLite).
+
+One ``ModelMessage`` per row in ``chat_messages`` — no giant JSON blobs, no
+in-memory cache, no whole-chat reads on every turn. ``get_conversation`` reads
+only the tail rows needed for the window; ``add_messages`` appends new rows.
+"""
 
 import logging
-from collections import defaultdict
-from typing import Dict, List
+from typing import List
 
+from pydantic import TypeAdapter
 from pydantic_ai.messages import ModelMessage
+from sqlalchemy import func, select
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.storage.base import _sanitize, _window, deserialize_messages, serialize_messages
+from kibernikto.storage.base import _sanitize, _window
+from kibernikto.storage.config import STORAGE_SETTINGS
 from kibernikto.storage.sql.engine import ensure_db_initialized, get_session
-from kibernikto.storage.sql.models import ChatHistoryRow
+from kibernikto.storage.sql.models import ChatMessageRow
 
 logger = logging.getLogger(__name__)
 
+# Single-message adapter — the payload column stores one serialized ModelMessage.
+_message_adapter: TypeAdapter = TypeAdapter(ModelMessage)
+
+# Slack multiplier moved to STORAGE_SETTINGS.HISTORY_WINDOW_SLACK.
+
 
 class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
-    """History storage via SQLAlchemy async — shared PG/SQLite impl.
-
-    Keeps an in-memory cache (same ``defaultdict`` pattern as file variant)
-    so repeated reads within the same process don't hit the DB every turn.
-    """
+    """Per-message history storage — one row per ``ModelMessage``."""
 
     def __init__(
         self,
@@ -31,50 +39,60 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
         self._name = name
         self._history_size = history_size
         self._keep_thinking = keep_thinking
-        self._storage: Dict[int, List[ModelMessage]] = defaultdict(list)
-        self._loaded: set[int] = set()
 
-    async def _load(self, chat_id: int) -> None:
-        if chat_id in self._loaded:
-            return
+    async def _read_tail(self, chat_id: int, limit: int) -> List[ModelMessage]:
+        """Read the last ``limit`` messages for *chat_id*, oldest-first."""
         await ensure_db_initialized()
         async with await get_session() as session:
-            row = await session.get(ChatHistoryRow, chat_id)
-            if row is not None and row.messages:
-                try:
-                    messages = deserialize_messages(row.messages)
-                    messages = _sanitize(messages, keep_thinking=self._keep_thinking)
-                    self._storage[chat_id] = messages
-                except Exception as exc:
-                    logger.warning("Failed to parse history for chat %s: %s", chat_id, exc)
-                    self._storage[chat_id] = []
-            else:
-                self._storage[chat_id] = []
-        self._loaded.add(chat_id)
+            stmt = (
+                select(ChatMessageRow.payload)
+                .where(
+                    ChatMessageRow.chat_id == chat_id,
+                    ChatMessageRow.name == self._name,
+                )
+                .order_by(ChatMessageRow.seq.desc())
+                .limit(limit)
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+        messages: List[ModelMessage] = []
+        for raw in reversed(rows):
+            try:
+                messages.append(_message_adapter.validate_python(raw))
+            except Exception as exc:
+                logger.warning("Skipping unparseable message for chat %s: %s", chat_id, exc)
+        return messages
 
-    async def _save(self, chat_id: int) -> None:
-        messages = self._storage.get(chat_id)
-        if messages is None:
-            return
-        await ensure_db_initialized()
-        raw = serialize_messages(_sanitize(messages, keep_thinking=self._keep_thinking))
-        async with await get_session() as session:
-            row = await session.get(ChatHistoryRow, chat_id)
-            if row is None:
-                row = ChatHistoryRow(chat_id=chat_id, messages=raw)
-                session.add(row)
-            else:
-                row.messages = raw
-            await session.commit()
+    async def _next_seq(self, session, chat_id: int) -> int:
+        stmt = select(func.coalesce(func.max(ChatMessageRow.seq), -1)).where(
+            ChatMessageRow.chat_id == chat_id,
+            ChatMessageRow.name == self._name,
+        )
+        return (await session.execute(stmt)).scalar_one() + 1
 
     # ── HistoryStorage ─────────────────────────────────────────────────────
 
     async def get_conversation(self, chat_id: int) -> List[ModelMessage]:
-        await self._load(chat_id)
-        return _window(self._storage[chat_id], self._history_size)
+        # Fetch the tail with slack so _window can align to a request boundary.
+        tail = await self._read_tail(chat_id, self._history_size * STORAGE_SETTINGS.HISTORY_WINDOW_SLACK)
+        return _window(tail, self._history_size)
+
+    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]:
+        return await self._read_tail(chat_id, limit)
 
     async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
-        await self._load(chat_id)
-        self._storage[chat_id].extend(messages)
-        self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)
-        await self._save(chat_id)
+        if not messages:
+            return
+        clean = _sanitize(messages, keep_thinking=self._keep_thinking)
+        await ensure_db_initialized()
+        async with await get_session() as session:
+            seq = await self._next_seq(session, chat_id)
+            for msg in clean:
+                session.add(ChatMessageRow(
+                    chat_id=chat_id,
+                    name=self._name,
+                    seq=seq,
+                    kind=msg.kind,
+                    payload=_message_adapter.dump_python(msg, mode="json"),
+                ))
+                seq += 1
+            await session.commit()

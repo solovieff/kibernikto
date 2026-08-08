@@ -22,6 +22,9 @@ def start(outer_env=False):
     configure_logger()
     print_banner()
 
+    from kibernikto.storage.config import validate_storage
+    validate_storage()
+
     if args.multi_agent:
         from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
         from kibernikto.ai.agent.extended.orchestrators import kibernikto_subagents_agent

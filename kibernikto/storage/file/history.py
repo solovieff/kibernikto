@@ -81,6 +81,10 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
         await self._load(chat_id)
         return _window(self._storage[chat_id], self._history_size)
 
+    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]:
+        await self._load(chat_id)
+        return self._storage[chat_id][-limit:]
+
     async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
         await self._load(chat_id)
         self._storage[chat_id].extend(messages)

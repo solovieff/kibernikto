@@ -10,6 +10,7 @@ import logging
 import os
 
 from pydantic_ai import RunContext
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.storage.singletons import chat_data, history_storage
@@ -65,18 +66,29 @@ async def set_user_info(ctx: RunContext[KiberniktoDeps], new_info: str) -> str:
     return "Info replaced."
 
 
+def _format_message(m) -> str | None:
+    """Render one ModelMessage as a text line for the history dump."""
+    if isinstance(m, ModelRequest):
+        for part in m.parts:
+            if isinstance(part, UserPromptPart):
+                return f"user: {part.content if isinstance(part.content, str) else '[content]'}"
+        return None
+    if isinstance(m, ModelResponse):
+        # Only visible text — tool calls/returns are internal plumbing.
+        bits = [part.content for part in m.parts if isinstance(part, TextPart)]
+        return f"assistant: {' '.join(bits)}" if bits else None
+    return None
+
+
 @conversation_agent.tool
 async def answer_on_full_history(ctx: RunContext[KiberniktoDeps], request: str) -> str:
     """Answer a request based on the full chat history."""
     chat_id = ctx.deps.chat_id if ctx.deps else None
     if chat_id is None:
         return "No chat context available."
-    # Get full history (up to 5000 messages).
-    messages = await history_storage.get_conversation(chat_id)
+    messages = await history_storage.get_full_conversation(chat_id, limit=5000)
     if not messages:
         return "No chat history available yet."
-    # Format history as text for the model.
-    history_text = "\n".join(
-        f"{m.kind}: {getattr(m, 'content', '')}" for m in messages[-5000:]
-    )
+    lines = [line for m in messages if (line := _format_message(m))]
+    history_text = "\n".join(lines)
     return f"Chat history:\n{history_text}\n\nAnswer this request based on the history: {request}"

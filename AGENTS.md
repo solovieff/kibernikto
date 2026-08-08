@@ -59,6 +59,37 @@ CLI (kibernikto command / main.py)
 ## Python Style
 Write code as an expert top level senior mega cto developer. Cold and effective pro. One line good comments!
 
+Python Development (3.14+)
+
+Core Philosophy
+
+Stdlib and Mature Libraries First
+
+Always prefer Python stdlib solutions
+External deps only when stdlib insufficient
+Prefer dataclasses over attrs, pathlib over os.path
+Type Hints Everywhere (No Any)
+
+Python 3.14 has lazy annotations by default
+Use Protocol for structural typing (duck typing)
+Avoid Any—use concrete types or generics
+NEVER use typing.Optional. Use Type | None instead (e.g., str | None).
+Protocol Over ABC
+
+Protocol for implicit interface satisfaction
+ABC only when runtime isinstance() needed
+Protocols are more flexible and Pythonic
+Flat Control Flow
+
+Guard clauses with early returns
+Pattern matching to flatten conditionals
+Maximum 2 levels of nesting
+Explicit Error Handling
+
+Custom exception hierarchy for domain errors
+Raise early, handle at boundaries
+except ValueError | TypeError: (no parens)
+
 ## Build & Run
 - Don't install packages yourself — ask first
 - Check `.idea/runConfigurations/` before running tests or code

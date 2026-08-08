@@ -47,7 +47,11 @@ class S3MediaStore:  # satisfies MediaStore (structural)
                 region_name=self._region,
                 aws_access_key_id=self._access_key,
                 aws_secret_access_key=self._secret_key,
-                config=BotoConfig(retries={"max_attempts": _S3_MAX_ATTEMPTS}),
+                config=BotoConfig(
+                    retries={"max_attempts": _S3_MAX_ATTEMPTS},
+                    s3={"addressing_style": STORAGE_SETTINGS.S3_ADDRESSING_STYLE},
+                    request_checksum_calculation=STORAGE_SETTINGS.S3_CHECKSUM_CALCULATION,
+                ),
             ).__aenter__()
         return self._client
 
