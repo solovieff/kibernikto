@@ -91,7 +91,7 @@ class TelegramAgent(KiberniktoAgent):
             message=message,
         )
         await refresh_chat_context(message)
-        info = chat_data.load(message.chat.id)
+        info = await chat_data.load(message.chat.id)
         deps.conversation_context = f"[Current conversation context] {info.as_string()}"
         deps.timezone = info.timezone
         return deps

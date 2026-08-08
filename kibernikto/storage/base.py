@@ -62,9 +62,9 @@ def _window(messages: List[ModelMessage], history_size: int) -> List[ModelMessag
 class HistoryStorage(Protocol):
     """Any per-chat history backend — in-memory, file, postgres, etc."""
 
-    def get_conversation(self, chat_id: int) -> List[ModelMessage]: ...
+    async def get_conversation(self, chat_id: int) -> List[ModelMessage]: ...
 
-    def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
+    async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
 
 
 class MemoryHistoryStorage:
@@ -77,9 +77,9 @@ class MemoryHistoryStorage:
         self._history_size = history_size
         self._keep_thinking = keep_thinking
 
-    def get_conversation(self, chat_id: int) -> List[ModelMessage]:
+    async def get_conversation(self, chat_id: int) -> List[ModelMessage]:
         return _window(self._storage[chat_id], self._history_size)
 
-    def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
+    async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
         self._storage[chat_id].extend(messages)
         self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)

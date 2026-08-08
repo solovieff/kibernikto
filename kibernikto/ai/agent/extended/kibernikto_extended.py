@@ -10,7 +10,7 @@ from pydantic_ai.models import Model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.storage.file.chat_data import chat_data
-from kibernikto.storage.file.history import FileStoreHistoryStorage
+from kibernikto.storage.factory import get_history_storage
 from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
@@ -29,14 +29,14 @@ class KiberniktoExtended(TelegramAgent):
 
     def __init__(self, **kwargs) -> None:
         agent_name = kwargs.get('name', AGENT_KIBERNIKTO_SETTINGS.NAME)
-        kwargs.setdefault('history_storage', FileStoreHistoryStorage(name=agent_name))
+        kwargs.setdefault('history_storage', get_history_storage(agent_name))
         super().__init__(**kwargs)
 
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
         """Run with credit-based model selection, then charge credits after."""
         model_override: Model | None = None
         if chat_id is not None:
-            info = chat_data.load(chat_id)
+            info = await chat_data.load(chat_id)
             model_override = infer_kibernikto_model(info.model_name)
 
         if model_override is not None:
@@ -46,11 +46,11 @@ class KiberniktoExtended(TelegramAgent):
 
         # Charge credits after a successful run.
         if chat_id is not None:
-            info = chat_data.load(chat_id)
+            info = await chat_data.load(chat_id)
             previous_tier = _credit_tier(info.credits)
             info.charge(effort=1)
             new_tier = _credit_tier(info.credits)
-            chat_data.save(chat_id, info)
+            await chat_data.save(chat_id, info)
             if new_tier != previous_tier:
                 logger.info("Model tier changed for chat %s: %s -> %s", chat_id, previous_tier, new_tier)
 

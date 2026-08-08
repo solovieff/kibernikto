@@ -46,9 +46,9 @@ async def add_user_info(ctx: RunContext[KiberniktoDeps], new_info: str) -> str:
     chat_id = ctx.deps.chat_id if ctx.deps else None
     if chat_id is None:
         return "No chat context available."
-    info = chat_data.load(chat_id)
+    info = await chat_data.load(chat_id)
     info.private_info = f"{info.private_info}\n{new_info}".strip()
-    chat_data.save(chat_id, info)
+    await chat_data.save(chat_id, info)
     logger.info("add_user_info: chat=%s info_len=%d", chat_id, len(info.private_info))
     return "Info added."
 
@@ -59,9 +59,9 @@ async def set_user_info(ctx: RunContext[KiberniktoDeps], new_info: str) -> str:
     chat_id = ctx.deps.chat_id if ctx.deps else None
     if chat_id is None:
         return "No chat context available."
-    info = chat_data.load(chat_id)
+    info = await chat_data.load(chat_id)
     info.private_info = new_info
-    chat_data.save(chat_id, info)
+    await chat_data.save(chat_id, info)
     logger.info("set_user_info: chat=%s info_len=%d", chat_id, len(info.private_info))
     return "Info replaced."
 
@@ -73,7 +73,7 @@ async def answer_on_full_history(ctx: RunContext[KiberniktoDeps], request: str) 
     if chat_id is None:
         return "No chat context available."
     # Get full history (up to 5000 messages).
-    messages = history_storage.get_conversation(chat_id)
+    messages = await history_storage.get_conversation(chat_id)
     if not messages:
         return "No chat history available yet."
     # Format history as text for the model.

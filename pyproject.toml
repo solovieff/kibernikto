@@ -21,6 +21,10 @@ dependencies = [
     "certifi>=2026.1.4",
     "python-dotenv>=1.2.2",
     "pydantic-ai-harness[dynamic-workflow]>=0.7.1",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.30.0",
+    "aiosqlite>=0.20.0",
+    "aioboto3>=14.0.0",
 ]
 
 [project.urls]

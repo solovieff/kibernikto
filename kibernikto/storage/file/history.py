@@ -47,27 +47,30 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
     def _path(self, chat_id: int) -> Path:
         return self._dir() / f"{chat_id}.json"
 
-    def _save(self, chat_id: int) -> None:
+    async def _save(self, chat_id: int) -> None:
         messages = self._storage.get(chat_id)
         if messages is None:
             return
         try:
+            import asyncio
             # Belts-and-suspenders: storage is already sanitized in add_messages,
             # but re-sanitize here so direct _storage mutations can't leak to disk.
             data = _model_message_adapter.dump_json(_sanitize(messages, keep_thinking=self._keep_thinking))
-            self._path(chat_id).write_text(data.decode("utf-8"), encoding="utf-8")
+            await asyncio.to_thread(self._path(chat_id).write_text, data.decode("utf-8"), "utf-8")
         except Exception as exc:
             logger.error("Failed to save history for chat %s: %s", chat_id, exc)
 
-    def _load(self, chat_id: int) -> None:
+    async def _load(self, chat_id: int) -> None:
         if chat_id in self._storage:
             return
+        import asyncio
         path = self._path(chat_id)
         if not path.exists():
             self._storage[chat_id] = []
             return
         try:
-            messages = _model_message_adapter.validate_json(path.read_text(encoding="utf-8"))
+            text = await asyncio.to_thread(path.read_text, "utf-8")
+            messages = _model_message_adapter.validate_json(text)
             # Migrate old files that still contain instructions / binaries.
             messages = _sanitize(messages, keep_thinking=self._keep_thinking)
             self._storage[chat_id] = messages
@@ -77,13 +80,13 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
 
     # ── HistoryStorage ─────────────────────────────────────────────────────
 
-    def get_conversation(self, chat_id: int) -> List[ModelMessage]:
-        self._load(chat_id)
+    async def get_conversation(self, chat_id: int) -> List[ModelMessage]:
+        await self._load(chat_id)
         return _window(self._storage[chat_id], self._history_size)
 
-    def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
+    async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
         if chat_id not in self._storage:
-            self._load(chat_id)
+            await self._load(chat_id)
         self._storage[chat_id].extend(messages)
         self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)
-        self._save(chat_id)
+        await self._save(chat_id)

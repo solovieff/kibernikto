@@ -34,7 +34,7 @@ class KiberniktoAgent(Agent):
 
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
         if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:
-            kwargs['message_history'] = self._history_storage.get_conversation(chat_id)
+            kwargs['message_history'] = await self._history_storage.get_conversation(chat_id)
 
         run_result: AgentRunResult = await super().run(*args, **kwargs)
 
@@ -43,15 +43,11 @@ class KiberniktoAgent(Agent):
         messages = run_result.new_messages()
         if chat_id is not None:
             published = await self._persist_generated_images(run_result, chat_id)
-            # The model sees its generation in its own response: append the
-            # public URL as a TextPart to the history copy. The live response
-            # stays untouched so the user doesn't see the note; providers that
-            # fetch URLs from text will let the model re-see the image.
             if published:
                 messages = self._annotate_generation(messages, published)
 
         if self._history_storage is not None and chat_id is not None:
-            self._history_storage.add_messages(chat_id=chat_id, messages=messages)
+            await self._history_storage.add_messages(chat_id=chat_id, messages=messages)
 
         return run_result
 
@@ -88,7 +84,7 @@ class KiberniktoAgent(Agent):
         for image in run_result.response.images:
             ext = (image.media_type or "image/png").split("/")[-1].split(";")[0] or "png"
             try:
-                media_store.save(chat_id, image.data, ext)
+                await media_store.save(chat_id, image.data, ext)
             except Exception as exc:
                 logger.warning("Failed to save generated image for chat %s: %s", chat_id, exc)
             try:

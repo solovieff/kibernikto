@@ -27,12 +27,13 @@ class MediaFileStore:
 
     # ── durable media ──────────────────────────────────────────────────────
 
-    def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str:
+    async def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str:
         """Persist bytes under ``media/{chat_id}/``; returns a media ref ``"{chat_id}/{file}"``."""
+        import asyncio
         chat_dir = self._media_dir / str(chat_id)
         chat_dir.mkdir(parents=True, exist_ok=True)
         file_name = name or f"{uuid.uuid4().hex[:12]}.{ext.lstrip('.')}"
-        (chat_dir / file_name).write_bytes(data)
+        await asyncio.to_thread((chat_dir / file_name).write_bytes, data)
         return f"{chat_id}/{file_name}"
 
     def path(self, media_ref: str) -> Path:
@@ -58,5 +59,15 @@ class MediaFileStore:
         except Exception as exc:
             logger.warning("Failed to clean tmp file %s: %s", path, exc)
 
-#: Module-level singleton — shared by the preprocessor and the agent.
-media_store = MediaFileStore()
+#: Lazily resolved module-level singleton (PEP 562).
+_media_store = None
+
+
+def __getattr__(name: str):
+    if name == "media_store":
+        global _media_store
+        if _media_store is None:
+            from kibernikto.storage.factory import get_media_store
+            _media_store = get_media_store()
+        return _media_store
+    raise AttributeError(name)

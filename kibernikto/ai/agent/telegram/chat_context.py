@@ -44,7 +44,7 @@ def format_chat_context(chat: ChatFullInfo) -> Optional[str]:
 
 async def refresh_chat_context(message: Message) -> None:
     """Persist full getChat facts into the chat bucket, refreshing when missing or stale."""
-    info = chat_data.load(message.chat.id)
+    info = await chat_data.load(message.chat.id)
     updated_at = info.client_app_info_updated_at or 0
     if info.client_app_info and time.time() - updated_at < _CHAT_REFRESH_SECONDS:
         return
@@ -55,4 +55,4 @@ async def refresh_chat_context(message: Message) -> None:
         return
     info.client_app_info = format_chat_context(chat) or info.client_app_info
     info.client_app_info_updated_at = time.time()
-    chat_data.save(message.chat.id, info)
+    await chat_data.save(message.chat.id, info)
