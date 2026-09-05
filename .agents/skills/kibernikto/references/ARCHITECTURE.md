@@ -1,102 +1,63 @@
 # Architecture
 
-## Package Layout
+Paths below are repository-relative. Python modules, not historical diagrams, define the API.
 
-```
-kibernikto/
-├── config.py                    # AppSettings (APP_*)
-├── ai/agent/
-│   ├── __init__.py              # re-exports kibernikto_agent singleton
-│   ├── utils.py                 # infer_kibernikto_model + provider helpers
-│   └── core/
-│       ├── kibernikto_agent.py  # KiberniktoAgent class + agent singleton
-│       ├── config.py            # AgentKiberniktoSettings
-│       ├── history.py           # MemoryHistoryStorage + history_storage singleton
-│       ├── deps.py              # KiberniktoDeps (attachments side-channel)
-│       └── image.py             # generate_image helper
-└── telegram/
-    ├── config.py                # TelegramSettings (TG_*)
-    ├── runner.py                # init() dispatcher + run_sync() entry
-    ├── agent/
-    │   └── telegram_agent.py    # TelegramAgent + TelegramDeps + kibernikto_telegram_agent
-    ├── handlers/
-    │   ├── commands.py          # commands_router: /start /help
-    │   └── conversation.py      # conversation_router: private/group/edited
-    ├── middleware/
-    │   ├── middleware_service.py    # ServiceMiddleware
-    │   ├── middleware_firewall.py   # FirewallMiddleware
-    │   ├── middleware_subscription.py # SubscriptionMiddleware
-    │   └── utils.py             # get_event_message, is_from_admin
-    ├── pre_processors/
-    │   ├── __init__.py          # TelegramMessagePreprocessor base
-    │   └── _default.py          # DefaultTelegramMessagePreprocessor + PreprocessorSettings
-    ├── payment/
-    │   └── payment_utils.py     # Stars invoice / pre-checkout / subscription helpers
-    └── utils/
-        ├── conversation.py      # reply() — chunked Markdown send
-        └── permissions.py       # should_react, is_reply, get_message_text
-```
+## Source map
 
-## Three Layers
-
-```
-CLI / main.py
-    └── kibernikto.cmd.__start:start()
-            └── kibernikto.telegram.runner:run_sync()
-                    ├── init()  — builds Dispatcher, wires routers + middlewares
-                    └── dp.run_polling(bot)
-```
-
-| Layer | Responsibility |
-|---|---|
-| `kibernikto.ai.agent` | LLM calls, history, model routing — no Telegram |
-| `kibernikto.telegram.agent` | Telegram ↔ agent bridge (`process_message`, `reply_to`) |
-| `kibernikto.telegram.*` | Dispatcher, handlers, middlewares, preprocessors, payments |
-
-## Request Lifecycle
-
-```
-Telegram Update
-  → ServiceMiddleware   (log, forward to service group)
-  → ErrorsMiddleware    (catch & report exceptions)
-  → FirewallMiddleware  (allowlist / publicness check)
-  → SubscriptionMiddleware (Stars paywall if enabled)
-  → conversation_router / commands_router
-      → _process_and_reply(message)
-          → TelegramMessagePreprocessor().process_tg_message(message)  → list[UserContent]
-          → kibernikto_telegram_agent.process_message(message)
-              → KiberniktoAgent.run(user_content, chat_id=chat_id)
-                  → history_storage.get_conversation(chat_id)
-                  → pydantic_ai.Agent.run(...)
-                  → history_storage.add_messages(chat_id, new_messages)
-          → kibernikto_telegram_agent.reply_to(message, result)
-              → reply(message, text, ...)  — chunked Markdown send
-```
-
-## Singleton Chain
-
-| Singleton | Module | Built from |
+| Layer | Source | Responsibility |
 |---|---|---|
-| `kibernikto_agent` | `kibernikto.ai.agent` | `AGENT_KIBERNIKTO_SETTINGS` |
-| `kibernikto_telegram_agent` | `kibernikto.telegram.agent` | same settings, wraps `kibernikto_agent` pattern |
-| `history_storage` | `kibernikto.ai.agent.core.history` | process-local `defaultdict` |
+| CLI | `kibernikto/cmd/__start.py`, `main.py` | dotenv, logging, validation, agent selection, polling |
+| Core | `kibernikto/ai/agent/core/kibernikto_agent.py` | `KiberniktoAgent`, configured `agent`, async history and attachments |
+| Model routing | `kibernikto/ai/agent/utils.py` | provider-prefixed model inference |
+| Telegram agent | `kibernikto/ai/agent/telegram/telegram_agent.py` | dependencies, preprocessing, model invocation, reply |
+| Context | `kibernikto/ai/agent/telegram/chat_context.py`, `kibernikto/ai/agent/telegram/identity.py` | chat facts, bot identity instructions |
+| Extended agent | `kibernikto/ai/agent/extended/kibernikto_extended.py` | named history, credit-based model selection and charging |
+| Orchestrator | `kibernikto/ai/agent/extended/orchestrators.py` | local experts and optional peer builder |
+| Experts | `kibernikto/ai/agent/harness/` | conversation, image, web, report, scheduler |
+| Telegram app | `kibernikto/telegram/agent/telegram_app.py` | Bot, Dispatcher, startup/shutdown, peer hub |
+| Transport | `kibernikto/telegram/handlers/`, `kibernikto/telegram/pre_processors/`, `kibernikto/telegram/utils/` | update routing, content conversion, rendering |
+| Access/payment | `kibernikto/telegram/middleware/`, `kibernikto/telegram/payment/` | observer middleware, Stars lookup |
+| Peers | `kibernikto/ai/agent/telegram/peer_agent.py`, `kibernikto/telegram/peer_hub.py` | remote text model and process-local correlation |
+| Storage | `kibernikto/storage/base.py`, `kibernikto/storage/factory.py`, `kibernikto/storage/singletons.py` | protocols, backend selection and lazy proxies |
+| Backends | `kibernikto/storage/file/`, `kibernikto/storage/sql/`, `kibernikto/storage/s3/` | JSON/files, PostgreSQL/SQLite, S3 media |
 
-## Settings Surface
+## Request lifecycle
 
-| Class | Prefix | Module |
-|---|---|---|
-| `AppSettings` | `APP_` | `kibernikto.config` |
-| `AgentKiberniktoSettings` | `AGENT_KIBERNIKTO_` | `kibernikto.ai.agent.core.config` |
-| `TelegramSettings` | `TG_` | `kibernikto.telegram.config` |
-| `SubscriptionSettings` | `SUBSCRIPTION_` | `kibernikto.telegram.middleware.middleware_subscription` |
-| `PreprocessorSettings` | `TRANSCRIBE_` | `kibernikto.telegram.pre_processors._default` |
+1. `TelegramApp.from_agent` creates a Bot (HTML default) and Dispatcher. It does **not**
+   set the active agent; handlers resolve the module-level agent at invocation time.
+2. Peer middleware first consumes a matched private reply. Otherwise it sets the app's
+   hub in a context variable and continues into the appropriate observer's middleware.
+3. Commands precede conversation routing. Conversation handlers emit one typing action,
+   then call active `agent.process_message(message)` and `agent.reply_to(message, result)`.
+4. `TelegramAgent` guards private bot traffic, preprocesses content, refreshes persisted
+   chat facts and builds `TelegramDeps`; group input includes author/time annotations.
+5. `KiberniktoAgent.run` optionally loads history, invokes pydantic-ai, materializes tool
+   attachments, archives/publishes generated images, then appends sanitized history.
+6. `reply` renders `result.output` plus media. Expected peer replies bypass this entire
+   conversation path rather than being fed back as new user requests.
 
-## Class Hierarchy
+See [middleware observers](TELEGRAM-MIDDLEWARES.md), not a single linear
+Service → Errors → Firewall diagram: errors use a separate observer.
 
-```
-pydantic_ai.Agent
-    └── KiberniktoAgent          — adds chat_id history, binary attachment materialisation
-            └── TelegramAgent    — adds process_message(), reply_to(), TelegramDeps
-```
+## Agent hierarchy and state
 
-`TelegramDeps` inherits `KiberniktoDeps` (attachments list, extra dict) and adds `message: Message | None`.
+`Agent` → `KiberniktoAgent` → `TelegramAgent` → `KiberniktoExtended`.
+`TelegramPeerAgent` subclasses `KiberniktoAgent` with a Telegram-backed model, not
+`TelegramAgent` or `KiberniktoExtended`.
+
+`kibernikto.ai.agent` re-exports `kibernikto_agent`, `kibernikto_model`,
+`TelegramAgent`, `TelegramDeps`, `kibernikto_telegram_agent`, `set_telegram_agent`
+and `KiberniktoDeps`. These package imports eagerly construct configured agents;
+"usable without polling" does not mean "no Telegram imports/settings".
+
+Default core/Telegram agents share the lazy `default` history namespace. Extended
+agents select their own name via the factory. Chat data is shared across agent names;
+media namespaces distinguish generated (`default`) and Telegram-uploaded (`telegram`) files.
+See [Storage](STORAGE.md).
+
+## Superseded descriptions
+
+There is no `kibernikto/telegram/runner.py` or `kibernikto/ai/agent/core/history.py`.
+The old `kibernikto/telegram/agent/telegram_agent.py` location is removed; the
+transport package holds `TelegramApp`. Old diagrams claiming memory-only storage,
+three always-active message middlewares, or inconsistent `result.data` handlers are obsolete.

@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
 
 from pydantic_ai import ModelSettings
 from pydantic_ai.capabilities import WebSearch
@@ -42,6 +46,31 @@ def build_subagents_agent() -> KiberniktoExtended:
 
     return KiberniktoExtended(
         model=model,
+        model_settings=_common_model_settings(),
+        name=AGENT_KIBERNIKTO_SETTINGS.NAME,
+        capabilities=[WebSearch(), sub_agents],
+    )
+
+
+def build_subagents_agent_with_tg_peers(
+    peers: list[TelegramPeerAgent],
+) -> KiberniktoExtended:
+    """Build local experts plus explicitly supplied Telegram peers.
+
+    No remote tokens, polling or network requests are needed at construction.
+    Register the result with ``set_telegram_agent`` before running ``to_telegram``.
+    Correlated answers are admitted automatically; no duplicate env allowlist.
+    """
+    sub_agents = SubAgents(
+        agents=[
+            *(SubAgent(agent) for agent in _EXPERT_AGENTS),
+            *(SubAgent(peer) for peer in peers),
+        ],
+        agent_folders=None,
+        contain_errors=True,
+    )
+    return KiberniktoExtended(
+        model=infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME),
         model_settings=_common_model_settings(),
         name=AGENT_KIBERNIKTO_SETTINGS.NAME,
         capabilities=[WebSearch(), sub_agents],

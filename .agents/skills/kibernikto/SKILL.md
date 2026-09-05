@@ -1,315 +1,113 @@
 ---
 name: kibernikto
-description: Work with the Kibernikto framework — a multi-agent AI system built on pydantic-ai with a ready-made Telegram bot integration. Use when the user mentions Kibernikto, the `kibernikto` Python package, KiberniktoAgent, Kibernikto Telegram bot, the `kibernikto` CLI command, or any of the framework's modules (aiogram dispatcher, voice transcription, Telegram Stars payments, imgbb image upload, group/subscription/firewall middlewares, `AGENT_KIBERNIKTO_*` / `TG_*` env vars). Also use when modifying files under `kibernikto/` or the `main.py` / `env_examples/kibernikto.env` entry points.
+description: Use when developing Kibernikto agents or Telegram bots.
+version: 3.0.0
+author: Kibernikto Team, Hermes Agent
 license: MIT
-compatibility: Requires Python 3.11+ and pydantic-ai==1.106.0
+platforms: [linux, macos, windows]
+compatibility: Use the existing repo environment; see pyproject.toml.
 metadata:
-  version: "2.0.1"
-  author: Kibernikto Team
+  hermes:
+    tags: [python, agents, telegram, pydantic-ai]
+    related_skills: [building-pydantic-ai-agents, pydantic-ai-harness]
 ---
 
 # Kibernikto Framework
 
-Kibernikto is a multi-agent AI framework with a ready-made Telegram bot connection. The package
-ships:
+Develop the local implementation, not a remembered PyPI API. Kibernikto combines
+pydantic-ai agents, harness delegation, pluggable storage and an aiogram Telegram app.
+This skill documents the working tree; recheck source before changing a contract.
 
-- **Core** — a `KiberniktoAgent` subclass of `pydantic_ai.Agent` with built-in per-chat history
-  management, multi-provider model inference (OpenAI, OpenRouter, vsegpt, routerai), and pydantic-settings
-  based configuration.
-- **Telegram** — an `aiogram` v3 dispatcher with conversation handlers, three middlewares (firewall,
-  service, subscription), a multimodal message preprocessor (text, photo, voice, audio, PDF, replies,
-  forwards), and Telegram Stars payment integration.
+## When to Use
 
-You can use the core agent without Telegram (it's a regular `pydantic_ai.Agent`) and wire it into your own
-app, or run the full Telegram bot via the `kibernikto` CLI command.
+- Editing `kibernikto/`, entry points, settings, tests or framework documentation.
+- Building local experts or Telegram peer subagents, changing history, preprocessing,
+  reply delivery, access control or Stars billing.
+- Don't use for generic pydantic-ai or aiogram questions unrelated to this framework.
 
-## When to Use This Skill
+## Prerequisites
 
-Invoke this skill when:
+- Read the root `AGENTS.md` and `pyproject.toml` for project rules, Python requirements,
+  dependencies and entry points. No IDE configuration is required to run code or tests.
+- Use `read_file` / `search_files` for discovery and `patch` / `write_file` for edits.
+  Run commands via `terminal` with the repository root as `workdir`.
+- Use the existing virtual environment. **Do not install, sync dependencies, fetch,
+  read live `.env` files, print credentials or start polling without authorization.**
+- `pyproject.toml` declares Python >=3.11, pydantic-ai >=2.27.0,<3,
+  aiogram >=3.30.0,<4 and pydantic-ai-harness >=0.18.0,<0.19.
+  Project development conventions target Python 3.14+. Check the actual interpreter
+  and locked dependencies; neither an old exact pin nor the metadata floor proves compatibility.
 
-- The user mentions **Kibernikto**, the `kibernikto` PyPI package, `KiberniktoAgent`, or the
-  `kibernikto` CLI command
-- Code imports from `kibernikto.*` (e.g. `kibernikto.ai.agent`, `kibernikto.telegram.*`)
-- Editing files under `kibernikto/`, `main.py`, `env_examples/kibernikto.env`, or `scripts/`
-- Touching `AGENT_KIBERNIKTO_*`, `TG_*`, `SUBSCRIPTION_*`, or `APP_*` environment variables
-- Working on aiogram handlers, Telegram middlewares, voice transcription (Whisper), image upload to
-  imgbb, or Telegram Stars (`XTR`) subscription flow
-- The user asks to add a tool, swap a model provider, change the system prompt, customize the
-  preprocessor, or extend access control
+## How to Run
 
-Do **not** use this skill for:
-
-- Generic `pydantic_ai` questions unrelated to Kibernikto — use the `building-pydantic-ai-agents` skill
-- `aiogram` questions unrelated to Kibernikto's dispatcher layout
-- The `pydantic-ai-harness` / CodeMode sandboxing (use the `pydantic-ai-harness` skill)
-
-## Mental Model
-
-Kibernikto is organised in **three layers**:
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  CLI entry: kibernikto → kibernikto.cmd.__start:start            │
-│  main.py  → start(outer_env=True)                                │
-└──────────────────────────────────────────────────────────────────┘
-                                │
-                ┌───────────────┴────────────────┐
-                ▼                                ▼
-   ┌────────────────────────┐       ┌────────────────────────────┐
-   │ kibernikto.telegram    │       │  kibernikto.ai.agent       │
-   │ (aiogram dispatcher)   │       │  (pydantic_ai.Agent)       │
-   │                        │       │                            │
-   │  runner.run_sync()     │       │  KiberniktoAgent.run(      │
-   │  handlers/             │◀──────│     user_message,          │
-   │  middleware/           │extends│     chat_id=chat_id)       │
-   │  pre_processors/       │       │  )                         │
-   │  payment/              │       │  ├─ history_storage        │
-   │  agent/                │       │  ├─ infer_kibernikto_model │
-   │    TelegramAgent       │       │  └─ AgentKiberniktoSettings│
-   │      .process_message  │       │                            │
-   │      .reply_to         │       │  kibernikto_agent (singleton)│
-   │                        │       │                            │
-   │  kibernikto_telegram_  │       │                            │
-   │  agent (singleton)     │       │                            │
-   │                        │       │                            │
-   │  config: TG_*          │       │                            │
-   └────────────────────────┘       └────────────────────────────┘
-```
-
-The default conversation handlers always call
-`kibernikto_telegram_agent.process_message(message)` and, if the result is not `None`,
-`kibernikto_telegram_agent.reply_to(message, result)`. Both methods live on the
-`TelegramAgent` subclass; ``process_message`` internally invokes
-``self.run(user_message, chat_id=chat_id)`` which is the ``KiberniktoAgent.run`` override that
-loads/saves per-chat history.
-
-The **Telegram layer** turns aiogram updates into a list of `UserContent` items and hands them to
-**`kibernikto_telegram_agent.process_message(message)`** (which internally calls
-`kibernikto_agent.run(..., chat_id=...)` and replies via
-`kibernikto_telegram_agent.reply_to(message, result)`). The core agent loads per-chat history from
-`MemoryHistoryStorage`, runs the LLM, and writes new messages back. The Telegram layer adds the
-"typing…" indicator and delegates the response rendering (text chunking, Markdown, binary
-attachments) to the shared `reply()` helper.
-
-**Two agent shapes are present in the codebase.** Use them accordingly:
-
-- `kibernikto_agent` (`kibernikto.ai.agent.core.kibernikto_agent.agent`) — the canonical configured
-  `KiberniktoAgent` singleton built from `AGENT_KIBERNIKTO_SETTINGS`. Always imported as
-  `from kibernikto.ai.agent import kibernikto_agent`. Use it directly when you embed the agent in a
-  non-Telegram app.
-- `TelegramAgent` (`kibernikto.telegram.agent.telegram_agent.TelegramAgent`) — a `KiberniktoAgent`
-  subclass that encapsulates the full Telegram conversation lifecycle
-  (`process_message` + `reply_to`). The default conversation handlers always delegate to the
-  module-level `kibernikto_telegram_agent` singleton, which is built from the same env-derived
-  config as `kibernikto_agent`. Subclass `TelegramAgent` to add tools, swap the preprocessor, or
-  override the response strategy — then call `set_telegram_agent(my_agent)` before the dispatcher
-  starts.
-
-## Quick Start Patterns
-
-### Run the Telegram bot
-
-```bash
-# from PyPI
-pip install kibernikto
-kibernikto --env_file_path=/path/to/kibernikto.env
-
-# from this repo
-python main.py
-```
-
-`main.py` is a one-liner: `from kibernikto.cmd import start; start(outer_env=True)`.
-`outer_env=True` means the caller is responsible for loading env vars (so `python-dotenv` is skipped
-inside `__start.py`).
-
-### Use `KiberniktoAgent` directly (no Telegram)
+For an authorized live bot, with configuration ready before agent imports:
 
 ```python
-import asyncio
-from kibernikto.ai.agent import kibernikto_agent
-
-
-async def main():
-    result = await kibernikto_agent.run(
-        "Привет! Кто ты?",
-        chat_id=12345,  # any stable int — drives the per-chat history bucket
-    )
-    print(result.output)
-
-
-asyncio.run(main())
+terminal(command=".venv/bin/python main.py", workdir="<repo>")
 ```
 
-`chat_id` is the only Kibernikto-specific parameter. If omitted, the agent behaves like a plain
-`pydantic_ai.Agent` and no history is persisted.
+`main.py` calls `start(outer_env=False)`. The CLI also accepts `--multi-agent` and
+`--env_file_path`; see [Runtime](references/UTILS-AND-RUNNER.md) for the important
+import-time dotenv limitation. On Windows use the existing venv's `Scripts/python.exe`.
+Never start another poller for a token already owned by a running app.
 
-### Subclass `KiberniktoAgent` to add tools
+## Procedure
 
-```python
-from pydantic_ai import RunContext
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
-from kibernikto.ai.agent import kibernikto_agent  # base singleton
+1. Inspect the working tree and the affected implementation; preserve unrelated edits.
+   Identify the actual exported class, settings reader and runtime caller.
+2. Follow the request through `TelegramApp` → handlers → active `TelegramAgent` →
+   `KiberniktoAgent.run` → storage. Verify which event observer and history namespace apply.
+3. Make the smallest scoped change. Keep local experts as ordinary `KiberniktoAgent`
+   instances; `KiberniktoExtended` is an optional orchestrator, not a requirement for experts.
+4. Exercise offline tests with fake models/transports and isolated storage; verify docs
+   imports and relative links. Report executed checks separately from live verification.
 
+## Quick Reference
 
-my_agent = KiberniktoAgent(
-    model=kibernikto_agent.model,
-    model_settings=kibernikto_agent.model_settings,
-    system_prompt="You are a helpful Kibernikto cousin.",
-)
-
-
-@my_agent.tool
-async def get_time(ctx: RunContext) -> str:
-    """Return current server time."""
-    from datetime import datetime
-    return datetime.now().isoformat()
-```
-
-Both `my_agent` and `kibernikto_agent` share the module-level `history_storage` singleton — no extra
-wiring needed.
-
-### Subclass `TelegramAgent` to customise the bot
-
-When you want to keep the default dispatcher but plug in your own agent
-behaviour, subclass `TelegramAgent` and call `set_telegram_agent(...)` before
-the dispatcher starts. The default conversation handlers will then dispatch
-to your subclass via `process_message` / `reply_to`.
-
-```python
-from pydantic_ai import RunContext
-
-from kibernikto.ai.agent import kibernikto_agent  # base singleton, for model + settings
-from kibernikto.telegram.agent import TelegramAgent, set_telegram_agent
-
-
-class MyAgent(TelegramAgent):
-    pass
-
-
-my_agent = MyAgent(
-    model=kibernikto_agent.model,
-    model_settings=kibernikto_agent.model_settings,
-    system_prompt="You are Kibernikto's helpful cousin.",
-)
-
-
-@my_agent.tool
-async def get_time(ctx: RunContext) -> str:
-    """Return current server time."""
-    from datetime import datetime
-    return datetime.now().isoformat()
-
-
-set_telegram_agent(my_agent)  # take effect before the dispatcher starts polling
-```
-
-Override any of these to customise behaviour:
-
-* `pre_processor` (property / ctor kwarg) — replace the multimodal
-  `Message → list[UserContent]` strategy.
-* `process_message(message)` — change how the message is turned into agent
-  input, e.g. add a system prefix, suppress the typing loop, or branch on
-  chat type.
-* `reply_to(message, result)` — change how the response is sent (custom
-  chunking, additional buttons, etc.).
-
-### Configure via env
-
-All settings are `pydantic_settings.BaseSettings` instances — set env vars (or pass a `.env` file
-via `--env_file_path`) to override defaults. See [Configuration](./references/CONFIGURATION.md).
-
-```env
-APP_INSTANCE_NAME=my-kibernikto
-APP_URL=https://my.site
-AGENT_KIBERNIKTO_PROVIDER_TYPE=openrouter
-AGENT_KIBERNIKTO_MODEL_NAME=openrouter:anthropic/claude-sonnet-4-5
-AGENT_KIBERNIKTO_MODEL_MAX_TOKENS=760
-AGENT_KIBERNIKTO_MODEL_TEMPERATURE=0.7
-AGENT_KIBERNIKTO_HISTORY_SIZE=6
-AGENT_KIBERNIKTO_MODEL_MODALITIES=["text", "photo"]
-AGENT_KIBERNIKTO_WHO_AM_I="Respond as Kibernikto — a gentle universe creator."
-
-TG_BOT_KEY=...:...
-TG_MASTER_ID=199740245
-TG_PUBLIC=true
-TG_REACTION_CALLS=["киберникто", "honda"]
-```
-
-## Task Routing Table
-
-Load only the most relevant reference first. Read additional references only if the task spans
-multiple areas.
-
-| I want to... | Reference |
+| Concern | Current contract |
 |---|---|
-| Understand package layout, layers, request lifecycle | [Architecture](./references/ARCHITECTURE.md) |
-| Use `KiberniktoAgent`, add tools, manage history, switch model providers | [Core Agent](./references/CORE-AGENT.md) |
-| Set env vars, customise system prompt, modalities, history size, access lists | [Configuration](./references/CONFIGURATION.md) |
-| Add/edit conversation handlers (private, group, edited) or commands | [Telegram Handlers](./references/TELEGRAM-HANDLERS.md) |
-| Add/edit preprocessor logic (text, photo, voice, audio, PDF, reply, forward) | [Telegram Preprocessing](./references/TELEGRAM-PREPROCESSING.md) |
-| Tune access control, service logging, errors, or Star subscriptions | [Telegram Middlewares](./references/TELEGRAM-MIDDLEWARES.md) |
-| Add/adjust the Telegram Stars payment flow | [Payments](./references/PAYMENTS.md) |
-| Tweak text splitting, image upload, or run the entry points | [Utils, Runner & Logging](./references/UTILS-AND-RUNNER.md) |
-| Follow an older link into `COMMON-TASKS.md` | [Task Reference Map](./references/COMMON-TASKS.md) |
+| Base agent | `kibernikto.ai.agent.core.kibernikto_agent.KiberniktoAgent` |
+| Telegram agent | `kibernikto.ai.agent.telegram.telegram_agent.TelegramAgent` |
+| Active Telegram agent | `set_telegram_agent(agent)` in that same module; returns previous agent |
+| App | `agent.to_telegram()` → `TelegramApp`; register agent separately before polling |
+| Output | `AgentRunResult.output`, including structured output; not `result.data` |
+| History | `history_storage=` injection; `chat_id=` enables load/save for async `run` |
+| Storage | `APP_STORAGE_DATA_BACKEND=file|pg|sqlite`, `MEDIA_BACKEND=file|s3` |
+| Local delegation | `SubAgents(agents=[SubAgent(agent), ...])` |
+| Remote delegation | `TelegramPeerAgent` also works with real `SubAgent(peer)` |
+| Ready peer builder | `build_subagents_agent_with_tg_peers(peers)` preserves local experts |
 
-## Key Practices
+## References
 
-- **Always import the singleton as `kibernikto_agent`**:
-  `from kibernikto.ai.agent import kibernikto_agent`. Don't re-instantiate `Agent(...)` with the same
-  model — `kibernikto_agent` is configured from `AGENT_KIBERNIKTO_SETTINGS` and is the object the
-  Telegram handlers already call.
-- **Use `chat_id` for history, not the full conversation object**. The core agent stores messages in
-  a process-local `MemoryHistoryStorage` keyed by `chat_id`. There is no Redis/DB layer — history is
-  lost on restart.
-- **Set the right `PROVIDER_TYPE`/`MODEL_NAME` prefix**. `openrouter:foo/bar` and `vsegpt:foo` are
-  routed by `infer_kibernikto_model`; anything else falls through to `pydantic_ai.infer_model`. See
-  [Core Agent → Model providers](./references/CORE-AGENT.md#model-providers).
-- **`pre_processor` returns `list[UserContent] | None`** — not a string. Text, photos (as `ImageUrl`),
-  transcriptions, and reply/forward markers are mixed into a single list and passed to
-  `kibernikto_agent.run` as a single argument. The core agent does not parse strings.
-- **Middlewares are applied in order**: `ServiceMiddleware → ErrorsMiddleware → FirewallMiddleware →
-  SubscriptionMiddleware`. Adding a new middleware means appending to the `middlewares` list in
-  `kibernikto/telegram/runner.py::init()` and writing `apply_if_needed(dispatcher)` as a `@staticmethod`.
-- **Configuration is env-only**. Don't pass settings as constructor args; let
-  `pydantic_settings` resolve them. Env vars override the defaults declared in each `*Settings`
-  class.
-- **Logging goes through Logfire**. `configure_logger()` calls
-  `logfire.instrument_pydantic_ai()`; if you add new model calls, prefer `pydantic_ai` patterns so
-  they get traced automatically.
+- [Architecture](references/ARCHITECTURE.md): current files and request lifecycle.
+- [Core agent](references/CORE-AGENT.md): imports, instructions, history and attachments.
+- [Storage](references/STORAGE.md): file/SQL/S3 persistence and isolation.
+- [Agents and harness](references/AGENTS-AND-HARNESS.md): experts, credit tiers, delegation.
+- [Configuration](references/CONFIGURATION.md): real defaults and consumed env fields.
+- [Telegram handlers](references/TELEGRAM-HANDLERS.md): registration and agent replacement.
+- [Telegram peers](references/TELEGRAM-PEERS.md): registration, opt-in multimodal transport,
+  input capture/selection, correlation, access and process-local limits.
+- [Preprocessing](references/TELEGRAM-PREPROCESSING.md): media, quotes, transcription, PDF stub.
+- [Middlewares](references/TELEGRAM-MIDDLEWARES.md): observer-specific order and permissions.
+- [Payments](references/PAYMENTS.md): actual Stars transaction lookup and incomplete pieces.
+- [Runtime and utilities](references/UTILS-AND-RUNNER.md): startup, logging, delivery and tests.
+- [Common tasks](references/COMMON-TASKS.md): scoped implementation recipes.
 
-## Common Gotchas
+## Pitfalls
 
-- **`chat_id` is `int | None` in `KiberniktoAgent.run`**. If you forget to pass it, history is
-  silently skipped — your agent will appear "amnesic" only between calls in the same process.
-  Outside Telegram, pass any stable int to enable history.
-- **`agent.run` returns `AgentRunResult`**, not a string. Use `result.output` for the model text or
-  `result.data` if you configured `output_type=BaseModel`. The current Telegram handlers use
-  `result.output` (private) **and** `result.data` (group / edited) inconsistently — see
-  [Telegram Handlers](./references/TELEGRAM-HANDLERS.md#known-quirk-resultoutput-vs-resultdata).
-- **`HistoryHistoryStorage.get_conversation` aligns to a `request` message** at the window start.
-  The window is the last `AGENT_KIBERNIKTO_HISTORY_SIZE` messages, then walked back until a
-  `kind == 'request'` is found. Sending a partial history is intentional — don't "fix" it to
-  always start at index 0.
-- **`should_react` import is broken** in
-  `kibernikto/telegram/utils/permissions.py:should_react` — it imports
-  `from telegram.utils.conversation import is_reply, get_message_text`, which is the wrong top-level
-  package. It should be `from kibernikto.telegram.utils.conversation import ...`. The default bot
-  config ships a different `REACTION_CALLS` (e.g. `honda`, `киберникто`) so this only blows up in
-  groups with replies, not in plain keyword-triggered groups.
-- **`ServiceMiddleware.forward_message_service_group` has `or 1 == 1`**, which forwards **every**
-  private message including admin messages. The `# FIXME DEBUG` comment is real — tighten it to
-  `or not is_from_admin(message)` if you want admin-only forwarding, or `and not is_from_admin(...)`
-  for everyone-except-admin.
-- **`TelegramMessagePreprocessor` is global state**. The handlers call
-  `TelegramMessagePreprocessor()` fresh on every message, but `_default` keeps a module-level
-  `SETTINGS` and `IGNORED_TYPES` constant — fine for reads, not safe for mutating them at runtime.
-- **Telegram Stars subscription period is hard-coded** to 30 days
-  (`DEFAULT_SUBSCRIPTION_PERIOD = 2592000` in `kibernikto/telegram/payment/payment_utils.py`).
-  Change it together with the display copy in `SubscriptionMiddleware.get_payment_keyboard`.
-- **`PreprocessorSettings` prefix is `TRANSCRIBE_`** (not `TG_` or `VOICE_`). All
-  transcription-related env vars must be named `TRANSCRIBE_OPENAI_API_KEY`, `TRANSCRIBE_PROCESSOR`,
-  etc. Double-check if your `.env` file uses any legacy `VOICE_*` names — they will be silently
-  ignored.
-- **`pydantic-ai==1.106.0` is pinned exactly** in `pyproject.toml`. Don't bump it without testing
-  the `KiberniktoAgent.run` override — pydantic-ai's `AgentRunResult.new_messages()` signature has
-  shifted across versions.
+- Recheck current source for API facts: `TelegramApp` owns polling, `TelegramAgent`
+  lives in the AI agent package, and history defaults to the configured storage backend.
+- The old `ServiceMiddleware` unconditional-forwarding debug expression is **not present**.
+  Current forwarding skips admins. Do not reintroduce it or change service implementation
+  merely to reconcile an old note.
+- History request-boundary alignment and the fixed Stars period remain intentional.
+- Telegram peer waits are process-local; SQL history does not make them durable jobs.
+  Peer error policy is still under development: a passing happy path or generic error
+  containment is not proof of complete recovery/retry semantics.
+
+## Verification
+
+Use [the offline runbook](references/UTILS-AND-RUNNER.md#offline-verification).
+`scripts/check_docs.py` checks this entire skill's Markdown links, literal repo paths,
+Python snippet syntax and import targets without loading secrets or using the network.
+Verify the final diff contains only authorized files. No commit is implied by this skill.

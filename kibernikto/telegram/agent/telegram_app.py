@@ -9,6 +9,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+from kibernikto.telegram.peer_hub import PeerHub
+from kibernikto.telegram.middleware.middleware_peer import PeerMiddleware
+
 if TYPE_CHECKING:
     from aiogram.types import User
 
@@ -26,6 +29,10 @@ class TelegramApp:
     def __init__(self, bot: Bot, dispatcher: Dispatcher) -> None:
         self.bot = bot
         self.dispatcher = dispatcher
+        self.peer_hub = PeerHub()
+        self.dispatcher.message.outer_middleware(PeerMiddleware(self.peer_hub))
+        self.dispatcher.edited_message.outer_middleware(PeerMiddleware(self.peer_hub, accept_replies=False))
+        self.dispatcher.shutdown.register(self.peer_hub.close)
 
     def run_polling(self) -> None:  # noqa: ANN201 — blocks
         """Block and run long-polling (sync entry point)."""
@@ -59,14 +66,13 @@ class TelegramApp:
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dispatcher = Dispatcher(name=APP_SETTINGS.INSTANCE_NAME)
+        app = cls(bot, dispatcher)
 
         for mw in (ServiceMiddleware, ErrorsMiddleware, FirewallMiddleware, SubscriptionMiddleware):
             mw.apply_if_needed(dispatcher)
 
         dispatcher.include_router(commands_router)
         dispatcher.include_router(conversation_router)
-
-        app = cls(bot, dispatcher)
 
         # Startup hook: DB tables + bot identity + optional greeting.
         async def _on_startup(bot: Bot) -> None:

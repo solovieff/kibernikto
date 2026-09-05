@@ -1,127 +1,107 @@
 # Core Agent
 
-`kibernikto.ai.agent` — a thin `pydantic_ai.Agent` subclass with per-chat history and multi-provider
-model routing. **No Telegram dependency** — usable standalone in any async Python app.
+Source: `kibernikto/ai/agent/core/kibernikto_agent.py`.
 
-## Class Hierarchy
-
-```
-pydantic_ai.Agent
-    └── KiberniktoAgent          (kibernikto/ai/agent/core/kibernikto_agent.py)
-            └── TelegramAgent    (kibernikto/telegram/agent/telegram_agent.py)
-```
-
-`KiberniktoAgent` adds only **one override**: `run(*args, chat_id=None, **kwargs)` that auto-loads
-and saves per-chat history via `history_storage`. It also materialises tool-produced binary
-attachments (`deps.attachments`) into the final `ModelResponse` as `FilePart`s.
-
-`TelegramAgent` layered on top adds Telegram lifecycle: `process_message(message)` and
-`reply_to(message, result)`. The default conversation handlers always delegate to the
-`kibernikto_telegram_agent` singleton.
-
-## Public Imports
+## Imports and construction
 
 ```python
-from kibernikto.ai.agent import kibernikto_agent          # configured singleton
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent  # base class
-from kibernikto.ai.agent.core.history import history_storage            # shared storage
-from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS   # settings
-from kibernikto.ai.agent.utils import infer_kibernikto_model            # model router
+from kibernikto.ai.agent import kibernikto_agent, KiberniktoDeps
+from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.utils import infer_kibernikto_model
+from kibernikto.storage.base import MemoryHistoryStorage
+from kibernikto.storage.singletons import history_storage, chat_data, media_store
 ```
 
-## `chat_id` Semantics
+`KiberniktoAgent` accepts normal pydantic-ai constructor kwargs plus
+`history_storage=` (a `HistoryStorage` implementation or `None`). Global settings
+are ordinarily env-derived; this does **not** prohibit agent dependency injection.
 
-| `chat_id` | Behaviour |
-|---|---|
-| `None` | Plain `pydantic_ai.Agent.run` — no history loaded or saved |
-| `int` | Loads `history_storage.get_conversation(chat_id)` before call; saves `run_result.new_messages()` after |
+## History semantics
 
-If the caller supplies `message_history=` in kwargs, the override does **not** overwrite it.
+Only the overridden **async `run`** adds these semantics; do not assume inherited
+`run_sync`, streaming or iteration APIs perform the same persistence.
 
-## Model Routing (`infer_kibernikto_model`)
+- `chat_id=None`: no automatic history load/save or generated-image persistence.
+- With a chat ID and non-None storage, load `get_conversation(chat_id)` unless
+  `message_history` was explicitly supplied (even an empty list prevents loading).
+- Append `run_result.new_messages()` on successful completion, including when the
+  caller provided its own history. No automatic append occurs after a raised run error.
+- `history_storage=None` disables history; a supplied chat ID still enables generated
+  image archiving/publishing. Omit the chat ID for a fully storage-free text smoke test.
+- The default is a factory-backed lazy proxy, **not** `MemoryHistoryStorage`.
+  For isolated tests inject a new memory store; don't clear a production singleton's internals.
 
-`AGENT_KIBERNIKTO_MODEL_NAME` value determines the provider by its prefix before `:`:
+See [Storage](STORAGE.md) for namespaces, SQL startup and request-boundary windows.
 
-| Prefix | Provider |
-|---|---|
-| `openrouter:` | `OpenRouterModel` with medium reasoning effort |
-| `vsegpt:` | `OpenAIChatModel` via `https://api.vsegpt.ru:7090/v1` |
-| `routerai:` | `OpenAIChatModel` via `https://routerai.ru/api/v1` |
-| *(none)* | Falls through to `pydantic_ai.models.infer_model` (e.g. `openai:gpt-4.1`) |
+## Instructions
 
-> `AGENT_KIBERNIKTO_PROVIDER_TYPE` is declared in settings but **not** used for routing — the
-> prefix in `MODEL_NAME` is what actually routes.
+Construction adds `resolve_instructions(self.name)` as pydantic-ai `instructions`.
+It reads `{APP_STORAGE_FILESTORE_LOCATION}/{name}-instructions.txt` if present,
+otherwise `AGENT_KIBERNIKTO_WHO_AM_I`. This still uses the filestore root with SQL data.
+It resolves at construction, not on every request; later turns reuse those instructions.
+Telegram adds dynamic bot identity and dependency-built conversation context.
+Supplying `system_prompt` does not remove these base instructions.
 
-To add a new provider: write a `*_provider()` helper in `utils.py`, add an `elif` branch in
-`infer_kibernikto_model`, and document the required env var.
+## Model routing
 
-## History Storage (`MemoryHistoryStorage`)
+`infer_kibernikto_model(None)` and an empty string return `None`. A nonempty model
+without `:` raises `ValueError`; use a provider-prefixed string.
 
-- **In-memory, process-local** — restart wipes everything.
-- Window = last `AGENT_KIBERNIKTO_HISTORY_SIZE` (default 6) messages, walked back to the nearest
-  `kind == 'request'` boundary. Window can be shorter than requested size by design.
-- **Singleton** — both `kibernikto_agent` and any subclass instance share the same `history_storage`
-  by default.
-- To swap persistence (e.g. Redis): subclass `KiberniktoAgent` and override `run`, or monkey-patch
-  `history_storage` before anything imports the agent module.
-
-## Binary Attachments (`KiberniktoDeps`)
-
-Tools cannot return binary content to the user directly (tool return goes back to the model). Instead
-they append `BinaryContent` to `deps.attachments`. After `super().run()` returns,
-`_materialize_attachments` folds those binaries into `run_result.response.parts` as `FilePart`s —
-making them visible via `response.images` / `response.files` and serialisable into history.
-
-`deps_type=KiberniktoDeps` is set on the singleton. Custom agents must also set it if they use tools
-that produce attachments.
-
-## Settings (`AgentKiberniktoSettings`, prefix `AGENT_KIBERNIKTO_`)
-
-Key fields and their defaults:
-
-| Env var | Default | Effect |
+| Prefix | Implementation | Credential |
 |---|---|---|
-| `AGENT_KIBERNIKTO_MODEL_NAME` | `anthropic/claude-sonnet-4.6` | Routed by prefix |
-| `AGENT_KIBERNIKTO_MODEL_MAX_TOKENS` | `760` | `ModelSettings.max_tokens` |
-| `AGENT_KIBERNIKTO_MODEL_TEMPERATURE` | `0.7` | `ModelSettings.temperature` |
-| `AGENT_KIBERNIKTO_MODEL_PARALLEL_TOOL_CALLS` | `true` | `ModelSettings.parallel_tool_calls` |
-| `AGENT_KIBERNIKTO_HISTORY_SIZE` | `6` | `MemoryHistoryStorage` window |
-| `AGENT_KIBERNIKTO_MODEL_MODALITIES` | `["text"]` | Add `"photo"` / `"audio"` for multimodal |
-| `AGENT_KIBERNIKTO_WHO_AM_I` | *(Kibernikto persona)* | System prompt |
+| `openrouter:` | `OpenRouterModel`, medium reasoning effort | `OPENROUTER_API_KEY` |
+| `vsegpt:` | OpenAI-compatible endpoint at vsegpt | `VSEGPT_API_KEY` |
+| `routerai:` | `RouterAiProvider` + OpenAI-compatible model | `ROUTERAI_API_KEY` |
+| Other prefix | `pydantic_ai.models.infer_model` | provider-specific |
 
-All other pydantic-ai constructor params (`output_type`, `toolsets`, `capabilities`, `retries`,
-`mcp_servers`) are untouched — use the `building-pydantic-ai-agents` skill for those.
+`PROVIDER_TYPE` is declared but does not route models. `APP_URL` and
+`APP_INSTANCE_NAME` become OpenRouter app metadata. Provider availability is not
+established by a model string being a source default.
 
-## Adding Tools
+## Attachments and output
 
-Attach directly to the singleton **before the first `.run()` call**:
+Tools add `BinaryContent` using `deps.add_attachment` / `add_attachments`.
+After the model returns, `_materialize_attachments` converts image binaries as needed
+and adds `FilePart`s to the final response. The shared deps buffer remains intact so
+parent runs can deliver binaries created by subagents. Images are archived through
+`media_store`, published through `image_hosting`, and represented by URL text in
+history; storage sanitization strips `FilePart`s. This is not a guarantee that all
+non-image attachments are archived.
 
-```python
-from pydantic_ai import RunContext
-from kibernikto.ai.agent import kibernikto_agent
+Read `result.output` for text **or structured output**; there is no supported
+`result.data` split. Telegram's default renderer expects text. Customize `reply_to`
+if using a structured output type.
 
-@kibernikto_agent.tool
-async def get_weather(ctx: RunContext, city: str) -> str:
-    """Return current weather for `city`."""
-    ...
-```
+## Adding tools and testing
 
-For a separate agent with the same model config, instantiate `KiberniktoAgent` with
-`infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)` — both agents share `history_storage`
-automatically.
-
-## Testing
-
-Standard pydantic-ai patterns apply — see `building-pydantic-ai-agents` skill for `TestModel` /
-`FunctionModel`. History state is keyed by `chat_id`; clear `history_storage._storage[chat_id]` in
-fixtures for isolation.
+A complete offline example (configuration must be isolated before imports):
 
 ```python
+import asyncio
 from pydantic_ai.models.test import TestModel
-from kibernikto.ai.agent import kibernikto_agent
+from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.storage.base import MemoryHistoryStorage
 
-async def test_agent():
-    with kibernikto_agent.override(model=TestModel()):
-        result = await kibernikto_agent.run("Hello!", chat_id=42)
-        assert result.output
+async def smoke():
+    history = MemoryHistoryStorage(history_size=6)
+    agent = KiberniktoAgent(
+        model=TestModel(custom_output_text="ok"), name="smoke",
+        history_storage=history,
+    )
+
+    @agent.tool_plain
+    def status() -> str:
+        """Return the local test status."""
+        return "ready"
+
+    result = await agent.run("Hello", chat_id=42)
+    assert result.output == "ok"
+    assert await history.get_conversation(42)
+
+asyncio.run(smoke())
 ```
+
+The configured singleton also supports `@kibernikto_agent.tool` before use. For
+new independent agents, explicitly decide their name, model, deps and history
+namespace. See [offline verification](UTILS-AND-RUNNER.md#offline-verification).

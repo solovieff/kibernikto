@@ -27,6 +27,16 @@ Ready `aiogram` dispatcher with AI Executors connection and telegram message pro
 👵 Kibernikto tools usage with telegram bot
 connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search)
 
+## Telegram peer agents
+
+Add a Telegram bot alongside local experts with
+`build_subagents_agent_with_tg_peers([TelegramPeerAgent(...)])`.
+The existing `build_subagents_agent()` and `--multi-agent` behavior are unchanged.
+
+- [Peer API, access rules and limitations](docs/telegram-peers.md)
+- [Runnable caller + poetry-worker example](examples/telegram_peers.py)
+- Offline regression tests: `python -m unittest discover -s tests -q`
+
 # install from pip
 
 ``pip install kibernikto``

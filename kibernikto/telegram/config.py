@@ -12,6 +12,7 @@ class TelegramSettings(BaseSettings):
     BOT_KEY: str | None = None
     MASTER_ID: int = Field(default=199740245, description="Primary admin Telegram user id")
     MASTER_IDS: List[int] = Field(default=[], description="Additional admin user ids (TG_MASTER_ID is always checked separately)")
+    PEER_IDS: list[int] = Field(default_factory=list, description="Bot user ids allowed to send new private peer requests; normal firewall rules still apply")
     PUBLIC: bool = Field(default=True, description="If everyone can talk privately")
     FRIEND_GROUP_IDS: List[int] | None = Field(default=None, description="If present only these groups are allowed")
     PRIVILEGED_USERS: List[int] | None = Field(default=None, description="Special user ids")

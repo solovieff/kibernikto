@@ -38,6 +38,9 @@ class KiberniktoDeps:
     image-to-image generation without asking the main model to copy URLs back.
     """
 
+    peer_inputs: list[BinaryContent] | None = None
+    """Explicit delegation selection; None uses current binary user_message_parts, [] sends none."""
+
     extra: dict[str, Any] = field(default_factory=dict)
     """Free-form bag for any additional run-scoped data tools want to share."""
 
