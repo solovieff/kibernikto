@@ -1,74 +1,138 @@
 # Configuration
 
-All settings are `pydantic_settings.BaseSettings` — env vars only, no constructor args.
+Most settings are module-level `BaseSettings` instances, resolved from environment at
+import time. Configure the process **before imports**; don't mutate global settings
+in a live service. Agent constructors still accept `model=`, `history_storage=`,
+`pre_processor=` and other documented injection points. Lists use JSON env values.
+Defaults below are source defaults, not recommendations or verified provider availability.
 
-## AppSettings (`APP_*`) — `kibernikto/config.py`
+## App
 
-| Env var | Default | Notes |
+Source: `kibernikto/config.py`, prefix `APP_`.
+
+| Field suffix | Default | Use |
 |---|---|---|
-| `APP_INSTANCE_NAME` | `"kibernikto"` | Used in OpenRouter `app_title` header |
-| `APP_URL` | `"https://kibernikto.ru"` | Used in OpenRouter `app_url` header |
+| `INSTANCE_NAME` | `kibernikto-app` | logging service, Dispatcher name, OpenRouter title |
+| `URL` | `https://none.com` | OpenRouter app URL |
+| `TAG_NAME` | `kibernikto` | declared app metadata |
 
-## AgentKiberniktoSettings (`AGENT_KIBERNIKTO_*`) — `kibernikto/ai/agent/core/config.py`
+## Agent
 
-| Env var | Default | Notes |
+Source: `kibernikto/ai/agent/core/config.py`, prefix `AGENT_KIBERNIKTO_`.
+
+| Field suffix | Default | Use |
 |---|---|---|
-| `AGENT_KIBERNIKTO_NAME` | `"kibernikto"` | Agent `name=` in pydantic-ai |
-| `AGENT_KIBERNIKTO_PROVIDER_TYPE` | `"openrouter"` | Declared but **not** used for routing — prefix in `MODEL_NAME` routes |
-| `AGENT_KIBERNIKTO_MODEL_NAME` | `"anthropic/claude-sonnet-4.6"` | Prefix before `:` selects provider |
-| `AGENT_KIBERNIKTO_MODEL_MAX_TOKENS` | `760` | `ModelSettings.max_tokens` |
-| `AGENT_KIBERNIKTO_MODEL_TEMPERATURE` | `0.7` | `ModelSettings.temperature` |
-| `AGENT_KIBERNIKTO_MODEL_PARALLEL_TOOL_CALLS` | `true` | `ModelSettings.parallel_tool_calls` |
-| `AGENT_KIBERNIKTO_HISTORY_SIZE` | `6` | `MemoryHistoryStorage` window |
-| `AGENT_KIBERNIKTO_MODEL_MODALITIES` | `["text"]` | Add `"photo"` / `"audio"` for multimodal |
-| `AGENT_KIBERNIKTO_WHO_AM_I` | *(Kibernikto persona prompt)* | System prompt |
+| `NAME` | `kibernikto` | configured agent name |
+| `PROVIDER_TYPE` | `openrouter` | declared only; model prefix routes |
+| `MODEL_NAME` | `openrouter:anthropic/claude-sonnet-5` | primary model |
+| `IMAGE_MODEL_NAME` | `None` | optional image-generation model/tool |
+| `MODEL_MAX_TOKENS` | `1300` | model settings |
+| `MODEL_TEMPERATURE` | `0.3` | model settings |
+| `MODEL_PARALLEL_TOOL_CALLS` | `true` | model settings |
+| `HISTORY_SIZE` | `6` | window in model messages, request-aligned |
+| `KEEP_THINKING_IN_HISTORY` | `false` | reasoning retention; see storage caveat |
+| `MODEL_MODALITIES` | `["text"]` | declared list of text/photo/audio; not a preprocessor gate |
+| `WHO_AM_I` | source persona | fallback instructions when named instruction file absent |
+| `TRIAL_CREDITS` | `260` | new `ConversationInfo` balance |
+| `POOR_CREDITS` | `30` | below this selects poor model |
+| `RICH_CREDITS` | `500` | at/above this selects rich model |
+| `POOR_MODEL` | `openrouter:google/gemini-2.5-flash` | low-credit model and image expert |
+| `MEDIUM_MODEL` | `openrouter:anthropic/claude-sonnet-5` | medium-credit model |
+| `RICH_MODEL` | `openrouter:anthropic/claude-sonnet-5` | high-credit model |
 
-Provider API keys read directly from env (no prefix):
+The conversation expert reads `AGENT_KIBERNIKTO_READ_MODEL` directly via `os.getenv`
+(default `openrouter:google/gemini-3.5-flash-lite`); it is not a settings field.
+Provider credentials: `OPENROUTER_API_KEY`, `VSEGPT_API_KEY`, `ROUTERAI_API_KEY`,
+or provider-specific keys such as `OPENAI_API_KEY`. Never dump these values.
 
-| Env var | Used by |
-|---|---|
-| `OPENAI_API_KEY` | pydantic-ai default OpenAI provider |
-| `OPENROUTER_API_KEY` | OpenRouter provider |
-| `VSEGPT_API_KEY` | `vsegpt:` prefix routing |
-| `ROUTER_AI_KEY` | `routerai:` prefix routing |
+## Storage
 
-## TelegramSettings (`TG_*`) — `kibernikto/telegram/config.py`
+Source: `kibernikto/storage/config.py`, prefix `APP_STORAGE_`.
 
-| Env var | Default | Notes |
+| Field suffix | Default | Use |
 |---|---|---|
-| `TG_BOT_KEY` | *(required)* | Telegram bot token |
-| `TG_MASTER_ID` | `None` | Admin user ID — bypasses firewall/subscription |
-| `TG_PUBLIC` | `false` | If `false`, only `TG_MASTER_ID` can use the bot |
-| `TG_REACTION_CALLS` | `[]` | Bot reacts in groups when message contains these strings |
-| `TG_SERVICE_GROUP_ID` | `None` | Chat ID to forward all incoming messages to |
-| `TG_ALLOW_GROUPS` | `false` | Enable group chat handling |
-| `TG_BOT_MENTIONS` | `[]` | Bot username mentions that trigger group response |
+| `FILESTORE_LOCATION` | `~/.kibernikto` | file root, instructions, temporary files |
+| `DATA_BACKEND` | `file` | file/pg/sqlite |
+| `MEDIA_BACKEND` | `file` | file/s3 |
+| `PG_DSN` | `None` | required for pg |
+| `SQLITE_PATH` | `:memory:` | persistent file must be explicitly configured |
+| `HISTORY_WINDOW_SLACK` | `3` | SQL tail-fetch multiplier |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | `None` | all required for s3 |
+| `S3_REGION` | `us-east-1` | region |
+| `S3_ADDRESSING_STYLE` | `path` | path/virtual |
+| `S3_CHECKSUM_CALCULATION` | `when_required` | when_required/when_supported |
 
-## SubscriptionSettings (`SUBSCRIPTION_*`) — `kibernikto/telegram/middleware/middleware_subscription.py`
+See [Storage](STORAGE.md) for persistence and startup behavior. Media storage and
+public image hosting are separate; choosing S3 does not replace image publishing.
 
-| Env var | Default | Notes |
+## Telegram
+
+Source: `kibernikto/telegram/config.py`, prefix `TG_`.
+
+| Field suffix | Default | Use |
 |---|---|---|
-| `SUBSCRIPTION_ENABLED` | `false` | Enable Telegram Stars paywall |
-| `SUBSCRIPTION_PRICE` | `10` | Stars per period |
-| `SUBSCRIPTION_PERIOD` | `2592000` | Seconds (30 days) — hard-coded in `payment_utils.py` |
-| `SUBSCRIPTION_PROMO_FREE_PROB` | `0.0` | Probability of free access (unimplemented in current code) |
+| `BOT_KEY` | `None` | required when constructing a live Bot, not when parsing settings |
+| `MASTER_ID` | `199740245` | primary admin; configure your deployment explicitly |
+| `MASTER_IDS` | `[]` | additional admin IDs |
+| `PEER_IDS` | `[]` | opt-in for unsolicited new private bot requests, not correlated replies |
+| `PUBLIC` | `true` | private access for non-admins |
+| `FRIEND_GROUP_IDS` | `None` | None/empty permits groups; otherwise ID allowlist |
+| `PRIVILEGED_USERS` | `None` | declared, not a firewall bypass |
+| `SERVICE_GROUP_ID` | `None` | enables service forwarding and error-report observer |
+| `REACTION_CALLS` | `["honda", "киберникто"]` | group substring triggers plus runtime bot identity |
+| `SAY_HI` | `false` | send configured sticker to master at startup |
+| `STICKER_IDS` | source list | stickers available to greeting helper |
+| `STICKER_PROBABILITY` | `0.13` | declared; not used by the current reply path |
+| `CHUNK_SENTENCES` | `1024` | declared; current reply splitter doesn't consume it |
+| `MAX_MESSAGE_LENGTH` | `4096` | declared; reply module also has its own constant |
+| `MAX_CAPTION_LENGTH` | `1023` | declared; reply module also has its own constant |
+| `ADMIN_COMMANDS_ALLOWED` | `true` | declared; commands router does not consult it |
+| `BOT_MESSAGE_DELAY` | `0.0` | positive value enables randomized group-bot delay up to 13s |
+| `MARKDOWN_TO_HTML` | `true` | HTML conversion; false uses legacy Markdown |
+| `FILES_LOCATION` | `/tmp` | legacy declaration; media temp paths come from storage |
 
-## PreprocessorSettings (`TRANSCRIBE_*`) — `kibernikto/telegram/pre_processors/_default.py`
+`TG_PEER_IDS` does not bypass private firewall or subscriptions. Registration/calling
+already admits the correlated answer; do not duplicate outbound subagents there.
+See [Peers](TELEGRAM-PEERS.md) and [Middlewares](TELEGRAM-MIDDLEWARES.md).
 
-> ⚠️ Note: prefix is `TRANSCRIBE_`, **not** `TG_` or `VOICE_`.
+## Subscription
 
-| Env var | Default | Notes |
+Source: `kibernikto/telegram/middleware/middleware_subscription.py`, prefix `SUBSCRIPTION_`.
+
+| Field suffix | Default | Use |
 |---|---|---|
-| `TRANSCRIBE_PROCESSOR` | `None` | `"openai"` / `"elevenlabs"` / `"auto"` — enables voice transcription |
-| `TRANSCRIBE_OPENAI_API_KEY` | `None` | Key for Whisper transcription |
-| `TRANSCRIBE_OPENAI_API_MODEL` | `"whisper-1"` | Model used for transcription |
-| `TRANSCRIBE_OPENAI_API_BASE_URL` | `None` | Custom base URL for transcription endpoint |
-| `TRANSCRIBE_OPENAI_API_LANGUAGE` | `"ru"` | Language hint |
-| `TRANSCRIBE_MIN_COMPLEX_SECONDS` | `300` | Voice files longer than this get extra processing |
+| `ENABLED` | `false` | register message paywall |
+| `PROMO_FREE_PROB` | `45` | declared, unused; no implemented random free pass |
+| `BASE_PRICE_STARS` | `52` | first invoice amount |
+| `ADDING_UP` | `26` | declared, unused |
+| `POOR_CREDITS` | `52` | declared, unused |
+| `TRIAL_CREDITS` | `247` | middle invoice amount, not agent initial balance |
+| `RICH_CREDITS` | `390` | largest invoice amount, not agent rich threshold |
 
-## Startup Banner Order
+The fixed 30-day period is code, not a `SUBSCRIPTION_PERIOD` field. Payment and agent
+credit settings are distinct; no automatic credit top-up is wired. See [Payments](PAYMENTS.md).
 
-On bot start, `print_banner()` logs JSON dumps of settings in this order:
-1. `AppSettings`
-2. `AgentKiberniktoSettings`
-3. `TelegramSettings`
+## Transcription and image hosting
+
+Source: `kibernikto/telegram/pre_processors/_default.py`, prefix `TRANSCRIBE_`.
+
+| Field suffix | Default | Use |
+|---|---|---|
+| `PROCESSOR` | `None` | declared openai/elevenlabs/auto; not consulted by voice handler |
+| `OPENAI_API_KEY` | `None` | actual gate for OpenAI transcription |
+| `OPENAI_API_MODEL` | `whisper-1` | transcription model |
+| `OPENAI_API_BASE_URL` | `None` | optional compatible endpoint |
+| `OPENAI_API_LANGUAGE` | `ru` | language hint |
+| `MIN_COMPLEX_SECONDS` | `300` | declared, unused |
+
+`kibernikto/utils/image_hosting.py` reads `IMAGE_HOSTING_PROVIDER` (default `imgbb`,
+only registered provider), `IMAGE_STORAGE_API_KEY` and `IMAGE_STORAGE_EXPIRATION`
+(default `0`, no expiration). Not `IMGBB_API_KEY`.
+`JINA_AI_API_KEY` configures the web/report integrations; see [Experts](AGENTS-AND-HARNESS.md).
+
+## Superseded configuration notes
+
+`TG_ALLOW_GROUPS`, `TG_BOT_MENTIONS`, `SUBSCRIPTION_PRICE`, `SUBSCRIPTION_PERIOD`,
+`ROUTER_AI_KEY`, `IMGBB_API_KEY` and legacy `VOICE_*` names are not current settings.
+The old exact pydantic-ai 1.106.0 pin is removed. CLI dotenv timing is described in
+[Runtime](UTILS-AND-RUNNER.md); specifying a file after settings imports does not rebuild them.

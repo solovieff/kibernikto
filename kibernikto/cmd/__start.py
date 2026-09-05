@@ -1,10 +1,6 @@
 import argparse
 from dotenv import load_dotenv
 
-from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.config import configure_logger, print_banner
-import kibernikto.ai.agent.telegram.telegram_agent as _tg_agent
-
 
 def start(outer_env=False):
     """Build the Telegram bot and start polling."""
@@ -18,6 +14,10 @@ def start(outer_env=False):
 
     if not outer_env:
         load_dotenv(dotenv_path=args.env_file_path)
+
+    # Runtime imports construct settings and providers from the selected environment.
+    from kibernikto.config import configure_logger, print_banner
+    import kibernikto.ai.agent.telegram.telegram_agent as _tg_agent
 
     configure_logger()
     print_banner()

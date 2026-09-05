@@ -13,6 +13,7 @@ from aiogram.types import (
     InputMediaPhoto,
     InputMediaVideo,
     Message,
+    ReplyParameters,
 )
 from aiogram.types.input_file import BufferedInputFile
 
@@ -70,8 +71,8 @@ async def reply(
 
     Returns the text portion that was sent (empty string when only media was delivered).
     """
-    # Bot-to-bot in private: nothing reads it — don't respond at all.
-    if _is_private_bot(message):
+    # Only new, opted-in private peer requests may receive a response.
+    if _is_private_bot(message) and not is_private_peer_request(message):
         return ""
 
     payload = _Payload.of(content)
@@ -85,7 +86,7 @@ async def reply(
 
 
 def _is_private_bot(message: Message) -> bool:
-    """True when the sender is a bot in a private chat (skip entirely)."""
+    """True when the sender is a bot in a private chat."""
     return bool(
         message.from_user
         and message.from_user.is_bot
@@ -93,9 +94,18 @@ def _is_private_bot(message: Message) -> bool:
     )
 
 
+def is_private_peer_request(message: Message) -> bool:
+    """Opt in to new private bot requests; replies belong exclusively to the hub."""
+    return bool(
+        _is_private_bot(message)
+        and message.from_user.id in TELEGRAM_SETTINGS.PEER_IDS
+        and message.reply_to_message is None
+    )
+
+
 def _uses_reply(message: Message) -> bool:
-    """Anchor replies for humans; bots in groups post flat to avoid reply loops."""
-    return not (message.from_user and message.from_user.is_bot)
+    """Anchor humans and private peers; group bots post flat to avoid loops."""
+    return _is_private_bot(message) or not (message.from_user and message.from_user.is_bot)
 
 
 # ── Internals ─────────────────────────────────────────────────────────────────
@@ -189,7 +199,12 @@ async def _deliver_text(
         message: Message, text: str, reply_mode: bool, parse_mode: Optional[ParseMode]
 ) -> None:
     """Send one text chunk, replying to the message or posting flat."""
-    if reply_mode:
+    if reply_mode and _is_private_bot(message):
+        await message.bot.send_message(
+            chat_id=message.chat.id, text=text, parse_mode=parse_mode,
+            reply_parameters=ReplyParameters(message_id=message.message_id),
+        )
+    elif reply_mode:
         await message.reply(text=text, parse_mode=parse_mode)
     else:
         await message.bot.send_message(chat_id=message.chat.id, text=text, parse_mode=parse_mode)
@@ -213,13 +228,13 @@ async def _deliver_photo(
 
 
 async def _deliver_media_group(message: Message, media: List["BinaryContent"], reply_mode: bool) -> None:
-    """Send a media group, replying to the message or posting flat."""
-    if reply_mode:
-        await message.answer_media_group(media=[_as_input_media(binary) for binary in media])
-    else:
-        await message.bot.send_media_group(
-            chat_id=message.chat.id, media=[_as_input_media(binary) for binary in media]
-        )
+    """Send independent media messages, replying or posting flat."""
+    # Individual sends preserve order and work for single files and mixed media.
+    for binary in media:
+        kind = _media_kind(binary)
+        sender = getattr(message.bot, f'send_{kind}')
+        await sender(chat_id=message.chat.id, **{kind: _as_input_file(binary)},
+                     reply_parameters=ReplyParameters(message_id=message.message_id) if reply_mode else None)
 
 
 def _non_image_files(files: List["BinaryContent"]) -> List["BinaryContent"]:
@@ -230,7 +245,7 @@ def _non_image_files(files: List["BinaryContent"]) -> List["BinaryContent"]:
 def _media_kind(content: "BinaryContent") -> str:
     """Map a pydantic_ai ``BinaryContent`` to an aiogram media-group kind."""
     if content.is_audio:
-        return "audio"
+        return "audio" if content.media_type in ('audio/mpeg', 'audio/mp4', 'audio/x-m4a') else "document"
     if content.is_video:
         return "video"
     if content.is_image:
@@ -248,6 +263,10 @@ def _as_input_media(content: "BinaryContent"):
 
 
 def _filename_for(content: "BinaryContent", fallback_ext: str = "bin") -> str:
+    filename = (getattr(content, 'vendor_metadata', None) or {}).get('filename')
+    if isinstance(filename, str) and filename and len(filename) <= 128 and not any(
+            c in filename for c in '/\\') and not any(ord(c) < 32 for c in filename) and filename not in ('.', '..'):
+        return filename
     media_type = getattr(content, "media_type", "") or ""
     ext = re.sub(r"[^A-Za-z0-9]", "", media_type.split("/")[-1])[:8] or fallback_ext
     return f"kibernikto-{uuid.uuid4().hex[:8]}.{ext}"

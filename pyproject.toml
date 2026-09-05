@@ -34,8 +34,9 @@ Repository = "https://github.com/solovieff/kibernikto"
 [project.scripts]
 kibernikto = "kibernikto.cmd.__start:start"
 
-[tool.setuptools]
-packages = ["kibernikto"]
+[tool.setuptools.packages.find]
+include = ["kibernikto*"]
+namespaces = false
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
