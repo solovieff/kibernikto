@@ -8,14 +8,29 @@ from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelRespo
 from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.core.media_check import check_history_images, fetch_bytes, head_alive
 from kibernikto.storage.base import HistoryStorage
 from kibernikto.storage.singletons import history_storage
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS, resolve_instructions
+from kibernikto.storage.factory import get_media_store
 from kibernikto.storage.singletons import media_store
 from kibernikto.utils.image_hosting import image_hosting
 
 logger = logging.getLogger(__name__)
+
+
+async def _store_exists(store_name: str, media_ref: str) -> bool:
+    """Check a media ref in the named media store (``default`` or ``telegram``)."""
+    return await get_media_store(store_name).exists(media_ref)
+
+
+async def _store_save(store_name: str, media_ref: str, data: bytes) -> None:
+    """Save downloaded bytes under the exact ref recorded in history."""
+    chat_id, name = media_ref.split('/', 1)
+    ext = name.rsplit('.', 1)[-1] if '.' in name else 'bin'
+    await get_media_store(store_name).save(int(chat_id), data, ext=ext, name=name)
+
 
 model: Model = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
 
@@ -26,6 +41,10 @@ model_settings: ModelSettings = ModelSettings(max_tokens=AGENT_KIBERNIKTO_SETTIN
 
 
 class KiberniktoAgent(Agent):
+    # Network probes for history image links; overridable per instance (tests stay offline).
+    image_head = staticmethod(head_alive)
+    image_fetch = staticmethod(fetch_bytes)
+
     def __init__(self, *, history_storage: Optional[HistoryStorage] = history_storage, **kwargs):
         super().__init__(**kwargs)
         self._history_storage = history_storage
@@ -35,6 +54,7 @@ class KiberniktoAgent(Agent):
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
         if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:
             kwargs['message_history'] = await self._history_storage.get_conversation(chat_id)
+            await self._repair_history_images(kwargs, chat_id)
 
         run_result: AgentRunResult = await super().run(*args, **kwargs)
 
@@ -50,6 +70,17 @@ class KiberniktoAgent(Agent):
             await self._history_storage.add_messages(chat_id=chat_id, messages=messages)
 
         return run_result
+
+    async def _repair_history_images(self, kwargs: dict, chat_id: int) -> None:
+        """Replace dead history image links with text and persist the fixed history once."""
+        fixed, changed = await check_history_images(
+            kwargs['message_history'], chat_id=chat_id, exists=_store_exists, save=_store_save,
+            head=self.image_head, fetch=self.image_fetch,
+        )
+        if not changed:
+            return
+        kwargs['message_history'] = fixed
+        await self._history_storage.replace_messages(chat_id, fixed)
 
     @staticmethod
     def _annotate_generation(messages: list[ModelMessage], urls: list[str]) -> list[ModelMessage]:

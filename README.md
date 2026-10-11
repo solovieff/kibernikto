@@ -51,6 +51,6 @@ kibernikto --env_file_path=/path/to/your/env/local.env
 
 **code**
 
-- Install the requirements   
-  `pip install -r requirements.txt`
+- Install the package and its dependencies (Python 3.14, see `pyproject.toml`)
+  `pip install .`
 - Run `main.py` file using your environment.

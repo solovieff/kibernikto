@@ -90,18 +90,21 @@ class TelegramMessagePreprocessor:
             photo = message.photo[-1]
             file = await message.bot.get_file(photo.file_id)
             photo_file = await message.bot.download_file(file.file_path)
-            # Durable local copy so agents can read the original later.
+            # Durable local copy so agents can read the original later; its ref is kept on the ImageUrl.
+            media_ref = None
             try:
                 photo_bytes = photo_file.getvalue() if hasattr(photo_file, "getvalue") else photo_file
                 ext = os.path.splitext(file.file_path)[1] or ".jpg"
-                await media_store.save(message.chat.id, photo_bytes, ext=ext, name=f"{photo.file_unique_id}{ext}")
+                media_ref = await media_store.save(message.chat.id, photo_bytes, ext=ext,
+                                                   name=f"{photo.file_unique_id}{ext}")
             except Exception as exc:
                 logging.error("Error saving photo to media store: %s", exc)
             url = await image_hosting.publish(photo_file.getvalue() if hasattr(photo_file, "getvalue") else photo_file, photo.file_unique_id)
             if not url:
                 return ["[Image processing: failed to publish image]"]
             logging.info("published image: %s", url)
-            return [ImageUrl(url=url)]
+            metadata = {"media_ref": media_ref, "media_store": "telegram"} if media_ref else None
+            return [ImageUrl(url=url, vendor_metadata=metadata)]
         except Exception as exc:
             logging.error("Error processing photo: %s", exc)
             return [f"[Image processing error: {exc}]"]

@@ -76,6 +76,19 @@ class S3MediaStore:  # satisfies MediaStore (structural)
         resp = await client.get_object(Bucket=self._bucket, Key=self._key(media_ref))
         return await resp["Body"].read()
 
+    async def exists(self, media_ref: str) -> bool:
+        """True when the object exists (HEAD); a 404 means absent, other errors propagate."""
+        from botocore.exceptions import ClientError
+
+        client = await self._get_client()
+        try:
+            await client.head_object(Bucket=self._bucket, Key=self._key(media_ref))
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return False
+            raise
+        return True
+
     # ── tmp transit (local, same as file variant) ─────────────────────────
 
     def tmp_path(self, name: str) -> Path:

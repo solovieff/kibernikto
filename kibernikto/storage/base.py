@@ -86,6 +86,8 @@ class HistoryStorage(Protocol):
 
     async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
 
+    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
+
 
 @runtime_checkable
 class MediaStore(Protocol):
@@ -102,6 +104,8 @@ class MediaStore(Protocol):
     async def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str: ...
 
     async def read(self, media_ref: str) -> bytes: ...
+
+    async def exists(self, media_ref: str) -> bool: ...
 
     def tmp_path(self, name: str) -> Path: ...
 
@@ -137,3 +141,6 @@ class MemoryHistoryStorage:
     async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
         self._storage[chat_id].extend(messages)
         self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)
+
+    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
+        self._storage[chat_id] = _sanitize(list(messages), keep_thinking=self._keep_thinking)

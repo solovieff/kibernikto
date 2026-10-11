@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 # Reuse the offline import environment, never the production env file.
-from tests import test_telegram_peer
+from tests import test_telegram_peer  # noqa: F401 — side effect: offline import environment
 from pydantic_ai.models.test import TestModel
 from pydantic_ai_harness.subagents import SubAgents
 import os

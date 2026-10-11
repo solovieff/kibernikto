@@ -90,3 +90,8 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
         self._storage[chat_id].extend(messages)
         self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)
         await self._save(chat_id)
+
+    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
+        await self._load(chat_id)
+        self._storage[chat_id] = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+        await self._save(chat_id)

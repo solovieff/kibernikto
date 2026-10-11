@@ -9,8 +9,9 @@ Sources: `kibernikto/telegram/payment/payment_utils.py`,
 2. Successful-payment messages, slash commands and non-private chats bypass the check.
    Admin status alone does not bypass it.
 3. For other private messages, `check_sub(message.chat.id, bot)` requests
-   `bot.get_star_transactions()` and finds the latest matching source user with the
-   fixed subscription period. It accepts a transaction within that period.
+   `bot.get_star_transactions(offset=..., limit=100)` across all pages and finds the
+   latest non-refunded invoice payment for that user, payload and fixed subscription
+   period. Non-user sources are ignored. Future-dated and expired payments are rejected.
 4. If inactive, `get_payment_keyboard(bot)` generates three invoice links through
    `create_payment_link` and sends an access-restricted message; no agent run occurs.
 
@@ -29,15 +30,17 @@ See [Configuration](CONFIGURATION.md#subscription) for actual field names and de
 ## Storage and incomplete integration
 
 There is **no process-local subscription dict** and no application subscription DB.
-The implementation asks Telegram on every checked message. It only examines the
-returned transaction page: no pagination, authoritative entitlement ledger, refund
-reconciliation or comprehensive source-type validation is implemented here.
+The implementation asks Telegram on every checked message. Pagination and refund-ID
+exclusion are implemented, but there is no durable entitlement ledger or snapshot
+isolation while pages change. Large transaction histories increase lookup latency.
 
-The current app/routers do **not** register dedicated pre-checkout approval or
-successful-payment fulfillment handlers. The middleware's successful-payment skip
-is not a fulfillment implementation. Old references to `send_subscription_invoice`,
-`handle_pre_checkout`, `handle_successful_payment` or `has_active_subscription` were
-invented/stale APIs, not functions available to import.
+`kibernikto/telegram/handlers/payments.py` registers `handle_pre_checkout` and
+`handle_successful_payment`. Checkout validates enabled billing, XTR, the payload
+and one of the three current configured amounts. Successful payments are consumed
+before conversations and acknowledged without calling an LLM. Invoice links created
+before price changes may be rejected; request a new link. Acknowledgement is not a
+durable fulfillment ledger or credit top-up. The APIs `send_subscription_invoice`
+and `has_active_subscription` do not exist.
 
 `SUBSCRIPTION_PROMO_FREE_PROB` is declared but unused. Agent credit balances in
 `ConversationInfo` and `KiberniktoExtended` are a separate mechanism; no payment-driven

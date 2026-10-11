@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from typing import Literal, List
@@ -59,6 +60,27 @@ def resolve_instructions(name: str) -> str:
     return AGENT_KIBERNIKTO_SETTINGS.WHO_AM_I
 
 
-def print_banner():
+def agent_summary(name: str, agent_settings: AgentKiberniktoSettings = AGENT_KIBERNIKTO_SETTINGS) -> dict:
+    """Non-secret summary of the agent that will actually serve requests (no keys, no personality text)."""
+    s = agent_settings
+    return {
+        'MODE': name,
+        'MODEL_NAME': s.MODEL_NAME,
+        'IMAGE_MODEL_NAME': s.IMAGE_MODEL_NAME,
+        'POOR_MODEL': s.POOR_MODEL,
+        'MEDIUM_MODEL': s.MEDIUM_MODEL,
+        'RICH_MODEL': s.RICH_MODEL,
+        'POOR_CREDITS': s.POOR_CREDITS,
+        'RICH_CREDITS': s.RICH_CREDITS,
+        'TRIAL_CREDITS': s.TRIAL_CREDITS,
+        'HISTORY_SIZE': s.HISTORY_SIZE,
+        'MODEL_MAX_TOKENS': s.MODEL_MAX_TOKENS,
+        'MODEL_TEMPERATURE': s.MODEL_TEMPERATURE,
+        'MODEL_PARALLEL_TOOL_CALLS': s.MODEL_PARALLEL_TOOL_CALLS,
+    }
+
+
+def print_agent_summary(name: str) -> None:
+    """Log the active agent's non-secret settings (call after the agent is selected)."""
     logger = logging.getLogger('kibernikto')
-    logger.info(AGENT_KIBERNIKTO_SETTINGS.model_dump_json(indent=2))
+    logger.info(json.dumps(agent_summary(name), indent=2, ensure_ascii=False))

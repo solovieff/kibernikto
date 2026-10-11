@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -23,8 +24,17 @@ def _dsn() -> str:
     if s.DATA_BACKEND == "pg":
         return s.PG_DSN
     if s.DATA_BACKEND == "sqlite":
-        return f"sqlite+aiosqlite:///{s.SQLITE_PATH}"
+        return f"sqlite+aiosqlite:///{_sqlite_file(s.SQLITE_PATH)}"
     raise RuntimeError(f"Unsupported DATA_BACKEND for SQL engine: {s.DATA_BACKEND}")
+
+
+def _sqlite_file(path: str) -> str:
+    """Expand ``~``, create the parent directory and return the file path; ``:memory:`` is kept."""
+    if path == ":memory:":
+        return path
+    resolved = Path(path).expanduser()
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    return str(resolved)
 
 
 def _create_engine() -> None:

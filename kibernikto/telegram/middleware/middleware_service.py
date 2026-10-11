@@ -89,8 +89,9 @@ class ErrorsMiddleware(BaseMiddleware):
             f"{user_message.md_text or ''}\n"
             f"<{type(exc).__name__}: {exc}>"
         )
+        # Plain text: default bot parse_mode is HTML, and exception text like "<Name: ...>" breaks parsing.
         try:
-            await bot.send_message(self.service_group_id, text)
+            await bot.send_message(self.service_group_id, text[:4096], parse_mode=None)
         except Exception as send_exc:
             logger.exception("Failed to send error report to service group: %s", send_exc)
 

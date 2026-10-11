@@ -71,6 +71,31 @@ class CliHelpTests(unittest.TestCase):
                     self.assertEqual(result.stderr, "")
 
 
+class AgentSummaryTests(unittest.TestCase):
+    def test_summary_lists_models_without_secrets_or_personality(self) -> None:
+        # Offline placeholders: importing the agent package needs a provider key, never a real one.
+        with patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test-not-a-real-key',
+                                     'AGENT_KIBERNIKTO_MODEL_NAME': 'openrouter:test/offline',
+                                     'APP_STORAGE_DATA_BACKEND': 'file',
+                                     'APP_STORAGE_MEDIA_BACKEND': 'file'}):
+            from kibernikto.ai.agent.core.config import AgentKiberniktoSettings, agent_summary
+
+        settings = AgentKiberniktoSettings(
+            _env_file=None, MODEL_NAME='openrouter:m/main', POOR_MODEL='openrouter:m/poor',
+            MEDIUM_MODEL='openrouter:m/medium', RICH_MODEL='openrouter:m/rich',
+            WHO_AM_I='SECRET PERSONALITY TEXT',
+        )
+        summary = agent_summary('default', settings)
+        self.assertEqual(summary['MODEL_NAME'], 'openrouter:m/main')
+        self.assertEqual(summary['MEDIUM_MODEL'], 'openrouter:m/medium')
+        self.assertEqual(summary['MODE'], 'default')
+        self.assertNotIn('WHO_AM_I', summary)
+        self.assertNotIn('SECRET PERSONALITY TEXT', str(summary))
+        # Explicit secret-bearing field names; substring checks misfire on MODEL_MAX_TOKENS.
+        forbidden = {'API_KEY', 'SECRET', 'ACCESS_KEY', 'PROVIDER_KEY', 'TOKEN'}
+        self.assertFalse(forbidden & set(summary))
+
+
 class CliStartupTests(unittest.TestCase):
     def run_startup(
         self, argv: list[str], *, outer_env: bool = False,
@@ -105,7 +130,10 @@ class CliStartupTests(unittest.TestCase):
         )
         runtime_modules = {
             "kibernikto.config": config,
-            "kibernikto.ai.agent.core.config": SimpleNamespace(AGENT_KIBERNIKTO_SETTINGS=object()),
+            "kibernikto.ai.agent.core.config": SimpleNamespace(
+                AGENT_KIBERNIKTO_SETTINGS=object(),
+                print_agent_summary=lambda name: record("summary:" + name),
+            ),
             "kibernikto.ai.agent.telegram.telegram_agent": telegram,
             "kibernikto.storage.config": SimpleNamespace(validate_storage=lambda: record("storage")),
             "kibernikto.ai.agent.extended.orchestrators": SimpleNamespace(
@@ -147,7 +175,7 @@ class CliStartupTests(unittest.TestCase):
         self.assertEqual(events[0], ("dotenv:custom.env", None))
         self.assertTrue(all(value == "selected-file" for _, value in events[1:]))
         self.assertEqual([name for name, _ in events if not name.startswith("import:")], [
-            "dotenv:custom.env", "logger", "banner", "storage", "poll_default",
+            "dotenv:custom.env", "logger", "banner", "storage", "summary:default", "poll_default",
         ])
         default_app.run_polling.assert_called_once_with()
         multi_app.run_polling.assert_not_called()
@@ -169,7 +197,7 @@ class CliStartupTests(unittest.TestCase):
         loader.assert_called_once_with(dotenv_path=".env")
         self.assertIn(("import:kibernikto.ai.agent.extended.orchestrators", "selected-file"), events)
         self.assertEqual([name for name, _ in events if not name.startswith("import:")], [
-            "dotenv:.env", "logger", "banner", "storage", "set_agent", "poll_multi",
+            "dotenv:.env", "logger", "banner", "storage", "set_agent", "summary:multi-agent", "poll_multi",
         ])
         default_app.run_polling.assert_not_called()
         multi_app.run_polling.assert_called_once_with()

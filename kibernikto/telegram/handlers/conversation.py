@@ -3,8 +3,10 @@ import logging
 from aiogram import Router, F, enums
 from aiogram.filters import or_f
 from aiogram.types import Message
+from pydantic_ai import ModelHTTPError
 
 import kibernikto.ai.agent.telegram.telegram_agent as _agent_module
+from kibernikto.ai.agent.telegram.telegram_agent import user_facing_model_error
 from kibernikto.telegram.utils.permissions import should_react
 
 logger = logging.getLogger(__name__)
@@ -23,7 +25,14 @@ async def _process_and_reply(message: Message) -> None:
     agent = _agent_module.kibernikto_telegram_agent
 
     await message.bot.send_chat_action(message.chat.id, "typing")
-    result = await agent.process_message(message)
+    try:
+        result = await agent.process_message(message)
+    except Exception as error:
+        # Re-raised so ErrorsMiddleware reports it; user gets a short hint instead of silence.
+        hint = user_facing_model_error(error) if isinstance(error, ModelHTTPError) else (
+            "Не получилось ответить, сообщение передано администратору.")
+        await message.answer(hint)
+        raise
     await agent.reply_to(message, result)
 
 

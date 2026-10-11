@@ -1,13 +1,12 @@
-import asyncio
 import logging
 from typing import Dict, Any, Callable, Awaitable
 
 from aiogram import BaseMiddleware, Dispatcher
-from aiogram import enums, Bot, Router
+from aiogram import enums
 from aiogram.types import Message, TelegramObject
 
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
-from kibernikto.telegram.utils.permissions import is_from_admin, admin_or_public
+from kibernikto.telegram.utils.permissions import admin_or_public
 from kibernikto.telegram.utils.conversation import reply
 from kibernikto.telegram.utils.permissions import group_allowed
 

@@ -9,11 +9,11 @@ from typing import Optional
 
 from aiogram.enums import ChatType
 from aiogram.types import Message, BufferedInputFile, ReplyParameters
-from pydantic_ai.messages import BinaryContent
 from kibernikto.telegram.peer_protocol import PeerEnvelope, PeerProtocolError, download_envelope, FILENAME
 from pydantic_ai import AgentRunResult, ModelHTTPError, RunContext
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.errors import map_model_error
 from kibernikto.ai.agent.core.kibernikto_agent import agent as kibernikto_agent
 from kibernikto.ai.agent.core.kibernikto_agent import model as kibernikto_model
 from kibernikto.ai.agent.core.image import generate_image
@@ -29,6 +29,10 @@ from .group_message import annotate_group_message
 from .identity import get_bot_identity
 
 logger = logging.getLogger(__name__)
+
+def user_facing_model_error(error: ModelHTTPError) -> str:
+    """Chat text for a provider error; the raw body stays in logs only (see ``core.errors``)."""
+    return map_model_error(error).user_message
 
 
 class TelegramAgent(KiberniktoAgent):
@@ -168,16 +172,12 @@ class TelegramAgent(KiberniktoAgent):
             if envelope is not None:
                 result._peer_request_id = envelope.request_id
             return result
-        except ModelHTTPError as error:
-            logger.exception(error)
-            if envelope is not None:
-                return PeerEnvelope.create('error', 'Remote model failed', [], request_id=envelope.request_id)
-            return error.message
         except Exception as error:
+            if envelope is None:
+                raise
             logger.exception(error)
-            if envelope is not None:
-                return PeerEnvelope.create('error', 'Remote execution failed', [], request_id=envelope.request_id)
-            return str(error)
+            reason = 'Remote model failed' if isinstance(error, ModelHTTPError) else 'Remote execution failed'
+            return PeerEnvelope.create('error', reason, [], request_id=envelope.request_id)
 
     async def reply_to(self, message: Message, result: AgentRunResult | PeerEnvelope | str | None) -> None:
         """Send the agent's response back to the chat (no-op if ``None``).

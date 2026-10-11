@@ -44,6 +44,10 @@ class MediaFileStore:  # satisfies MediaStore (structural)
         """Read the bytes of a media ref (async, off-loaded to a thread)."""
         return await asyncio.to_thread(self.path(media_ref).read_bytes)
 
+    async def exists(self, media_ref: str) -> bool:
+        """True when the media ref is already stored locally."""
+        return await asyncio.to_thread(self.path(media_ref).is_file)
+
     # ── tmp transit ────────────────────────────────────────────────────────
 
     def tmp_path(self, name: str) -> Path:

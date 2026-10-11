@@ -51,7 +51,7 @@ class TelegramApp:
         """
         from kibernikto.config import APP_SETTINGS
         from kibernikto.telegram.config import TELEGRAM_SETTINGS
-        from kibernikto.telegram.handlers import commands_router, conversation_router
+        from kibernikto.telegram.handlers import commands_router, conversation_router, payments_router
         from kibernikto.telegram.middleware.middleware_firewall import FirewallMiddleware
         from kibernikto.telegram.middleware.middleware_service import (
             ErrorsMiddleware,
@@ -72,6 +72,7 @@ class TelegramApp:
             mw.apply_if_needed(dispatcher)
 
         dispatcher.include_router(commands_router)
+        dispatcher.include_router(payments_router)
         dispatcher.include_router(conversation_router)
 
         # Startup hook: DB tables + bot identity + optional greeting.
@@ -94,13 +95,13 @@ class TelegramApp:
                 try:
                     sd = await bot.get_my_short_description()
                     short_desc = getattr(sd, "short_description", None) or getattr(sd, "description", None)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Bot short description unavailable: %s", exc)
                 try:
                     d = await bot.get_my_description()
                     desc = getattr(d, "description", None)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Bot description unavailable: %s", exc)
                 identity = format_bot_identity(
                     username=bot_me.username,
                     first_name=getattr(bot_me, "first_name", None),

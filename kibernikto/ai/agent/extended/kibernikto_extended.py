@@ -12,7 +12,6 @@ from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.storage.singletons import chat_data
 from kibernikto.storage.factory import get_history_storage
 from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
-from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
 logger = logging.getLogger(__name__)
 

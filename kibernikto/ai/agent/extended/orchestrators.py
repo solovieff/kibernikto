@@ -16,8 +16,8 @@ from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.extended.kibernikto_extended import KiberniktoExtended
 from kibernikto.ai.agent.harness.conversation_agent import conversation_agent
 from kibernikto.ai.agent.harness.image_agent import image_agent
-from kibernikto.ai.agent.harness.report_agent import report_agent
-from kibernikto.ai.agent.harness.scheduler_agent import scheduler_agent
+from kibernikto.ai.agent.harness.report_agent import report_agent  # noqa: F401 — kept for _EXPERT_AGENTS (commented-out entry)
+from kibernikto.ai.agent.harness.scheduler_agent import scheduler_agent  # noqa: F401 — kept for future expert wiring
 from kibernikto.ai.agent.harness.web_agent import web_agent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 

@@ -50,9 +50,9 @@ class SubscriptionMiddleware(BaseMiddleware):
         else:
             payment_keyboard = await self.get_payment_keyboard(bot=bot)
             await message.answer(
-                f"⚠️ ACCESS RESTRICTED: MORTAL DETECTED ⚠️\n"
+                "⚠️ ACCESS RESTRICTED: MORTAL DETECTED ⚠️\n"
                 "To continue accessing my awe-inspiring abilities,"
-                f" I require a modest payment.",
+                " I require a modest payment.",
                 reply_markup=payment_keyboard
             )
 

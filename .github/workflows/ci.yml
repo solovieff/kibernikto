@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Actions pinned to commit SHAs (tag in comment); bump deliberately.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@4959332f0f014c5280e7eac8b70c90cb574c9f9b # v6.6.0
+        with:
+          version: '0.9.17'
+          enable-cache: true
+      - name: Verify lock file matches pyproject.toml
+        run: uv lock --check
+      - name: Install locked dependencies
+        run: uv sync --frozen
+      - name: Lint (ruff, correctness rules)
+        run: uv run --frozen ruff check .
+      - name: Offline docs check and unit tests (isolated, network blocked)
+        run: uv run --frozen python -B .agents/skills/kibernikto/scripts/check_docs.py --tests

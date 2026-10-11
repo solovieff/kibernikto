@@ -17,7 +17,7 @@ class StorageSettings(BaseSettings):
     MEDIA_BACKEND: Literal["file", "s3"] = Field(default="file")
 
     PG_DSN: str | None = Field(default=None, description="postgresql+asyncpg://user:pass@host:5432/db")
-    SQLITE_PATH: str = Field(default=":memory:", description="Path to sqlite file for DATA_BACKEND=sqlite")
+    SQLITE_PATH: str = Field(default="~/.kibernikto/kibernikto.db", description="Path to sqlite file for DATA_BACKEND=sqlite")
     HISTORY_WINDOW_SLACK: int = Field(
         default=3,
         description="Multiplier for SQL history tail fetch: reads HISTORY_SIZE * slack rows so _window can align to a request boundary",

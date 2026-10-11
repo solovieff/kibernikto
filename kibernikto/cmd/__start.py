@@ -25,12 +25,17 @@ def start(outer_env=False):
     from kibernikto.storage.config import validate_storage
     validate_storage()
 
+    from kibernikto.ai.agent.core.config import print_agent_summary
+
     if args.multi_agent:
         from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
         from kibernikto.ai.agent.extended.orchestrators import kibernikto_subagents_agent
 
         # Use the pre-built subagents agent (SubAgents delegation with all expert sub-agents).
         set_telegram_agent(kibernikto_subagents_agent)
+        print_agent_summary('multi-agent')
+    else:
+        print_agent_summary('default')
 
     _tg_agent.kibernikto_telegram_agent.to_telegram().run_polling()
 

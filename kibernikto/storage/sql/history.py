@@ -10,7 +10,7 @@ from typing import List
 
 from pydantic import TypeAdapter
 from pydantic_ai.messages import ModelMessage
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.storage.base import _sanitize, _window
@@ -93,4 +93,21 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
                     payload=_message_adapter.dump_python(msg, mode="json"),
                 ))
                 seq += 1
+            await session.commit()
+
+    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
+        clean = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+        async with await get_session() as session:
+            await session.execute(delete(ChatMessageRow).where(
+                ChatMessageRow.chat_id == chat_id,
+                ChatMessageRow.name == self._name,
+            ))
+            for seq, msg in enumerate(clean):
+                session.add(ChatMessageRow(
+                    chat_id=chat_id,
+                    name=self._name,
+                    seq=seq,
+                    kind=msg.kind,
+                    payload=_message_adapter.dump_python(msg, mode="json"),
+                ))
             await session.commit()
