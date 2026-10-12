@@ -8,7 +8,7 @@
 .venv
 venv
 env
-env_examples
+deploy
 .env
 .env.*
 *.env

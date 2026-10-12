@@ -11,7 +11,7 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 REPO = Path(__file__).resolve().parents[1]
-EXAMPLE = REPO / 'env_examples' / 'kibernikto.env'
+EXAMPLE = REPO / 'deploy' / 'tg_bots' / 'kibernikto' / 'kibernikto.env'
 _SUPERSEDED_PREFIXES = ('OPENAI_', 'VOICE_', 'IMGBB_')
 _SUPERSEDED_NAMES = {'TG_STICKER_LIST', 'AGENT_KIBERNIKTO_PROVIDER_KEY', 'AGENT_KIBERNIKTO_PROVIDER_CUSTOM_URL'}
 

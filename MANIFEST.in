@@ -1,6 +1,6 @@
 include pyproject.toml
 include CHANGELOG.md
-recursive-include env_examples *.env
+recursive-include deploy *.env *.conf *.sh *.md Dockerfile known_hosts
 recursive-include tests *.py
 recursive-include examples *.py
 recursive-include docs *.md

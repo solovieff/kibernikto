@@ -5,8 +5,10 @@ Kibernikto is a long-polling Telegram bot. Run **one** instance per bot token: a
 ## 1. Prerequisites
 
 - Docker (or Podman) and a host with a persistent disk.
-- A Telegram bot token, LLM provider key, and an `env` file based on [`env_examples/kibernikto.env`](../env_examples/kibernikto.env).
+- A Telegram bot token, LLM provider key, and an `env` file based on [`deploy/tg_bots/kibernikto/kibernikto.env`](../deploy/tg_bots/kibernikto/kibernikto.env).
 - Keep the env file out of git and out of the image (`.dockerignore` already excludes `*.env`).
+
+Podman + systemd on a server, code cloned from git with a deploy key: use [`deploy/`](../deploy/README.md) instead of sections 2–5. State still lives in `/data`, mounted from `tg_bots/<bot>/data/`, so sections 6–8 apply.
 
 ## 2. Build
 

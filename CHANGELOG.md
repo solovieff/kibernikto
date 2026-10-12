@@ -21,7 +21,7 @@ bot entry point (`kibernikto --env_file_path=...`) is unchanged.
 
 ### Migrating from 1.10.x
 
-Start from [`env_examples/kibernikto.env`](env_examples/kibernikto.env).
+Start from [`deploy/tg_bots/kibernikto/kibernikto.env`](deploy/tg_bots/kibernikto/kibernikto.env).
 
 | 1.x | 2.0 |
 |---|---|

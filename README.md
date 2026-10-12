@@ -31,7 +31,7 @@ pip install --pre kibernikto   # 2.0 beta
 
 ## Run the Telegram bot
 
-1. Copy [`env_examples/kibernikto.env`](env_examples/kibernikto.env) and fill in at least
+1. Copy [`deploy/tg_bots/kibernikto/kibernikto.env`](deploy/tg_bots/kibernikto/kibernikto.env) and fill in at least
    `TG_BOT_KEY`, `TG_MASTER_ID` and the provider key for your model (e.g. `OPENROUTER_API_KEY`).
 2. Start it — **one process per bot token**:
 
@@ -40,7 +40,22 @@ kibernikto --env_file_path=/path/to/kibernikto.env               # single agent
 kibernikto --env_file_path=/path/to/kibernikto.env --multi-agent # with local experts
 ```
 
-Docker, storage, backups and rollback: [deployment runbook](docs/deployment.md).
+Models are provider-prefixed: `openrouter:vendor/model`, OpenAI-compatible gateways
+(`vsegpt:`, `routerai:`, `beget:` — key in `VSEGPT_API_KEY`, `ROUTERAI_API_KEY`, `BEGET_AI_API_KEY`)
+or any [pydantic-ai model string](https://ai.pydantic.dev/models/overview/). A new gateway is one
+`OPENAI_COMPATIBLE_PROVIDERS` entry in `kibernikto/ai/agent/utils.py`.
+
+## Deploy
+
+[`deploy/`](deploy/README.md) is a ready server layout: copy it, add a deploy key and env, run as root:
+
+```shell
+deploy/scripts/rebuild.sh -b kibernikto   # clone from git, build, run as kibernikto.service (podman + systemd)
+deploy/scripts/update.sh                  # rebuild every bot with new commits
+```
+
+One folder per bot in `deploy/tg_bots/`. Plain Docker, storage, backups and rollback:
+[deployment runbook](docs/deployment.md).
 
 ## Telegram peer agents
 

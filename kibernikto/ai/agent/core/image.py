@@ -2,11 +2,11 @@
 
 Provider routing in :func:`generate_image`:
 
-* **OpenRouter** (``OpenRouterModel``) and **routerai** (``RouterAiProvider``,
-  detected by ``provider.name``) — hits ``/chat/completions`` with
+* **OpenRouter** (``OpenRouterModel``) and gateways registered with
+  ``image_api="chat"`` (e.g. routerai) — hits ``/chat/completions`` with
   ``modalities=["image","text"]`` + ``image_config``.
-* **vsegpt** (``OpenAIChatModel``, remaining) — standard ``/images/generate``
-  endpoint, ``response_format="b64_json"``.
+* Other ``OpenAIChatModel`` gateways (vsegpt, beget, ...) — standard
+  ``/images/generate`` endpoint, ``response_format="b64_json"``.
 * **Everything else** — sub-agent fallback (may not return images).
 
 Generated binaries are ferried to the user via ``ctx.deps.attachments``; the
@@ -242,10 +242,10 @@ async def generate_image(ctx: RunContext[KiberniktoDeps], prompt: str) -> str:
         return str(exc)
 
     model = agent.model
-    provider_name = getattr(getattr(model, "_provider", None), "name", "")  # noqa: SLF001
+    image_api = getattr(getattr(model, "_provider", None), "image_api", None)  # noqa: SLF001
 
     try:
-        if isinstance(model, OpenRouterModel) or provider_name == "routerai":
+        if isinstance(model, OpenRouterModel) or image_api == "chat":
             binaries = await _openrouter_generate_images(request)
         elif isinstance(model, OpenAIChatModel):
             binaries = await _images_generate(prompt)

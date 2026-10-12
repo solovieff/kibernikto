@@ -17,4 +17,8 @@ tg_voices
 tg_files
 .DS_Store
 /kibernikto.egg-info/
+# Live bot folders (env, deploy key, data, logs); the template in deploy/tg_bots is tracked.
+/tg_bots/
+github.key
+deploy/tg_bots/*/data/
 .DS_Store

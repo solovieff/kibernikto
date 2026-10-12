@@ -16,10 +16,6 @@ class AgentKiberniktoSettings(BaseSettings):
 
     NAME: str = Field(default="kibernikto", description="Default kibernikto agent")
 
-    PROVIDER_TYPE: Literal["openai", "gateway", "openrouter", "vsegpt", "custom_openai"] = Field(
-        default="openrouter",
-        description="API provider type"
-    )
     HISTORY_SIZE: int = Field(default=6, description="History size")
     KEEP_THINKING_IN_HISTORY: bool = Field(
         default=False,
