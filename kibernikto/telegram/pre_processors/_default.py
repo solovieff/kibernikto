@@ -46,33 +46,30 @@ IGNORED_TYPES = {
     enums.ContentType.WEB_APP_DATA,
 }
 
-_MAX_REPLY_DEPTH = 3  # prevent recursion on deeply nested reply chains
+# Media attributes shared by Message and ExternalReplyInfo, described as cheap text markers.
+_MEDIA_KINDS = ("photo", "video", "video_note", "animation", "voice", "audio", "document",
+                "sticker", "story", "poll", "location", "venue", "contact", "dice")
 
 
 class TelegramMessagePreprocessor:
 
-    async def process_tg_message(
-            self,
-            message: types.Message,
-            *,
-            _reply_depth: int = 0,
-    ) -> list[UserContent] | None:
+    async def process_tg_message(self, message: types.Message) -> list[UserContent] | None:
         if message.content_type in IGNORED_TYPES:
             await message.reply("Unknown message type :(")
             return None
 
-        who = f"{message.from_user.username}:{message.from_user.id}"
-        logging.debug("processing %s from %s", message.content_type, who)
+        user = message.from_user
+        logging.debug("processing %s from %s", message.content_type,
+                      f"{user.username}:{user.id}" if user else "unknown")
 
-        parts: list[UserContent] = []
-        parts.extend(self._process_caption(message))
-        parts.extend(await self._process_reply(message, _reply_depth=_reply_depth))
-        parts.extend(await self._process_photo(message))
-        parts.extend(self._process_forward(message))
-        parts.extend(await self._process_voice(message))
-        parts.extend(await self._process_document(message))
-        parts.extend(self._process_text(message))
+        own: list[UserContent] = []
+        own.extend(self._process_caption(message))
+        own.extend(await self._process_photo(message))
+        own.extend(await self._process_voice(message))
+        own.extend(await self._process_document(message))
+        own.extend(self._process_text(message))
 
+        parts = [*await self._process_reply(message), *self._process_forward(message, own)]
         return parts or None
 
     # ── Per-content-type handlers (each returns list[UserContent]) ──────────────
@@ -143,61 +140,35 @@ class TelegramMessagePreprocessor:
 
         return [f"[Voice transcription]: {transcription}"]
 
-    async def _process_reply(
-            self,
-            message: types.Message,
-            *,
-            _reply_depth: int = 0,
-    ) -> list[UserContent]:
-        reply = message.reply_to_message
-        if not reply:
-            return []
-
-        # Identify the quoted message author.
-        if reply.from_user:
-            if reply.from_user.id == (await message.bot.me()).id:
-                author = "bot (you)"
-            elif reply.from_user.username:
-                author = f"@{reply.from_user.username}"
-            else:
-                author = reply.from_user.full_name
+    async def _process_reply(self, message: types.Message) -> list[UserContent]:
+        quote = message.quote.text if message.quote else None
+        if (reply := message.reply_to_message) and not reply.forum_topic_created:
+            author = _sender_label(reply, message.bot.id if message.bot else None)
+            # The bot already sees its own messages in history; only an explicit fragment adds signal.
+            body = [quote] if quote else [] if author == _SELF else await self._quoted_body(reply)
+        elif external := message.external_reply:
+            author = f"{_origin_label(external.origin)} in another chat"
+            body = [quote] if quote else _media_markers(external)
+        elif story := message.reply_to_story:
+            return [f"[Replying to a story from {_chat_label(story.chat)}]"]
         else:
-            author = "unknown"
-
-        # Recurse only up to _MAX_REPLY_DEPTH to avoid stack overflow on deep chains.
-        if _reply_depth >= _MAX_REPLY_DEPTH:
-            return [f"[Replying to {author}'s message — further nesting truncated]"]
-
-        quoted_parts = await self.process_tg_message(reply, _reply_depth=_reply_depth + 1)
-        if not quoted_parts:
-            return [f"[Replying to {author}'s message]"]
-
-        return [
-            f"[Replying to {author}'s message]:",
-            *quoted_parts,
-            "[End of quoted message]",
-        ]
-
-    def _process_forward(self, message: types.Message) -> list[UserContent]:
-        origin = message.forward_origin
-        if not origin:
             return []
 
-        match origin.type:
-            case MessageOriginType.USER:
-                user = origin.sender_user
-                source = f"@{user.username}" if user.username else user.full_name
-            case MessageOriginType.CHAT:
-                source = origin.sender_chat.title or str(origin.sender_chat.id)
-            case MessageOriginType.CHANNEL:
-                chat = origin.chat
-                source = f"{chat.title or chat.id} (message #{origin.message_id})"
-            case MessageOriginType.HIDDEN_USER:
-                source = origin.sender_user_name
-            case _:
-                source = "unknown"
+        header = f"[Replying to {author}'s message{', quoted fragment' if quote else ''}]"
+        return [f"{header}:", *body, "[End of quoted message]"] if body else [header]
 
-        return [f"[Forwarded from {source}]:"]
+    async def _quoted_body(self, reply: types.Message) -> list[UserContent]:
+        # Text + republished photo only; no transcription, documents or replies to stickers.
+        body: list[UserContent] = [*self._process_caption(reply), *self._process_text(reply)]
+        body.extend(await self._process_photo(reply))
+        body.extend(_media_markers(reply, skip=("photo",)))
+        return body
+
+    def _process_forward(self, message: types.Message, own: list[UserContent]) -> list[UserContent]:
+        if not (origin := message.forward_origin):
+            return own
+        header = f"[Forwarded from {_origin_label(origin)}]"
+        return [f"{header}:", *own, "[End of forwarded message]"] if own else [header]
 
     async def _process_document(self, message: types.Message) -> list[UserContent]:
         if not message.document:
@@ -233,6 +204,47 @@ class TelegramMessagePreprocessor:
             )
 
         return transcription.text if hasattr(transcription, "text") else transcription
+
+
+_SELF = "bot (you)"
+
+
+def _user_label(user: types.User) -> str:
+    return f"@{user.username}" if user.username else user.full_name
+
+
+def _chat_label(chat: types.Chat) -> str:
+    return f"@{chat.username}" if chat.username else chat.title or chat.full_name or str(chat.id)
+
+
+def _sender_label(message: types.Message, bot_id: int | None) -> str:
+    # sender_chat wins: anonymous admins and channel posts carry a placeholder from_user.
+    if message.sender_chat:
+        label = _chat_label(message.sender_chat)
+    elif message.from_user:
+        label = _SELF if message.from_user.id == bot_id else _user_label(message.from_user)
+    else:
+        label = "unknown"
+    return f"{label}, forwarded from {_origin_label(message.forward_origin)}" if message.forward_origin else label
+
+
+def _origin_label(origin: types.MessageOrigin) -> str:
+    match origin.type:
+        case MessageOriginType.USER:
+            return _user_label(origin.sender_user)
+        case MessageOriginType.CHAT:
+            return _chat_label(origin.sender_chat)
+        case MessageOriginType.CHANNEL:
+            return f"{_chat_label(origin.chat)} (message #{origin.message_id})"
+        case MessageOriginType.HIDDEN_USER:
+            return origin.sender_user_name
+        case _:
+            return "unknown"
+
+
+def _media_markers(source: types.Message | types.ExternalReplyInfo, skip: tuple[str, ...] = ()) -> list[UserContent]:
+    return [f"[{kind.replace('_', ' ')}]" for kind in _MEDIA_KINDS
+            if kind not in skip and getattr(source, kind, None)]
 
 
 async def _reply_async(text: str, message: types.Message, tg_bot: AIOGramBot) -> None:
