@@ -55,7 +55,7 @@ Source: `kibernikto/storage/config.py`, prefix `APP_STORAGE_`.
 | `DATA_BACKEND` | `file` | file/pg/sqlite |
 | `MEDIA_BACKEND` | `file` | file/s3 |
 | `PG_DSN` | `None` | required for pg |
-| `SQLITE_PATH` | `:memory:` | persistent file must be explicitly configured |
+| `SQLITE_PATH` | `~/.kibernikto/kibernikto.db` | durable file; `~` expanded, parent created; `:memory:` is ephemeral |
 | `HISTORY_WINDOW_SLACK` | `3` | SQL tail-fetch multiplier |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | `None` | all required for s3 |
 | `S3_REGION` | `us-east-1` | region |
@@ -63,7 +63,8 @@ Source: `kibernikto/storage/config.py`, prefix `APP_STORAGE_`.
 | `S3_CHECKSUM_CALCULATION` | `when_required` | when_required/when_supported |
 
 See [Storage](STORAGE.md) for persistence and startup behavior. Media storage and
-public image hosting are separate; choosing S3 does not replace image publishing.
+public image hosting are separate: `MEDIA_BACKEND=s3` archives private copies, while
+`IMAGE_HOSTING_PROVIDER=s3` publishes public URLs. Both reuse the `S3_*` credentials.
 
 ## Telegram
 
@@ -125,9 +126,21 @@ Source: `kibernikto/telegram/pre_processors/_default.py`, prefix `TRANSCRIBE_`.
 | `OPENAI_API_LANGUAGE` | `ru` | language hint |
 | `MIN_COMPLEX_SECONDS` | `300` | declared, unused |
 
-`kibernikto/utils/image_hosting.py` reads `IMAGE_HOSTING_PROVIDER` (default `imgbb`,
-only registered provider), `IMAGE_STORAGE_API_KEY` and `IMAGE_STORAGE_EXPIRATION`
-(default `0`, no expiration). Not `IMGBB_API_KEY`.
+Source: `kibernikto/utils/image_hosting.py`, `ImageHostingSettings`, prefix `IMAGE_`.
+
+| Field suffix | Default | Use |
+|---|---|---|
+| `HOSTING_PROVIDER` | `imgbb` | `imgbb` or `s3`; anything else fails settings validation |
+| `STORAGE_API_KEY` | `None` | imgbb key; missing key logs a startup warning and photo publishing fails |
+| `STORAGE_EXPIRATION` | `0` | imgbb TTL seconds; `0` keeps history links alive |
+| `S3_PUBLIC_BASE_URL` | `None` | required for s3; absolute URL serving the bucket root |
+| `S3_BUCKET` | `None` | public bucket; falls back to `APP_STORAGE_S3_BUCKET` |
+| `S3_PREFIX` | `public` | key prefix; grant anonymous read on this prefix only |
+| `S3_ACL` | `None` | optional canned ACL; many S3-compatible providers reject ACLs |
+
+S3 keys are `{prefix}/{yyyy}/{mm}/{uuid4}.{ext}`, written once with a sniffed
+`Content-Type` and immutable `Cache-Control`. `validate_storage()` HEADs the public
+bucket. Not `IMGBB_API_KEY`.
 `JINA_AI_API_KEY` configures the web/report integrations; see [Experts](AGENTS-AND-HARNESS.md).
 
 ## Superseded configuration notes

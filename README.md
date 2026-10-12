@@ -1,56 +1,61 @@
 # kibernikto
 
-Kibernikto is a multi agent ai framework with a telegram bot connection.  
-You can run Kibernikto in Telegram or use it as a core in your own app to build multi agent structures and benefit from
-utility methods.
+Kibernikto is a multi-agent AI framework with a Telegram bot connection, built on
+[pydantic-ai](https://ai.pydantic.dev) and aiogram 3. Run it as a ready Telegram bot or use
+`KiberniktoAgent` as the core of your own multi-agent app.
 
-You can combine KiberniktoAgent instances to orchestrate your Kiberniktos behaviour and tools calling.
+> **2.0 is in beta** and is a full rewrite: 1.x code and env names are not compatible.
+> See the [changelog and migration table](CHANGELOG.md).
 
-**Telegram**  
-Ready `aiogram` dispatcher with AI Executors connection and telegram message processors.
+**Telegram**
 
-- ✍️ conversations with AIs in groups or privately
-- 🔉 voice messages recognition
-- ⭐️ star payments [integration](/kibernikto/telegram/payment)
-- 🧐 user messages logging to service group
-- 📸 image recognition
+- ✍️ conversations with AIs in groups or privately, per-chat history
+- 🔉 voice message transcription
+- 📸 image understanding and generation
+- 🤖 other Telegram bots as delegated sub-agents ([peers](docs/telegram-peers.md))
+- ⭐️ Telegram Stars subscriptions
+- 🧐 user messages and errors forwarded to a service group
 
 **Core**
 
-- 🐫 multi LLM agent framework
-- 🫡 customizable LLM executors to extended
-- ⚙️ easy configuration
+- 🐫 `KiberniktoAgent` — a `pydantic_ai.Agent` with injectable per-chat history
+- 🧩 local experts (web, image, conversation) via pydantic-ai-harness `SubAgents`
+- 💾 history in files, SQLite or PostgreSQL; media in files or S3; public images via imgbb or S3
+- 🔭 Logfire tracing of every agent, model and tool call
 
-**Examples**
+## Install
 
-⚙️ [Environment](/env_examples/)  
-👵 Kibernikto tools usage with telegram bot
-connection: [planner](https://github.com/solovieff/kibernikto-planner), [brave search](https://github.com/solovieff/kibernikto-brave-search)
+```shell
+pip install --pre kibernikto   # 2.0 beta
+```
+
+## Run the Telegram bot
+
+1. Copy [`env_examples/kibernikto.env`](env_examples/kibernikto.env) and fill in at least
+   `TG_BOT_KEY`, `TG_MASTER_ID` and the provider key for your model (e.g. `OPENROUTER_API_KEY`).
+2. Start it — **one process per bot token**:
+
+```shell
+kibernikto --env_file_path=/path/to/kibernikto.env               # single agent
+kibernikto --env_file_path=/path/to/kibernikto.env --multi-agent # with local experts
+```
+
+Docker, storage, backups and rollback: [deployment runbook](docs/deployment.md).
 
 ## Telegram peer agents
 
 Add a Telegram bot alongside local experts with
 `build_subagents_agent_with_tg_peers([TelegramPeerAgent(...)])`.
-The existing `build_subagents_agent()` and `--multi-agent` behavior are unchanged.
 
 - [Peer API, access rules and limitations](docs/telegram-peers.md)
 - [Runnable caller + poetry-worker example](examples/telegram_peers.py)
-- Offline regression tests: `python -m unittest discover -s tests -q`
 
-# install from pip
+## Development
 
-``pip install kibernikto``
-
-# how to run the telegram bot
-
-- Setup [env](/env_examples/)
+Python 3.14 and the locked dependencies in `uv.lock`:
 
 ```shell
-kibernikto --env_file_path=/path/to/your/env/local.env
+uv sync
+uv run python -m unittest discover -s tests -q
+uv run python main.py --env_file_path=env/kibernikto.env
 ```
-
-**code**
-
-- Install the package and its dependencies (Python 3.14, see `pyproject.toml`)
-  `pip install .`
-- Run `main.py` file using your environment.

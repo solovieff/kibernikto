@@ -1345,12 +1345,13 @@ wheels = [
 
 [[package]]
 name = "kibernikto"
-version = "2.0.1"
+version = "2.0.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "aioboto3" },
     { name = "aiofiles" },
     { name = "aiogram" },
+    { name = "aiohttp" },
     { name = "aiosqlite" },
     { name = "asyncpg" },
     { name = "certifi" },
@@ -1371,6 +1372,7 @@ requires-dist = [
     { name = "aioboto3", specifier = ">=15.5.0,<16" },
     { name = "aiofiles", specifier = ">=25.1.0,<26" },
     { name = "aiogram", specifier = ">=3.30.0,<4" },
+    { name = "aiohttp", specifier = ">=3.14.3,<4" },
     { name = "aiosqlite", specifier = ">=0.22.1,<0.23" },
     { name = "asyncpg", specifier = ">=0.31.0,<0.32" },
     { name = "certifi", specifier = ">=2026.7.22" },

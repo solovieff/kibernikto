@@ -16,15 +16,14 @@ from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.extended.kibernikto_extended import KiberniktoExtended
 from kibernikto.ai.agent.harness.conversation_agent import conversation_agent
 from kibernikto.ai.agent.harness.image_agent import image_agent
-from kibernikto.ai.agent.harness.report_agent import report_agent  # noqa: F401 — kept for _EXPERT_AGENTS (commented-out entry)
-from kibernikto.ai.agent.harness.scheduler_agent import scheduler_agent  # noqa: F401 — kept for future expert wiring
 from kibernikto.ai.agent.harness.web_agent import web_agent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 
 logger = logging.getLogger(__name__)
 
-# All expert sub-agents available to the orchestrator.
-_EXPERT_AGENTS = [web_agent, image_agent, conversation_agent] #, report_agent
+# Default experts. report_agent (needs VSEGPT_API_KEY) and scheduler_agent (no daemon) are opt-in:
+# importing them builds their models, so they must never load as a side effect of this module.
+_EXPERT_AGENTS = [web_agent, image_agent, conversation_agent]
 
 
 def _common_model_settings() -> ModelSettings:

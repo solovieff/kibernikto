@@ -36,11 +36,12 @@ The app exposes synchronous `run_polling()` and async `start_polling()`; both us
 its one Dispatcher/Bot. Call `set_telegram_agent` separately before polling.
 Startup initializes SQL tables when selected, gets bot identity/descriptions, sets
 identity instructions and optionally greets the master with a sticker. Shutdown
-cancels peer runs and closes storage resources. See [Storage](STORAGE.md).
+cancels peer runs, closes storage resources and the image-hosting client. See [Storage](STORAGE.md).
 
-`validate_storage()` does the configured S3 HEAD request before CLI polling; SQL
-initialization happens later in the polling event loop. File SQLite needs an existing
-parent directory. Never call startup or validation during a secret-free docs import test.
+`validate_storage()` does the configured S3 HEAD requests (media and public image
+bucket) before CLI polling and warns when imgbb has no key; SQL initialization happens
+later in the polling event loop. Never call startup or validation during a secret-free
+docs import test.
 
 ## Reply and text utilities
 
@@ -67,7 +68,9 @@ chunks; it is not a strict Telegram-limit guarantee.
 ## Images
 
 Prefer `image_hosting.publish(image_bytes, name)` from
-`kibernikto/utils/image_hosting.py`. The compatibility shim in
+`kibernikto/utils/image_hosting.py`; it returns `None` on failure. `ImageHosting` is a
+Protocol (`publish`, `aclose`) implemented by `ImgbbImageHosting` and `S3ImageHosting`.
+The compatibility shim in
 `kibernikto/utils/image.py` exposes `publish_image_file(image_bytes, name,
 expiration=None)` and `post(filename, name)`; the per-call expiration argument is
 ignored by the shim. Neither accepts a Bot/file ID. Settings and durable media
@@ -77,9 +80,19 @@ storage are explained in [Preprocessing](TELEGRAM-PREPROCESSING.md).
 
 `configure_logger()` and the app `print_banner()` live in `kibernikto/config.py`,
 not the command module. Logfire uses the app instance name and
-`send_to_logfire='if-token-present'`; pydantic-ai is instrumented and Python logging
-uses a Logfire handler. The CLI banner prints app settings plus backend-relevant
-storage fields with S3 credentials/DSN credentials masked. Agent and Telegram modules
+`send_to_logfire='if-token-present'`; pydantic-ai is instrumented.
+
+| Signal | Console | Logfire export |
+|---|---|---|
+| `kibernikto` DEBUG+, `aiogram`/`pydantic_ai` INFO+ | formatted stderr line | yes |
+| third-party WARNING+ (root level) | formatted stderr line | yes |
+| agent/model/tool spans | Logfire console (stdout), `LOGFIRE_CONSOLE*` env | yes |
+
+Root holds exactly two handlers (`force=True`, so repeated calls don't duplicate):
+our `StreamHandler` with `LOG_FORMAT`, and a `LogfireLoggingHandler` bound to
+`logfire.with_settings(console_log=False)` with a `NullHandler` fallback, so each
+record is printed once. Logfire ignores formatters. The CLI banner prints app
+settings plus backend-relevant storage fields with S3 credentials/DSN credentials masked. Agent and Telegram modules
 have separate banner functions, but the CLI does not call all of them in sequence.
 Do not dump the environment, unmasked settings, chat history or credential-bearing
 Git configuration for diagnostics.

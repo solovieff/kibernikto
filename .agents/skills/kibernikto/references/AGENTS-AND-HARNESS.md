@@ -58,8 +58,8 @@ context rather than assuming a bare base deps object satisfies every expert.
 | `kibernikto/ai/agent/harness/web_agent/web_expert.py` | `read_web`, `web_search`, `deep_search` via Jina | real network calls; read/search responses truncated to 8000 chars |
 | `kibernikto/ai/agent/harness/image_agent/image_expert.py` | `describe_image`, `edit_image` | vision model is separately hard-coded; editing calls core generation with deps input images |
 | `kibernikto/ai/agent/harness/conversation_agent/conversation_expert.py` | `add_user_info`, `set_user_info`, `answer_on_full_history` | full-history tool formats default namespace history (up to 5000), not necessarily the named parent's history |
-| `kibernikto/ai/agent/harness/report_agent/report_expert.py` | `generate_report`, Jina with VseGPT fallback | attaches text bytes; imported report singleton needs VseGPT config even though disabled in default delegation |
-| `kibernikto/ai/agent/harness/scheduler_agent/scheduler_expert.py` | plan/replan/delete/clear events, set timezone | separate JSON store; **no notification execution daemon**, not wired by default |
+| `kibernikto/ai/agent/harness/report_agent/report_expert.py` | `generate_report`, Jina with VseGPT fallback | attaches text bytes; opt-in: not imported by the harness package or orchestrator, and importing it requires `VSEGPT_API_KEY` |
+| `kibernikto/ai/agent/harness/scheduler_agent/scheduler_expert.py` | plan/replan/delete/clear events, set timezone | separate JSON store; **no notification execution daemon**; opt-in, not imported by default |
 
 Core image generation lives in `kibernikto/ai/agent/core/image.py`. Telegram registers
 its tool only when `IMAGE_MODEL_NAME` is truthy; the image expert's edit tool also

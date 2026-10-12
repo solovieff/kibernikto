@@ -127,8 +127,10 @@ class TelegramApp:
 
         async def _on_shutdown(bot: Bot) -> None:
             from kibernikto.storage.factory import shutdown_storage
+            from kibernikto.utils.image_hosting import image_hosting
 
             await shutdown_storage()
+            await image_hosting.aclose()
 
         dispatcher.shutdown.register(_on_shutdown)
 

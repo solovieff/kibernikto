@@ -31,9 +31,10 @@ The preprocessor uses `tg_media_store` from `kibernikto/storage/singletons.py` a
 bytes under the `telegram` media namespace and independently publishes a model-fetchable
 URL. Failure to archive is logged; failure to publish adds an error marker.
 
-Public hosting currently supports imgbb with `IMAGE_STORAGE_API_KEY`, selected by
-`IMAGE_HOSTING_PROVIDER=imgbb`. `IMAGE_STORAGE_EXPIRATION=0` omits a TTL. S3 storage
-is not automatically public URL hosting. Old `publish_image_file(bot, file_id)` and
+Public hosting is selected by `IMAGE_HOSTING_PROVIDER`: `imgbb` (default, needs
+`IMAGE_STORAGE_API_KEY`; `IMAGE_STORAGE_EXPIRATION=0` omits a TTL) or `s3` (public
+bucket served at `IMAGE_S3_PUBLIC_BASE_URL`, see [Configuration](CONFIGURATION.md)).
+`APP_STORAGE_MEDIA_BACKEND=s3` alone is private archiving, not public URL hosting. Old `publish_image_file(bot, file_id)` and
 `IMGBB_API_KEY` instructions were incorrect; the legacy wrapper takes bytes and name.
 
 ## Voice and documents

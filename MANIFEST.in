@@ -1,4 +1,6 @@
 include pyproject.toml
+include CHANGELOG.md
+recursive-include env_examples *.env
 recursive-include tests *.py
 recursive-include examples *.py
 recursive-include docs *.md

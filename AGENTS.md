@@ -2,7 +2,7 @@
 
 ## Project Context
 Kibernikto is a multi-agent AI framework with Telegram bot integration, built on pydantic-ai + aiogram v3.
-- Package: `kibernikto` (PyPI, v2.0.1)
+- Package: `kibernikto` (PyPI, v2.0.0b1)
 - Core: `KiberniktoAgent` — a `pydantic_ai.Agent` subclass with injectable per-chat history; file-backed by default, PostgreSQL/SQLite via `APP_STORAGE_DATA_BACKEND`
 - Telegram: aiogram dispatcher with conversation handlers, middlewares, multimodal preprocessor
 - Dependencies: `pydantic-ai`, `aiogram`, `logfire`, `pydantic-ai-harness`

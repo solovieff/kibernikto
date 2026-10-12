@@ -55,31 +55,30 @@ def _storage_dump() -> dict:
     return dump
 
 
-def configure_logger():
-    formatter = logging.Formatter(
-        fmt='%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s',
-        datefmt='%Y-%m-%d:%H:%M:%S'
-    )
+LOG_FORMAT = '%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s'
+LOG_DATE_FORMAT = '%Y-%m-%d:%H:%M:%S'
+LOGGER_LEVELS = {'kibernikto': logging.DEBUG, 'aiogram': logging.INFO, 'pydantic_ai': logging.INFO}
+
+
+def configure_logger() -> None:
+    """Stdlib records: formatted stderr + Logfire export. Spans: Logfire console (``LOGFIRE_CONSOLE*``) + export.
+
+    Root stays at WARN, so third-party warnings and errors reach both sinks; project loggers are more verbose.
+    Logfire ignores formatters, hence the separate console handler. Safe to call more than once.
+    """
     logfire.configure(service_name=APP_SETTINGS.INSTANCE_NAME, send_to_logfire='if-token-present')
     logfire.instrument_pydantic_ai()
 
-    logfire_handler = logfire.LogfireLoggingHandler()
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter(fmt=LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
 
-    # FIXME: does not work
-    logfire_handler.setFormatter(formatter)
+    # console_log=False: Logfire's console already shows spans; records are printed once, by our handler.
+    # NullHandler fallback: records under suppressed instrumentation are already printed by our handler.
+    logfire_handler = logfire.LogfireLoggingHandler(
+        fallback=logging.NullHandler(),
+        logfire_instance=logfire.with_settings(console_log=False),
+    )
 
-    # XXX: this will push all logging to logfire
-    logging.basicConfig(
-        format=formatter._fmt,
-        datefmt=formatter.datefmt,
-        level=logging.WARN,
-        handlers=[logfire_handler])
-
-    logger = logging.getLogger('kibernikto')
-    logger.setLevel(logging.DEBUG)
-
-    logger = logging.getLogger('aiogram')
-    logger.setLevel(logging.INFO)
-
-    logger = logging.getLogger('pydantic_ai')
-    logger.setLevel(logging.INFO)
+    logging.basicConfig(level=logging.WARN, handlers=[console_handler, logfire_handler], force=True)
+    for name, level in LOGGER_LEVELS.items():
+        logging.getLogger(name).setLevel(level)

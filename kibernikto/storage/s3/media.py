@@ -5,11 +5,11 @@ import uuid
 from pathlib import Path
 
 from kibernikto.storage.config import STORAGE_SETTINGS
+from kibernikto.storage.s3.client import open_async_client
 
 logger = logging.getLogger(__name__)
 
 _S3_PREFIX = "media"
-_S3_MAX_ATTEMPTS = 3
 
 
 class S3MediaStore:  # satisfies MediaStore (structural)
@@ -21,13 +21,8 @@ class S3MediaStore:  # satisfies MediaStore (structural)
     """
 
     def __init__(self, *, name: str = "default") -> None:
-        s = STORAGE_SETTINGS
         self._name = name
-        self._bucket = s.S3_BUCKET
-        self._endpoint = s.S3_ENDPOINT
-        self._region = s.S3_REGION
-        self._access_key = s.S3_ACCESS_KEY
-        self._secret_key = s.S3_SECRET_KEY
+        self._bucket = STORAGE_SETTINGS.S3_BUCKET
         self._tmp_dir = Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser() / "tmp"
         self._client = None
 
@@ -38,21 +33,7 @@ class S3MediaStore:  # satisfies MediaStore (structural)
     async def _get_client(self):
         """Lazy aioboto3 client with retry config."""
         if self._client is None:
-            import aioboto3
-            from botocore.config import Config as BotoConfig
-
-            self._client = await aioboto3.Session().client(
-                "s3",
-                endpoint_url=self._endpoint,
-                region_name=self._region,
-                aws_access_key_id=self._access_key,
-                aws_secret_access_key=self._secret_key,
-                config=BotoConfig(
-                    retries={"max_attempts": _S3_MAX_ATTEMPTS},
-                    s3={"addressing_style": STORAGE_SETTINGS.S3_ADDRESSING_STYLE},
-                    request_checksum_calculation=STORAGE_SETTINGS.S3_CHECKSUM_CALCULATION,
-                ),
-            ).__aenter__()
+            self._client = await open_async_client()
         return self._client
 
     async def aclose(self) -> None:

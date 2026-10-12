@@ -10,7 +10,7 @@ Sources: `kibernikto/storage/config.py`, `kibernikto/storage/base.py`,
 | `APP_STORAGE_DATA_BACKEND` | `file` | `file`, `pg`, `sqlite` (history and chat data) |
 | `APP_STORAGE_MEDIA_BACKEND` | `file` | `file`, `s3` (binary media) |
 | `APP_STORAGE_FILESTORE_LOCATION` | `~/.kibernikto` | file data, instructions and local temporary files |
-| `APP_STORAGE_SQLITE_PATH` | `:memory:` | explicit file required for restart persistence |
+| `APP_STORAGE_SQLITE_PATH` | `~/.kibernikto/kibernikto.db` | durable file; `:memory:` is ephemeral |
 
 `get_history_storage(name)` and `get_media_store(name)` cache by namespace;
 `get_chat_data_storage()` shares a single chat-data backend. Import lazy proxies from
@@ -63,8 +63,8 @@ count, so a signature-only change can be lost when no parts were removed.
 ## SQL and resource lifecycle
 
 `APP_STORAGE_PG_DSN` is required for `pg`; use SQLAlchemy's asyncpg URL scheme.
-For file SQLite, create the parent directory yourself; engine setup doesn't create it
-or expand a tilde in the configured path. `:memory:` is intentionally ephemeral.
+For file SQLite, engine setup expands `~` and creates the parent directory.
+`:memory:` is intentionally ephemeral.
 
 ```python
 from kibernikto.storage.sql.engine import ensure_db_initialized
@@ -80,8 +80,9 @@ async def sql_lifecycle():
 ```
 
 `TelegramApp` installs SQL initialization at startup and storage shutdown hooks.
-Standalone applications must own this lifecycle. `validate_storage()` currently
-HEAD-checks an S3 bucket when configured; it does not connect to SQL. Schema setup
+Standalone applications must own this lifecycle. `validate_storage()` HEAD-checks the
+S3 media bucket and the public image-hosting bucket when configured (S3 clients are
+built in `kibernikto/storage/s3/client.py`); it does not connect to SQL. Schema setup
 uses `create_all`, not a migration system. S3 keeps voice temporary files local and
 closes its lazy async client at shutdown.
 

@@ -61,27 +61,25 @@ def validate_storage() -> None:
     if s.MEDIA_BACKEND == "s3":
         _check_s3(s)
 
+    # Public image hosting is a media backend too: an unreachable bucket must fail before polling.
+    from kibernikto.utils.image_hosting import validate_image_hosting
+
+    validate_image_hosting()
     logger.info("Storage backends validated.")
 
 
 def _check_s3(s: StorageSettings) -> None:
     """HEAD bucket to verify S3 credentials and endpoint."""
+    check_s3_bucket(s.S3_BUCKET)
+
+
+def check_s3_bucket(bucket: str | None) -> None:
+    """HEAD *bucket* with the shared S3 credentials; raise ``OSError`` before polling on any failure."""
     try:
-        import boto3
-        from botocore.config import Config as BotoConfig
-        client = boto3.client(
-            "s3",
-            endpoint_url=s.S3_ENDPOINT,
-            region_name=s.S3_REGION,
-            aws_access_key_id=s.S3_ACCESS_KEY,
-            aws_secret_access_key=s.S3_SECRET_KEY,
-            config=BotoConfig(
-                s3={"addressing_style": s.S3_ADDRESSING_STYLE},
-                request_checksum_calculation=s.S3_CHECKSUM_CALCULATION,
-            ),
-        )
-        client.head_bucket(Bucket=s.S3_BUCKET)
-    except ImportError:
-        raise OSError("boto3 is required for S3 connectivity check — install it or use MEDIA_BACKEND=file")
+        from kibernikto.storage.s3.client import head_bucket_sync
+
+        head_bucket_sync(bucket)
+    except ImportError as exc:
+        raise OSError("boto3 is required for S3 connectivity check — install it or use MEDIA_BACKEND=file") from exc
     except Exception as exc:
-        raise OSError(f"S3 connection failed: {exc}") from exc
+        raise OSError(f"S3 connection failed for bucket {bucket!r}: {exc}") from exc

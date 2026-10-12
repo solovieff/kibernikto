@@ -11,7 +11,7 @@ Kibernikto is a long-polling Telegram bot. Run **one** instance per bot token: a
 ## 2. Build
 
 ```shell
-docker build -t kibernikto:2.0.1 .
+docker build -t kibernikto:2.0.0b1 .
 ```
 
 The image runs as UID `10001` and writes state only to `/data`.
@@ -23,7 +23,7 @@ mkdir -p ./kibernikto-data
 docker run -d --name kibernikto --restart unless-stopped \
   --env-file ./kibernikto.env \
   -v "$PWD/kibernikto-data:/data" \
-  kibernikto:2.0.1
+  kibernikto:2.0.0b1
 ```
 
 Configuration comes only from `--env-file`; the container has no `.env` file to load.
@@ -36,6 +36,20 @@ Default storage inside the container:
 | `APP_STORAGE_SQLITE_PATH` | `/data/kibernikto.db` | used when `APP_STORAGE_DATA_BACKEND=sqlite` |
 
 For PostgreSQL set `APP_STORAGE_DATA_BACKEND=pg` and `APP_STORAGE_PG_DSN` instead.
+
+### Public image hosting
+
+Photos and generated images are published to a public URL the model can fetch.
+
+- **imgbb** (default): set `IMAGE_STORAGE_API_KEY`. Without it startup logs a warning and photos reach the model as an error marker.
+- **S3**: set `IMAGE_HOSTING_PROVIDER=s3`, the `APP_STORAGE_S3_*` credentials and `IMAGE_S3_PUBLIC_BASE_URL` (the URL serving the bucket root, e.g. a CDN). Grant anonymous `s3:GetObject` on `IMAGE_S3_PREFIX` (default `public/`) only — never on the private `media/` prefix:
+
+```json
+{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": "*",
+  "Action": "s3:GetObject", "Resource": "arn:aws:s3:::YOUR_BUCKET/public/*"}]}
+```
+
+Startup HEADs the bucket and refuses to poll if it is unreachable. Check one published URL with `curl -I` after the first photo.
 
 ## 4. Verify
 
@@ -50,7 +64,7 @@ Send `/start` to the bot from an allowed account. A reply confirms the full path
 
 ```shell
 git pull
-docker build -t kibernikto:2.0.1 .
+docker build -t kibernikto:2.0.0b1 .
 docker stop kibernikto && docker rm kibernikto
 # re-run the command from section 3 with the new image tag
 ```
@@ -65,7 +79,7 @@ Keep the same `/data` volume: it holds history, chat credits and media.
 
 ## 7. Rollback
 
-Re-run section 3 with the previous image tag. Data format is unchanged across the 2.0.x line; check the release notes before crossing minor versions.
+Re-run section 3 with the previous image tag. Data format is unchanged across the 2.0 betas; check [CHANGELOG.md](../CHANGELOG.md) before crossing versions. 1.x data is not read by 2.0.
 
 ## 8. Known limits
 
