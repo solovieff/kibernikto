@@ -87,4 +87,4 @@ Re-run section 3 with the previous image tag. Data format is unchanged across th
 
 - No automatic health endpoint; use `docker logs` and the bot's responses.
 - One replica only. Scaling out requires a shared PostgreSQL DSN plus distinct bot tokens or a webhook setup, which this project does not provide.
-- Stars payments are verified offline only; a real test payment is required before production billing (see [PAYMENTS.md](../.agents/skills/kibernikto/references/PAYMENTS.md)).
+- Stars payments are verified offline only; a real test payment is required before production billing (see `kibernikto/telegram/payment/payment_utils.py`).

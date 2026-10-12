@@ -107,7 +107,7 @@ def runtime_checks(blocks: list[tuple[str, str]], run_tests: bool) -> dict[str, 
                         importlib.import_module(alias.name)
                         imports.add(alias.name)
         for file, block in blocks:
-            if file == "CORE-AGENT.md" and "asyncio.run(smoke())" in block:
+            if file == "SKILL.md" and "asyncio.run(smoke())" in block:
                 exec(compile(block, file, "exec"), {"__name__": "__docs_smoke__"})
         from kibernikto.ai.agent.extended.orchestrators import build_subagents_agent_with_tg_peers
         from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent

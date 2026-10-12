@@ -63,6 +63,7 @@ def build_subagents_agent_with_tg_peers(
     sub_agents = SubAgents(
         agents=[
             *(SubAgent(agent) for agent in _EXPERT_AGENTS),
+            # No timeout_seconds: the peer owns its deadline; an equal outer one races it and cancels mid-reply.
             *(SubAgent(peer) for peer in peers),
         ],
         agent_folders=None,

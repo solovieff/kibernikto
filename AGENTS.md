@@ -59,7 +59,7 @@ CLI (kibernikto command / main.py)
 - **ServiceMiddleware debug policy**: the historical `or 1 == 1` forwarding shortcut was deliberate, not an invitation to harden it. Current source skips admin messages and no longer contains that expression; do not change or reintroduce forwarding behavior merely to reconcile old documentation.
 
 ## Skills Available
-- `.agents/skills/kibernikto/SKILL.md` — full framework reference, architecture, task routing table
+- `.agents/skills/kibernikto/SKILL.md` — source map, cross-module contracts and traps
 - `.agents/skills/pydantic-ai-harness/SKILL.md` — CodeMode sandboxing
 - `.agents/skills/building-pydantic-ai-agents/SKILL.md` — building pydantic-ai agents
 
@@ -102,5 +102,5 @@ except ValueError | TypeError: (no parens)
 - Read `pyproject.toml` for Python requirements, dependencies and the `kibernikto` entry point; use the existing virtual environment. No IDE configuration is required.
 - From the repository root, check docs offline with `.venv/bin/python -B .agents/skills/kibernikto/scripts/check_docs.py`; add `--tests` to run unittest discovery in its isolated, network-blocked environment.
 - Standard test command: `.venv/bin/python -B -m unittest discover -s tests -t .` in an already isolated test environment; prefer the helper above when live credentials or storage may be inherited.
-- Authorized live run: `.venv/bin/python main.py` with configuration prepared before agent imports. Do not start polling without authorization or a second poller for an active bot token. See `.agents/skills/kibernikto/references/UTILS-AND-RUNNER.md` for startup details.
+- Authorized live run: `.venv/bin/python main.py` with configuration prepared before agent imports. Do not start polling without authorization or a second poller for an active bot token. Startup order lives in `kibernikto/cmd/__start.py`.
 - On Windows, use the existing virtual environment's `Scripts/python.exe` instead of `.venv/bin/python`.
