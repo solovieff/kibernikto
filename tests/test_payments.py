@@ -14,9 +14,14 @@ os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.types import Chat, Message, PreCheckoutQuery, StarTransaction, StarTransactions, SuccessfulPayment, Update, User
 
-from kibernikto.telegram.handlers.payments import handle_pre_checkout, handle_successful_payment
+from aiogram.filters import CommandObject
+
+from kibernikto.storage.models import ConversationInfo
+from kibernikto.telegram.config import TELEGRAM_SETTINGS
+from kibernikto.telegram.handlers.payments import cmd_balance, cmd_pay, handle_pre_checkout, handle_successful_payment
 from kibernikto.telegram.middleware.middleware_subscription import SUBSCRIPTION_SETTINGS
-from kibernikto.telegram.payment.payment_utils import DEFAULT_SUBSCRIPTION_PERIOD, SUBSCRIPTION_PAYLOAD, check_sub, create_payment_link
+from kibernikto.telegram.payment.payment_utils import (DEFAULT_SUBSCRIPTION_PERIOD, SUBSCRIPTION_PAYLOAD, TOPUP_PAYLOAD,
+                                                       check_sub, create_payment_link)
 
 
 USER = User(id=200, is_bot=False, first_name='payer')
@@ -31,11 +36,38 @@ def transaction(identifier: str = 'charge', *, days: int = 1, user: int = 200,
                            source=None if refund else partner, receiver=partner if refund else None)
 
 
+class MemoryChatData:
+    """In-memory ChatDataStore: round-trips through JSON like the real backends."""
+
+    def __init__(self) -> None:
+        self.rows: dict[int, str] = {}
+
+    async def load(self, chat_id: int) -> ConversationInfo:
+        row = self.rows.get(chat_id)
+        return ConversationInfo.model_validate_json(row) if row else ConversationInfo()
+
+    async def save(self, chat_id: int, info: ConversationInfo) -> None:
+        self.rows[chat_id] = info.model_dump_json()
+
+
+def paid_message(bot: Bot, *, amount: int = 52, payload: str = TOPUP_PAYLOAD, charge: str = 'charge',
+                 currency: str = 'XTR') -> Message:
+    payment = SuccessfulPayment(currency=currency, total_amount=amount, invoice_payload=payload,
+                                telegram_payment_charge_id=charge, provider_payment_charge_id='')
+    return Message(message_id=1, date=datetime.now(timezone.utc), from_user=USER,
+                   chat=Chat(id=200, type='private'), successful_payment=payment).as_(bot)
+
+
 class PaymentTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.bot = Bot('100:offline-test-token')
         self.bot.session.make_request = AsyncMock(return_value=True)
         self.addAsyncCleanup(self.bot.session.close)
+        # Never touch the real ~/.kibernikto chat bucket from tests.
+        self.chat_data = MemoryChatData()
+        patcher = patch('kibernikto.telegram.handlers.payments.chat_data', self.chat_data)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     async def test_invoice_preserves_payload_and_period(self) -> None:
         with patch.object(self.bot, 'create_invoice_link', new=AsyncMock(return_value='link')) as create:
@@ -108,7 +140,12 @@ class PaymentTests(unittest.IsolatedAsyncioTestCase):
                  (False, 'XTR', SUBSCRIPTION_PAYLOAD, 52, False),
                  (True, 'USD', SUBSCRIPTION_PAYLOAD, 52, False),
                  (True, 'XTR', 'other', 52, False),
-                 (True, 'XTR', SUBSCRIPTION_PAYLOAD, 1, False)]
+                 (True, 'XTR', SUBSCRIPTION_PAYLOAD, 1, False),
+                 # Top-ups accept any 1..10000 Stars and do not depend on the subscription switch.
+                 (False, 'XTR', TOPUP_PAYLOAD, 1, True),
+                 (False, 'XTR', TOPUP_PAYLOAD, 777, True),
+                 (False, 'XTR', TOPUP_PAYLOAD, 10001, False),
+                 (False, 'USD', TOPUP_PAYLOAD, 52, False)]
         for enabled, currency, payload, amount, valid in cases:
             with self.subTest(enabled=enabled, currency=currency, payload=payload, amount=amount):
                 query = PreCheckoutQuery(id='checkout', from_user=USER, currency=currency,
@@ -146,3 +183,97 @@ class PaymentTests(unittest.IsolatedAsyncioTestCase):
                           chat=Chat(id=200, type='private'), successful_payment=payment).as_(self.bot)
         await handle_successful_payment(message)
         self.bot.session.make_request.assert_not_awaited()
+        self.assertEqual(self.chat_data.rows, {})
+
+    def sent(self) -> object:
+        return self.bot.session.make_request.await_args.args[1]
+
+    async def test_topup_adds_stars_as_credits_and_persists(self) -> None:
+        start = (await self.chat_data.load(200)).credits
+        await handle_successful_payment(paid_message(self.bot, amount=100, charge='a'))
+        await handle_successful_payment(paid_message(self.bot, amount=5, charge='b'))
+        self.assertEqual((await self.chat_data.load(200)).credits, start + 105)
+        self.assertIn(f'Balance: {start + 105}', self.sent().text)
+
+    async def test_subscription_payment_also_tops_up(self) -> None:
+        start = (await self.chat_data.load(200)).credits
+        await handle_successful_payment(paid_message(self.bot, amount=52, payload=SUBSCRIPTION_PAYLOAD))
+        self.assertEqual((await self.chat_data.load(200)).credits, start + 52)
+
+    def test_add_credits_rejects_negative(self) -> None:
+        info = ConversationInfo(credits=0)
+        self.assertEqual(info.add_credits(5), 5)
+        with self.assertRaises(ValueError):
+            info.add_credits(-1)
+
+    def test_legacy_row_keys_are_ignored(self) -> None:
+        legacy = '{"tg_id": 1, "credits": 7, "timezone": "Europe/Moscow", "client_app_info": "x", "paid_charge_ids": ["a"]}'
+        self.assertEqual(ConversationInfo.model_validate_json(legacy).model_dump(), {'credits': 7})
+
+    def command(self, text: str, chat_type: str = 'private') -> tuple[Message, CommandObject]:
+        message = Message(message_id=1, date=datetime.now(timezone.utc), from_user=USER, text=text,
+                          chat=Chat(id=200, type=chat_type)).as_(self.bot)
+        name, _, args = text.lstrip('/').partition(' ')
+        return message, CommandObject(prefix='/', command=name, args=args or None)
+
+    async def test_pay_sends_topup_invoice(self) -> None:
+        for text, stars in (('/pay', SUBSCRIPTION_SETTINGS.TOPUP_STARS), ('/pay 500', 500)):
+            with self.subTest(text=text):
+                await cmd_pay(*self.command(text))
+                invoice = self.sent()
+                self.assertEqual((invoice.payload, invoice.currency, invoice.prices[0].amount),
+                                 (TOPUP_PAYLOAD, 'XTR', stars))
+                self.assertIsNone(getattr(invoice, 'subscription_period', None))
+
+    async def test_pay_rejects_bad_amounts_and_groups(self) -> None:
+        for text, chat_type in (('/pay 0', 'private'), ('/pay 10001', 'private'), ('/pay abc', 'private'),
+                                ('/pay -5', 'private'), ('/pay', 'group')):
+            with self.subTest(text=text, chat_type=chat_type):
+                await cmd_pay(*self.command(text, chat_type))
+                self.assertFalse(hasattr(self.sent(), 'prices'))
+
+    async def test_balance_reports_stored_credits(self) -> None:
+        await self.chat_data.save(200, ConversationInfo(credits=42))
+        await cmd_balance(*self.command('/balance'))
+        self.assertIn('42 credits', self.sent().text)
+
+    def as_admin(self, admin: bool = True):
+        return patch('kibernikto.telegram.handlers.payments.is_from_admin', return_value=admin)
+
+    async def test_admin_pay_adjusts_target_without_invoice(self) -> None:
+        await self.chat_data.save(777, ConversationInfo(credits=10))
+        with self.as_admin():
+            await cmd_pay(*self.command('/pay 100 777', chat_type='group'))
+            self.assertIn('Balance: 110', self.sent().text)
+            await cmd_pay(*self.command('/pay -500 777'))
+        self.assertEqual((await self.chat_data.load(777)).credits, 0)
+        self.assertFalse(hasattr(self.sent(), 'prices'))
+
+    async def test_admin_pay_rejects_garbage(self) -> None:
+        with self.as_admin():
+            for text in ('/pay 0 777', '/pay abc 777', '/pay 10 bob'):
+                with self.subTest(text=text):
+                    await cmd_pay(*self.command(text))
+                    self.assertIn('Usage', self.sent().text)
+        self.assertEqual(self.chat_data.rows, {})
+
+    async def test_non_admin_cannot_touch_others(self) -> None:
+        with self.as_admin(False):
+            await cmd_pay(*self.command('/pay 100 777'))
+            self.assertIn('Only admins', self.sent().text)
+            await cmd_balance(*self.command('/balance 777'))
+            self.assertIn('Only admins', self.sent().text)
+        self.assertEqual(self.chat_data.rows, {})
+
+    async def test_admin_commands_switch_disables_admin_args(self) -> None:
+        with self.as_admin(), patch.object(TELEGRAM_SETTINGS, 'ADMIN_COMMANDS_ALLOWED', False):
+            await cmd_pay(*self.command('/pay 100 777'))
+        self.assertIn('Only admins', self.sent().text)
+
+    async def test_admin_balance_reads_target(self) -> None:
+        await self.chat_data.save(777, ConversationInfo(credits=9))
+        with self.as_admin():
+            await cmd_balance(*self.command('/balance 777'))
+            self.assertIn('Chat 777: 9 credits', self.sent().text)
+            await cmd_balance(*self.command('/balance bob'))
+            self.assertIn('Usage', self.sent().text)

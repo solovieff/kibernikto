@@ -23,5 +23,8 @@ async def cmd_help(message: types.Message):
     await message.answer(
         "Available commands:\n"
         "/start - Start the bot\n"
-        "/help - Show this help message"
+        "/help - Show this help message\n"
+        "/balance - Show your credits\n"
+        "/pay [stars] - Top up credits with Telegram Stars\n"
+        "Admins: /pay <±credits> <tg_id>, /balance <tg_id>"
     )

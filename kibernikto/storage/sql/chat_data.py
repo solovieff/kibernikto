@@ -20,7 +20,7 @@ class SqlChatDataStorage:  # satisfies ChatDataStore (structural)
                     return ConversationInfo.model_validate(row.data)
                 except Exception as exc:
                     logger.warning("Failed to parse chat data for %s: %s", chat_id, exc)
-        info = ConversationInfo(tg_id=chat_id)
+        info = ConversationInfo()
         await self.save(chat_id, info)
         return info
 

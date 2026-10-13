@@ -1,15 +1,13 @@
 ---
 name: kibernikto
 description: Use when developing Kibernikto agents or Telegram bots.
-version: 4.0.0
-author: Kibernikto Team, Hermes Agent
 license: MIT
-platforms: [linux, macos, windows]
-compatibility: Use the existing repo environment; see pyproject.toml.
+compatibility: Linux, macOS or Windows; use the existing repo environment, see pyproject.toml.
 metadata:
-  hermes:
-    tags: [python, agents, telegram, pydantic-ai]
-    related_skills: [building-pydantic-ai-agents, pydantic-ai-harness]
+  version: "4.0.0"
+  author: Kibernikto Team, Hermes Agent
+  tags: python agents telegram pydantic-ai
+  related-skills: building-pydantic-ai-agents pydantic-ai-harness
 ---
 
 # Kibernikto
@@ -27,8 +25,8 @@ fields change often — read them in source, don't trust a remembered list.
 | Base agent, history, attachments | `kibernikto/ai/agent/core/kibernikto_agent.py` |
 | Model string → model | `kibernikto/ai/agent/utils.py` (`infer_kibernikto_model`) |
 | Telegram agent + active-agent setter | `kibernikto/ai/agent/telegram/telegram_agent.py` |
-| Credit tiers, local experts orchestrator | `kibernikto/ai/agent/extended/` |
-| Expert agents | `kibernikto/ai/agent/harness/` |
+| Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/extended/orchestrators.py` |
+| Expert agents, `CreditTier`, `chat_memory` capabilities | `kibernikto/ai/agent/harness/` |
 | Bot, Dispatcher, middleware order, lifecycle | `kibernikto/telegram/agent/telegram_app.py` |
 | Handlers / middlewares / preprocessing | `kibernikto/telegram/handlers/`, `kibernikto/telegram/middleware/`, `kibernikto/telegram/pre_processors/` |
 | Telegram peers (bot-to-bot subagents) | `kibernikto/ai/agent/telegram/peer_agent.py`, `kibernikto/telegram/peer_hub.py` |
@@ -60,7 +58,36 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
 - Importing an expert module builds its model. Report (needs `VSEGPT_API_KEY`) and scheduler
   (no execution daemon) are opt-in: keep them out of `harness/__init__.py` and default wiring.
 - Experts are plain `KiberniktoAgent`s delegated via the real `SubAgents(agents=[SubAgent(a)])`;
-  `KiberniktoExtended` is only for a credit-tiered parent. Agent credits are not Stars billing.
+  only a parent with the `CreditTier` capability (`harness/credit_tier.py`, wired in
+  `orchestrators.py`) selects tier models and spends credits. Peer envelopes set
+  `TelegramDeps.billable=False`; explicit `run(model=...)`/`override(model=...)` beat the tier.
+- `chat_data` (`ConversationInfo`) stores credits only; legacy JSON keys are ignored on load.
+  `build_deps` loads it once into `TelegramDeps.chat_info` (read-only; tier selection reuses it) and
+  writes nothing; `CreditTier.after_run` re-reads before charging so a mid-run top-up survives.
+  Credits are kept out of the prompt. Timezone is `utils.time_utils.DEFAULT_TIMEZONE` (Moscow).
+- Instructions per run, in order: persona (`{FILESTORE}/{NAME}-instructions.txt` **replaces** `WHO_AM_I`;
+  read once at agent construction → restart to apply), `Current date: …` (day granularity, cache-friendly),
+  then Telegram bot identity and chat context.
+- Persona text is a Handlebars template (`core/persona.py`, stock `TemplateStr`, needs `pydantic-ai-slim[spec]`)
+  rendered against `Persona(name, traits)` — never against deps (aiogram `Message` inside). No `{{` → plain static
+  string. Compiled at construction: an unknown field (`{{nmae}}`) raises then; no HTML escaping. Values come from
+  `persona_source=` (a `PersonaSource` Protocol, per run); default `StaticPersona` = `PERSONA_NAME` or "Kibernikto",
+  traits from `AGENT_KIBERNIKTO_PERSONA_TRAITS` JSON. `TelegramAgent` defaults to `TelegramPersona`:
+  `PERSONA_NAME` → bot `full_name` from getMe → "Kibernikto".
+- Bot identity (`telegram/identity.py`): `fetch_bot_identity` runs once in `_on_startup` (getMe + descriptions,
+  descriptions best-effort) into a `BotIdentity`; the prompt line, `{{name}}` and `should_react` all read it from
+  memory. BotFather edits apply after restart. `display_name` is the Telegram name, not `AGENT_KIBERNIKTO_NAME`.
+- Chat facts (`chat_context.get_chat_context`): getChat cached in process memory per (bot, chat),
+  600 s TTL, never persisted; includes `pinned:` text. Pin/title/photo service messages hit
+  `handle_chat_changed` → `forget_chat_context`. Failed getChat falls back to the update's `Chat`.
+- Web: `ExaSearch` when `EXA_API_KEY` is set, else `Researcher(subagents=[])` spilling oversized
+  tool output under `{FILESTORE}/tool-output` (1-day TTL). On the parent (tier model) by default;
+  `AGENT_KIBERNIKTO_WEB_MODEL_NAME` moves it into a `web_researcher` delegate on that model.
+- Memory is stock harness, on the parent: `chat_memory(name)` = `Memory` (namespace = chat id,
+  store from `get_memory_store()`: file → `{FILESTORE}/memory`, sqlite → `*.memory.db`, pg →
+  `PostgresMemoryStore`) + `ConversationSearch` over our own `HistoryStorage`, bound per run to
+  the caller's chat. No `StepPersistence`; `ConversationInfo` holds no facts about people.
+  Live pg check (opt-in): `KIBERNIKTO_TEST_PG_DSN=postgresql+asyncpg://... python -m unittest tests.test_chat_memory`.
 
 **Telegram**
 - Module-level routers attach to one Dispatcher per process; tests patch `include_router`.
@@ -78,6 +105,9 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
   receiving bot (it was the root cause on an old bot) before touching code.
 
 **Payments / ops**
+- Every successful Stars payment (`/pay` top-up or subscription) adds 1 credit per Star to
+  `chat_data`; no charge-id dedup by decision (a crash-redelivered update may credit twice). Top-ups work with `SUBSCRIPTION_ENABLED=false`.
+  Admins (`TG_MASTER_ID(S)`, `TG_ADMIN_COMMANDS_ALLOWED`) adjust balances directly: `/pay ±N tg_id`, `/balance tg_id`.
 - The subscription period is fixed at 30 days (`DEFAULT_SUBSCRIPTION_PERIOD`) by design.
   The paywall has no admin exemption, and each checked message queries Telegram for transactions.
 - ServiceMiddleware skips admins. Don't reintroduce the old `or 1 == 1` forwarding shortcut.

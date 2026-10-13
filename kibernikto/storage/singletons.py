@@ -52,7 +52,7 @@ class _LazySingleton:
 #: ``get_history_storage(name)`` directly for their own namespace.
 history_storage = _LazySingleton(get_history_storage, "default")
 
-#: Shared per-chat data (credits, private_info) — one bucket across agents.
+#: Shared per-chat data (credits, timezone) — one bucket across agents.
 chat_data = _LazySingleton(get_chat_data_storage, "")
 
 #: Agent-produced media (generations, reports, documents).

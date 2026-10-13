@@ -6,6 +6,7 @@ from typing import Optional
 from aiogram.types import Message
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.storage.models import ConversationInfo
 
 
 @dataclass
@@ -21,3 +22,5 @@ class TelegramDeps(KiberniktoDeps):
     app_chat_name: Optional[str] = None
     message: Optional[Message] = None
     timezone: Optional[str] = None
+    billable: bool = True  # False for peer-envelope requests: no credit tiering or charging.
+    chat_info: ConversationInfo | None = None  # Run-start snapshot of chat_data; read-only, writers reload.

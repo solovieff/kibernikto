@@ -3,7 +3,7 @@ import logging
 import uuid
 from typing import Optional
 
-from pydantic_ai import Agent, ModelSettings, AgentRunResult
+from pydantic_ai import Agent, ModelSettings, AgentRunResult, RunContext
 from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
 
@@ -12,10 +12,12 @@ from kibernikto.ai.agent.core.media_check import check_history_images, fetch_byt
 from kibernikto.storage.base import HistoryStorage
 from kibernikto.storage.singletons import history_storage
 from kibernikto.ai.agent.utils import infer_kibernikto_model
-from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS, resolve_instructions
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.persona import PersonaSource, StaticPersona, compile_persona, persona_source_text
 from kibernikto.storage.factory import get_media_store
 from kibernikto.storage.singletons import media_store
 from kibernikto.utils.image_hosting import image_hosting
+from kibernikto.utils.time_utils import DEFAULT_TIMEZONE, get_user_date
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +47,28 @@ class KiberniktoAgent(Agent):
     image_head = staticmethod(head_alive)
     image_fetch = staticmethod(fetch_bytes)
 
-    def __init__(self, *, history_storage: Optional[HistoryStorage] = history_storage, **kwargs):
+    def __init__(
+            self,
+            *,
+            history_storage: Optional[HistoryStorage] = history_storage,
+            persona_source: PersonaSource | None = None,
+            **kwargs,
+    ):
         super().__init__(**kwargs)
         self._history_storage = history_storage
-        # Personality loads from {filestore}/{name}-instructions.txt, else env WHO_AM_I.
-        self.instructions(resolve_instructions(self.name))
+        # Persona: {filestore}/{name}-instructions.txt or WHO_AM_I, a Handlebars template compiled once.
+        self.instructions(compile_persona(persona_source_text(self.name), persona_source or self.default_persona_source()))
+        self.instructions(self._current_date_prompt)
+
+    @staticmethod
+    def default_persona_source() -> PersonaSource:
+        """Values for ``{{name}}``/``{{traits}}`` when none is injected; transports override."""
+        return StaticPersona()
+
+    @staticmethod
+    def _current_date_prompt(ctx: RunContext[KiberniktoDeps]) -> str:
+        """Today's date each run; deps may carry a timezone (Telegram), else the default."""
+        return f"Current date: {get_user_date(getattr(ctx.deps, 'timezone', None) or DEFAULT_TIMEZONE)}."
 
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
         if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:

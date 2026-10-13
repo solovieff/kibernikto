@@ -8,7 +8,7 @@ from pydantic_ai.messages import FilePart, ModelMessage, ModelRequest, ModelResp
 
 from kibernikto.storage.models import ConversationInfo
 
-_DEFAULT_HISTORY_SIZE = 6
+_DEFAULT_HISTORY_SIZE = 13
 
 # Single canonical adapter for ModelMessage persistence — shared by all backends
 # so serialized payloads are byte-compatible across file/sql stores.
@@ -115,7 +115,7 @@ class MediaStore(Protocol):
 
 @runtime_checkable
 class ChatDataStore(Protocol):
-    """Any per-chat data backend (credits, private_info) — file, postgres, etc."""
+    """Any per-chat data backend (credits, timezone) — file, postgres, etc."""
 
     async def load(self, chat_id: int) -> ConversationInfo: ...
 

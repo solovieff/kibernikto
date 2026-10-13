@@ -15,6 +15,8 @@ import unittest
 
 SKILL = Path(__file__).resolve().parents[1]
 REPO = SKILL.parents[2]
+# Top-level frontmatter keys allowed by https://agentskills.io/specification.
+SPEC_KEYS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 REMOVED_PATHS = {
     "kibernikto/telegram/runner.py",
     "kibernikto/ai/agent/core/history.py",
@@ -63,8 +65,14 @@ def static_checks() -> tuple[dict[str, int], list[tuple[str, str]]]:
     assert description_match is not None
     description = description_match.group(1)
     assert len(description) <= 60 and description.endswith(".")
-    for key in ("name", "version", "author", "license", "platforms", "metadata"):
-        assert re.search(rf"^{key}:", frontmatter, re.M), key
+    # Agent Skills spec: fixed top-level keys, metadata is a flat string → string map.
+    top_keys = set(re.findall(r"^([\w-]+):", frontmatter, re.M))
+    assert top_keys <= SPEC_KEYS, top_keys - SPEC_KEYS
+    assert {"name", "description", "license", "compatibility", "metadata"} <= top_keys, top_keys
+    assert re.search(r"^name: kibernikto$", frontmatter, re.M)
+    meta = dict(re.findall(r"^  ([\w-]+): (\S.*)$", frontmatter, re.M))
+    assert not re.search(r"^ {4,}\S|^  [\w-]+:\s*$|^  [\w-]+: \[", frontmatter, re.M), "metadata must be flat strings"
+    assert {"version", "author"} <= meta.keys(), meta
     for sibling in ("building-pydantic-ai-agents", "pydantic-ai-harness"):
         assert (SKILL.parent / sibling / "SKILL.md").exists()
     return {"markdown_files": len(files), "links": links, "source_paths": paths,

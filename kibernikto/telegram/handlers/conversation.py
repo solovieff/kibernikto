@@ -6,6 +6,7 @@ from aiogram.types import Message
 from pydantic_ai import ModelHTTPError
 
 import kibernikto.ai.agent.telegram.telegram_agent as _agent_module
+from kibernikto.ai.agent.telegram.chat_context import forget_chat_context
 from kibernikto.ai.agent.telegram.telegram_agent import user_facing_model_error
 from kibernikto.telegram.utils.permissions import should_react
 
@@ -34,6 +35,12 @@ async def _process_and_reply(message: Message) -> None:
         await message.answer(hint)
         raise
     await agent.reply_to(message, result)
+
+
+@conversation_router.message(F.pinned_message | F.new_chat_title | F.new_chat_photo)
+async def handle_chat_changed(message: Message):
+    """Service message: invalidate cached getChat facts; nothing to answer."""
+    forget_chat_context(message)
 
 
 @conversation_router.message(F.chat.type == enums.ChatType.PRIVATE, ~F.text.startswith('/'), ~F.caption.startswith('/'))

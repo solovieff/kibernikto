@@ -31,7 +31,7 @@ class ChatDataStorage:  # satisfies ChatDataStore (structural)
                 return ConversationInfo.model_validate_json(text)
             except Exception as exc:
                 logger.warning("Failed to load chat data for %s: %s", chat_id, exc)
-        info = ConversationInfo(tg_id=chat_id)
+        info = ConversationInfo()
         await self.save(chat_id, info)
         return info
 

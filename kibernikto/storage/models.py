@@ -1,23 +1,29 @@
 """Backend-agnostic storage models — shared by file/sql chat_data stores."""
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 
 
 class ConversationInfo(BaseModel):
-    """Per-user data: private info, credits and model balancing."""
+    """Per-chat app data: credits only. Chat facts come live from getChat, facts about people from ``Memory``.
 
-    tg_id: Optional[int] = None
-    private_info: str = "No info yet."
-    public_info: str = ""
+    Legacy keys in stored rows (timezone, client_app_info, paid_charge_ids, ...) are ignored on load.
+    """
+
     credits: int = Field(default=AGENT_KIBERNIKTO_SETTINGS.TRIAL_CREDITS)
-    timezone: str = "Europe/Moscow"
-    client_app_info: str = ""
-    client_app_info_updated_at: Optional[float] = None
-    last_pinned_message: Optional[str] = None
+
+    def add_credits(self, amount: int) -> int:
+        """Credit a paid amount; returns the new balance."""
+        if amount < 0:
+            raise ValueError("Cannot add negative credits")
+        self.credits += amount
+        return self.credits
+
+    def adjust_credits(self, delta: int) -> int:
+        """Manual admin correction: add or remove credits, never below zero."""
+        self.credits = max(0, self.credits + delta)
+        return self.credits
 
     def charge(self, effort: int = 1, dependent: bool = False) -> int:
         """Spend credits proportional to effort; dependent calls cost less."""
@@ -34,16 +40,3 @@ class ConversationInfo(BaseModel):
         if self.credits >= s.RICH_CREDITS:
             return s.RICH_MODEL
         return s.MEDIUM_MODEL
-
-    def as_string(self) -> str:
-        """Compact one-line summary for the system prompt (empty fields omitted)."""
-        parts = []
-        if self.private_info and self.private_info != "No info yet.":
-            parts.append(f"private_info: {self.private_info}")
-        if self.public_info:
-            parts.append(f"public_info: {self.public_info}")
-        parts.append(f"credits: {self.credits}")
-        parts.append(f"timezone: {self.timezone}")
-        if self.client_app_info:
-            parts.append(self.client_app_info)
-        return " | ".join(parts)

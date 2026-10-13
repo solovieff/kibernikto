@@ -19,6 +19,8 @@ class SubscriptionSettings(BaseSettings):
     POOR_CREDITS: int = 52
     TRIAL_CREDITS: int = 247
     RICH_CREDITS: int = 390
+    # Default /pay invoice; one-time top-ups work even when ENABLED is off.
+    TOPUP_STARS: int = 247
 
 
 SUBSCRIPTION_SETTINGS = SubscriptionSettings()

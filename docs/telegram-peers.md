@@ -43,13 +43,13 @@ swarm = TelegramPeerAgent(
     description='Пишет стихи по заданной теме, размеру и настроению.',
     timeout=60,
 )
-_EXPERT_AGENTS = [web_agent, image_agent, conversation_agent, swarm]
+_EXPERT_AGENTS = [image_agent, swarm]
 # Existing SubAgents(agents=[SubAgent(agent) for agent in _EXPERT_AGENTS]) stays unchanged.
 ```
 
 The caller needs **its own** bot token, not the remote bot's token. A peer's
 Telegram address explicitly selects remote execution. Local experts remain local.
-`KiberniktoExtended` (credits/model balancing) is not required for every expert.
+The `CreditTier` capability (credits/model balancing) is not required for every expert.
 
 ## Request path
 

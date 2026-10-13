@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -13,14 +13,9 @@ from kibernikto.telegram.peer_hub import PeerHub
 from kibernikto.telegram.middleware.middleware_peer import PeerMiddleware
 
 if TYPE_CHECKING:
-    from aiogram.types import User
-
     from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
 
 logger = logging.getLogger(__name__)
-
-# Set after the bot starts; read by permissions.py.
-bot_me: Optional[User] = None
 
 
 class TelegramApp:
@@ -82,38 +77,11 @@ class TelegramApp:
                 from kibernikto.storage.sql.engine import ensure_db_initialized
                 await ensure_db_initialized()
 
-            global bot_me
-            bot_me = await bot.get_me()
-            logger.info("Bot started as @%s", bot_me.username)
-            # Populate global bot identity for system-prompt injection.
-            try:
-                from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-                from kibernikto.ai.agent.telegram.identity import format_bot_identity, set_bot_identity
+            from kibernikto.ai.agent.telegram.identity import fetch_bot_identity, set_bot_identity
 
-                short_desc = None
-                desc = None
-                try:
-                    sd = await bot.get_my_short_description()
-                    short_desc = getattr(sd, "short_description", None) or getattr(sd, "description", None)
-                except Exception as exc:
-                    logger.warning("Bot short description unavailable: %s", exc)
-                try:
-                    d = await bot.get_my_description()
-                    desc = getattr(d, "description", None)
-                except Exception as exc:
-                    logger.warning("Bot description unavailable: %s", exc)
-                identity = format_bot_identity(
-                    username=bot_me.username,
-                    first_name=getattr(bot_me, "first_name", None),
-                    short_description=short_desc,
-                    description=desc,
-                    name=AGENT_KIBERNIKTO_SETTINGS.NAME,
-                )
-                if identity:
-                    set_bot_identity(identity)
-                    logger.info("Bot identity: %s", identity)
-            except Exception as exc:
-                logger.warning("Failed to build bot identity: %s", exc)
+            identity = await fetch_bot_identity(bot)
+            set_bot_identity(identity)
+            logger.info("Bot started as @%s | %s", identity.username, identity.as_prompt())
             if TELEGRAM_SETTINGS.SAY_HI:
                 from kibernikto.telegram.utils.conversation import send_random_sticker
 

@@ -36,14 +36,16 @@ def should_react(message: Message) -> bool:
     Reacts when the message replies to the bot or mentions any of the
     configured reaction calls (including the bot's own name and @username).
     """
-    from kibernikto.telegram.agent.telegram_app import bot_me
+    from kibernikto.ai.agent.telegram.identity import BotIdentity, get_bot_identity
     from kibernikto.telegram.utils.conversation import is_reply, get_message_text
 
     message_text = get_message_text(message)
     if not message_text:
         return False
 
-    calls = [*TELEGRAM_SETTINGS.REACTION_CALLS, bot_me.full_name, f"@{bot_me.username}"]
+    me = get_bot_identity() or BotIdentity()
+    own = [me.full_name, f"@{me.username}" if me.username else None]
+    calls = [*TELEGRAM_SETTINGS.REACTION_CALLS, *filter(None, own)]
     haystack = message_text.lower()
     mentioned = any(call.lower() in haystack for call in calls)
 

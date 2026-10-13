@@ -18,15 +18,17 @@ from kibernikto.ai.agent.core.kibernikto_agent import agent as kibernikto_agent
 from kibernikto.ai.agent.core.kibernikto_agent import model as kibernikto_model
 from kibernikto.ai.agent.core.image import generate_image
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.persona import PersonaSource
 from kibernikto.storage.singletons import chat_data
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.telegram.utils.conversation import is_private_peer_request, reply
+from kibernikto.utils.time_utils import DEFAULT_TIMEZONE
 
-from .chat_context import refresh_chat_context
+from .chat_context import get_chat_context
 from .deps import TelegramDeps
 from .group_message import annotate_group_message
-from .identity import get_bot_identity
+from .identity import TelegramPersona, get_bot_identity
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +67,15 @@ class TelegramAgent(KiberniktoAgent):
         if AGENT_KIBERNIKTO_SETTINGS.IMAGE_MODEL_NAME:
             self.tool(generate_image)
 
+    @staticmethod
+    def default_persona_source() -> PersonaSource:
+        """``{{name}}`` falls back to the Telegram bot name from getMe."""
+        return TelegramPersona()
+
     async def _bot_identity_prompt(self, ctx: RunContext[TelegramDeps]) -> str:
-        """Inject bot identity (getMe + descriptions) — set once at startup."""
-        return get_bot_identity() or ""
+        """Inject bot identity (getMe + descriptions) — fetched once at startup."""
+        identity = get_bot_identity()
+        return identity.as_prompt() if identity else ""
 
     async def _user_context_prompt(self, ctx: RunContext[TelegramDeps]) -> str:
         """Inject the transport-built conversation context into the system prompt each run."""
@@ -87,9 +95,9 @@ class TelegramAgent(KiberniktoAgent):
     async def build_deps(self, message: Message) -> TelegramDeps:
         """Create the run-scoped deps for ``message``, enriched with chat context.
 
-        Refreshes the persisted per-chat facts (getChat on a TTL), then sets
-        ``conversation_context`` and ``timezone`` from the bucket. Override to
-        enrich the deps further — keep ``await super().build_deps(message)``.
+        Loads ``chat_data`` once into ``chat_info`` (read-only; credits) and takes
+        ``conversation_context`` from the in-memory getChat cache — nothing is written.
+        Override to enrich the deps further — keep ``await super().build_deps(message)``.
         """
         deps = TelegramDeps(
             is_personal=message.chat.type == ChatType.PRIVATE,
@@ -101,10 +109,10 @@ class TelegramAgent(KiberniktoAgent):
             user_full_name=message.from_user.full_name if message.from_user else None,
             message=message,
         )
-        await refresh_chat_context(message)
-        info = await chat_data.load(message.chat.id)
-        deps.conversation_context = f"[Current conversation context] {info.as_string()}"
-        deps.timezone = info.timezone
+        deps.chat_info = await chat_data.load(message.chat.id)
+        # Credits stay out of the prompt for now; prepend them here when the model needs its balance.
+        deps.conversation_context = f"[Current conversation context] {await get_chat_context(message)}"
+        deps.timezone = DEFAULT_TIMEZONE
         return deps
 
     async def process_message(self, message: Message) -> AgentRunResult | PeerEnvelope | str | None:
@@ -156,13 +164,14 @@ class TelegramAgent(KiberniktoAgent):
         deps.user_message_parts = list(user_message)
         if envelope is not None:
             deps.peer_inputs = list(envelope.binaries)
+            deps.billable = False
         elif captured is not None:
             deps.peer_inputs = captured
         # Annotate group messages with author + local time so the model knows who said what.
         # Bots are identified by @username (so peers can mention them), humans by full name.
         if not deps.is_personal and (deps.user_full_name or deps.username):
             author = deps.username if message.from_user and message.from_user.is_bot else deps.user_full_name
-            user_message = annotate_group_message(list(user_message), author, deps.timezone or "Europe/Moscow")
+            user_message = annotate_group_message(list(user_message), author, deps.timezone or DEFAULT_TIMEZONE)
             deps.user_message_parts = list(user_message)
 
         try:

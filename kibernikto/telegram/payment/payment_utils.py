@@ -6,6 +6,8 @@ from aiogram.types import StarTransaction, TransactionPartnerUser, LabeledPrice
 
 DEFAULT_SUBSCRIPTION_PERIOD = 2592000
 SUBSCRIPTION_PAYLOAD = 'subscription_payload'
+TOPUP_PAYLOAD = 'credits_topup'
+MAX_STARS = 10000
 TRANSACTION_PAGE_SIZE = 100
 logger = logging.getLogger(__name__)
 

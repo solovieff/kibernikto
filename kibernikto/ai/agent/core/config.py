@@ -1,14 +1,15 @@
 import json
 import logging
-from pathlib import Path
-from typing import Literal, List
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from kibernikto.storage.config import STORAGE_SETTINGS
-
-DEFAULT_SYSTEM_PROMPT = "Respond to all my questions as Kibernikto. Kibernikto is a gentle universe creator. He isn't afraid to joke in a sinister manner. Kibernikto never tries to avoid a specific answer including concrete names and events."
+DEFAULT_SYSTEM_PROMPT = (
+    "Respond to all my questions as Kibernikto. Kibernikto is a gentle universe creator. "
+    "He isn't afraid to joke in a sinister manner. "
+    "Kibernikto never tries to avoid a specific answer including concrete names and events."
+)
 
 
 class AgentKiberniktoSettings(BaseSettings):
@@ -19,41 +20,45 @@ class AgentKiberniktoSettings(BaseSettings):
     HISTORY_SIZE: int = Field(default=6, description="History size")
     KEEP_THINKING_IN_HISTORY: bool = Field(
         default=False,
-        description="Keep model reasoning (ThinkingPart) in stored history; off = drop (reasoning is replayed to the provider on every turn)",
+        description="Keep model reasoning (ThinkingPart) in stored history; "
+                    "off = drop (reasoning is replayed to the provider on every turn)",
     )
     MODEL_NAME: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model name")
     IMAGE_MODEL_NAME: str | None = Field(
         default=None,
         description="Provider-prefixed model used by the image-generation sub-agent",
     )
+    WEB_MODEL_NAME: str | None = Field(
+        default=None,
+        description="Set: web research runs as a delegated expert on this model; "
+                    "unset: parent capability on the tier model",
+    )
 
     MODEL_MAX_TOKENS: int = Field(default=1300, description="Model max tokens")
     MODEL_TEMPERATURE: float = Field(default=0.3, description="Model temperature")
     MODEL_PARALLEL_TOOL_CALLS: bool = Field(default=True, description="Parallel tool calls")
-    MODEL_MODALITIES: List[Literal['text', 'photo', 'audio']] = Field(
-        default=['text'], description="Photo or audio modalities"
+    MODEL_MODALITIES: list[Literal['text', 'photo', 'audio']] = Field(
+        default_factory=lambda: ['text'], description="Photo or audio modalities"
     )
 
-    WHO_AM_I: str = Field(default=DEFAULT_SYSTEM_PROMPT, description="Who am I")
+    WHO_AM_I: str = Field(default=DEFAULT_SYSTEM_PROMPT, description="Who am I (Handlebars template allowed)")
+    PERSONA_NAME: str | None = Field(default=None, description="{{name}} override; unset = Telegram bot name")
+    PERSONA_TRAITS: dict[str, int] = Field(
+        default_factory=dict, description='{{traits}} for the persona template, JSON: {"sarcasm": 10}'
+    )
 
-    # Credits & model balancing for KiberniktoExtended
+    # Credits & model balancing for the CreditTier capability
     TRIAL_CREDITS: int = Field(default=260, description="Initial credits for a new user")
     POOR_CREDITS: int = Field(default=30, description="Below this — poor model")
     RICH_CREDITS: int = Field(default=500, description="Above this — rich model")
     POOR_MODEL: str = Field(default="openrouter:google/gemini-2.5-flash", description="Model when credits are low")
-    MEDIUM_MODEL: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model when credits are medium")
+    MEDIUM_MODEL: str = Field(
+        default="openrouter:anthropic/claude-sonnet-5", description="Model when credits are medium",
+    )
     RICH_MODEL: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model when credits are high")
 
 
 AGENT_KIBERNIKTO_SETTINGS = AgentKiberniktoSettings()
-
-
-def resolve_instructions(name: str) -> str:
-    """Return instructions from ``{FILESTORE_LOCATION}/{name}-instructions.txt`` if present, else ``WHO_AM_I``."""
-    path = Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser() / f"{name}-instructions.txt"
-    if path.exists():
-        return path.read_text(encoding="utf-8")
-    return AGENT_KIBERNIKTO_SETTINGS.WHO_AM_I
 
 
 def agent_summary(name: str, agent_settings: AgentKiberniktoSettings = AGENT_KIBERNIKTO_SETTINGS) -> dict:
@@ -63,6 +68,7 @@ def agent_summary(name: str, agent_settings: AgentKiberniktoSettings = AGENT_KIB
         'MODE': name,
         'MODEL_NAME': s.MODEL_NAME,
         'IMAGE_MODEL_NAME': s.IMAGE_MODEL_NAME,
+        'WEB_MODEL_NAME': s.WEB_MODEL_NAME,
         'POOR_MODEL': s.POOR_MODEL,
         'MEDIUM_MODEL': s.MEDIUM_MODEL,
         'RICH_MODEL': s.RICH_MODEL,
