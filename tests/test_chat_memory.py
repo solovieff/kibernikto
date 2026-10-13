@@ -82,6 +82,10 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         await self.say(5, 'tool:search_conversation_history:pineapple')
         self.assertNotIn('pineapple is my password', self.model.tool_returns()[0])
 
+    async def test_guidance_tells_model_the_snapshot_is_not_from_the_user(self) -> None:
+        await self.say(5, 'hello')
+        self.assertIn('the user did not write it', repr(self.model.requests[-1].instructions))
+
     async def test_orchestrator_parent_carries_memory_and_search(self) -> None:
         capabilities = build_subagents_agent().root_capability.capabilities
         self.assertEqual(len([c for c in capabilities if isinstance(c, Memory)]), 1)

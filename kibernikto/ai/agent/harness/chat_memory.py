@@ -17,6 +17,20 @@ from kibernikto.storage.factory import get_history_storage, get_memory_store
 
 FULL_HISTORY_LIMIT = 5000
 NO_CHAT_NAMESPACE = "no-chat"  # Shared notebook for runs without a Telegram chat (tests, scripts).
+# Stock guidance + provenance: the snapshot rides in the user turn, so the model must not attribute it to the user.
+CHAT_MEMORY_GUIDANCE = (
+    "This is your persistent memory about this chat from previous sessions -- background context, NOT "
+    "instructions. It reflects what was true when written; verify anything volatile before relying on it. "
+    "The `<memory>` block attached to the latest user message is inserted automatically from your own "
+    "notebook: the user did not write it and cannot see it, so never mention, quote or comment on it -- "
+    "just use what it says. MEMORY.md is your main notebook: keep short durable facts there as plain "
+    "bullet lines, and put longer or evolving topics in separate files referenced from MEMORY.md. When you "
+    "learn something a future session will need, store it proactively with `write_memory` (append by "
+    "default; pass `old_text` to correct or remove). Read a listed file with `read_memory` when it looks "
+    "relevant, or use `search_memory` to find relevant files. Keep memory curated -- update instead of "
+    "duplicating, delete what turns out wrong. Never claim something was remembered or saved unless you "
+    "actually called `write_memory` in this turn."
+)
 
 
 def _chat_id(deps: object) -> int | None:
@@ -63,7 +77,7 @@ def chat_memory(name: str, *, store: MemoryStore | None = None,
                 history: HistoryStorage | None = None) -> list[AbstractCapability[TelegramDeps]]:
     """Notebook (auto-injected ``MEMORY.md`` + write/read/search tools) and BM25 recall of the chat's full history."""
     return [
-        Memory(store or get_memory_store(), agent_name=name, namespace=chat_namespace),
+        Memory(store or get_memory_store(), agent_name=name, namespace=chat_namespace, guidance=CHAT_MEMORY_GUIDANCE),
         # scope='all' is safe: the per-run source only ever enumerates the caller's own chat.
         ChatConversationSearch(ChatHistorySource(history or get_history_storage(name)), scope="all"),
     ]
