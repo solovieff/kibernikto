@@ -17,9 +17,12 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai_harness.conversation_search import ConversationSearch
 from pydantic_ai_harness.memory import FileStore, InMemoryStore, Memory, SqliteMemoryStore
 
-from kibernikto.ai.agent.extended.orchestrators import build_subagents_agent
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.harness.chat_memory import chat_memory
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
+from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
 from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
 from kibernikto.storage import factory
 from kibernikto.storage.base import MemoryHistoryStorage
@@ -67,6 +70,30 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         await self.say(6, 'hello')
         self.assertNotIn('likes cats', repr(self.model.requests[-1]))
 
+    async def test_persona_precedes_memory_guidance(self) -> None:
+        # Plain persona is a static string, the case where stock capability guidance used to jump ahead of it.
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'WHO_AM_I', 'PERSONA-MARK'):
+            agent = TelegramAgent(model=FunctionModel(self.model), name='mem-order', history_storage=self.history,
+                                  capabilities=chat_memory('mem-order', store=self.store, history=self.history))
+        await agent.run('hello', chat_id=5, deps=TelegramDeps(chat_id=5))
+        instructions = self.model.requests[-1].instructions or ''
+        self.assertTrue(instructions.startswith('PERSONA-MARK'), instructions[:120])
+        self.assertIn('## Chat memory', instructions)
+
+    async def test_orchestrator_instructions_start_with_persona(self) -> None:
+        # Plain and templated personas: a template is a callable, which pydantic_ai sorts after static text.
+        for persona, rendered in (('PERSONA-MARK', 'PERSONA-MARK'), ('PERSONA-MARK {{name}}', 'PERSONA-MARK Kib')):
+            with self.subTest(persona=persona), patch.object(AGENT_KIBERNIKTO_SETTINGS, 'WHO_AM_I', persona), \
+                    patch.object(AGENT_KIBERNIKTO_SETTINGS, 'PERSONA_NAME', 'Kib'):
+                parent = build_multi_agent()
+                with parent.override(model=FunctionModel(self.model)):
+                    await parent.run('hello', chat_id=5, deps=TelegramDeps(chat_id=5))
+                instructions = self.model.requests[-1].instructions or ''
+                self.assertTrue(instructions.startswith(rendered), instructions[:120])
+                self.assertEqual(instructions.count('PERSONA-MARK'), 1)
+                for guidance in ('## Chat memory', 'search_conversation_history', 'delegate_task'):
+                    self.assertIn(guidance, instructions)
+
     async def test_injected_memory_is_not_persisted_into_history(self) -> None:
         await self.say(5, 'tool:write_memory:- likes cats')
         await self.say(5, 'hello')
@@ -84,10 +111,19 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_guidance_tells_model_the_snapshot_is_not_from_the_user(self) -> None:
         await self.say(5, 'hello')
-        self.assertIn('the user did not write it', repr(self.model.requests[-1].instructions))
+        self.assertIn('The user did not write it', self.model.requests[-1].instructions)
+
+    async def test_works_on_a_plain_kibernikto_agent_without_telegram(self) -> None:
+        agent = KiberniktoAgent(model=FunctionModel(self.model), name='mem-core', history_storage=self.history,
+                                deps_type=KiberniktoDeps,
+                                capabilities=chat_memory('mem-core', store=self.store, history=self.history))
+        await agent.run('tool:write_memory:- likes cats', chat_id=5, deps=KiberniktoDeps(chat_id=5))
+        self.assertEqual(dict(self.store.files), {'5/mem-core/MEMORY.md': '- likes cats\n'})
+        await agent.run('tool:search_conversation_history:cats', chat_id=5, deps=KiberniktoDeps(chat_id=5))
+        self.assertIn('likes cats', self.model.tool_returns()[0])
 
     async def test_orchestrator_parent_carries_memory_and_search(self) -> None:
-        capabilities = build_subagents_agent().root_capability.capabilities
+        capabilities = build_multi_agent().root_capability.capabilities
         self.assertEqual(len([c for c in capabilities if isinstance(c, Memory)]), 1)
         self.assertEqual(len([c for c in capabilities if isinstance(c, ConversationSearch)]), 1)
 

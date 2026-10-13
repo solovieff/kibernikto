@@ -119,14 +119,15 @@ class TelegramPeerAgent(KiberniktoAgent):
 
     def __init__(self, *, peer: int | str, name: str, description: str,
                  timeout: float = 60, bot: Bot | None = None, hub: PeerHub | None = None,
-                 multimodal: bool = False) -> None:
+                 multimodal: bool = False, reaction: str | None = "🤝") -> None:
         valid_id = type(peer) is int and peer > 0
         valid_name = isinstance(peer, str) and re.fullmatch(r'@[A-Za-z][A-Za-z0-9_]{4,31}', peer)
         if not (valid_id or valid_name):
             raise ValueError('peer must be a positive private chat ID or @username')
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError('timeout must be finite and positive')
-        super().__init__(model=_TelegramModel(), name=name, description=description, history_storage=None)
+        super().__init__(model=_TelegramModel(), name=name, description=description, history_storage=None,
+                         reaction=reaction)
         self.peer = peer
         self.timeout = timeout
         self._peer_bot = bot

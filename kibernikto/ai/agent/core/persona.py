@@ -5,14 +5,20 @@ without ``{{`` stays a plain static instruction. Values come from a ``PersonaSou
 source can later be swapped for one backed by storage, mood, chat, etc. without touching the template.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Protocol
 
 from pydantic_ai import RunContext, TemplateStr
+from pydantic_ai.capabilities import AbstractCapability
+from pydantic_ai.messages import AgentInstructionSource, InstructionId
+from pydantic_ai.models import ModelRequestContext
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.storage.config import STORAGE_SETTINGS
+
+PERSONA_INSTRUCTION = "persona"
+PERSONA_ID = InstructionId(AgentInstructionSource(), name=PERSONA_INSTRUCTION)
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +72,22 @@ class PersonaPrompt:
 
 
 def compile_persona(text: str, source: PersonaSource) -> str | PersonaPrompt:
-    """Plain text stays static; a template is compiled now so a bad field name fails at startup."""
-    if "{{" not in text:
+    """Plain text stays static; a template is compiled now so a bad field name fails at startup (escape as ``\\{{``)."""
+    if not AGENT_KIBERNIKTO_SETTINGS.PERSONA_TEMPLATE or "{{" not in text:
         return text
     return PersonaPrompt(TemplateStr(text, deps_type=Persona), source)
+
+
+@dataclass
+class PersonaFirst(AbstractCapability[object]):
+    """Moves the persona part to the top: pydantic_ai sorts static capability text ahead of a templated persona."""
+
+    async def before_model_request(self, ctx: RunContext[object], request_context: ModelRequestContext) -> ModelRequestContext:
+        params = request_context.model_request_parameters
+        parts = params.instruction_parts or []
+        persona = next((part for part in parts if part.id == PERSONA_ID), None)
+        if persona is None or parts[0] is persona:
+            return request_context
+        # Leading the prompt makes it the cache prefix either way, so it is marked static.
+        ordered = [replace(persona, dynamic=False), *(part for part in parts if part is not persona)]
+        return replace(request_context, model_request_parameters=replace(params, instruction_parts=ordered))

@@ -1,37 +1,25 @@
 import dataclasses
 import logging
 import uuid
-from typing import Optional
 
 from pydantic_ai import Agent, ModelSettings, AgentRunResult, RunContext
 from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
 
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.media_check import check_history_images, fetch_bytes, head_alive
+from kibernikto.ai.agent.core.persona import (
+    PERSONA_INSTRUCTION, PersonaFirst, PersonaSource, StaticPersona, compile_persona, persona_source_text,
+)
+from kibernikto.ai.agent.utils import infer_kibernikto_model, with_attribution
 from kibernikto.storage.base import HistoryStorage
-from kibernikto.storage.singletons import history_storage
-from kibernikto.ai.agent.utils import infer_kibernikto_model
-from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.ai.agent.core.persona import PersonaSource, StaticPersona, compile_persona, persona_source_text
 from kibernikto.storage.factory import get_media_store
-from kibernikto.storage.singletons import media_store
+from kibernikto.storage.singletons import history_storage, media_store
 from kibernikto.utils.image_hosting import image_hosting
 from kibernikto.utils.time_utils import DEFAULT_TIMEZONE, get_user_date
 
 logger = logging.getLogger(__name__)
-
-
-async def _store_exists(store_name: str, media_ref: str) -> bool:
-    """Check a media ref in the named media store (``default`` or ``telegram``)."""
-    return await get_media_store(store_name).exists(media_ref)
-
-
-async def _store_save(store_name: str, media_ref: str, data: bytes) -> None:
-    """Save downloaded bytes under the exact ref recorded in history."""
-    chat_id, name = media_ref.split('/', 1)
-    ext = name.rsplit('.', 1)[-1] if '.' in name else 'bin'
-    await get_media_store(store_name).save(int(chat_id), data, ext=ext, name=name)
 
 
 model: Model = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
@@ -50,27 +38,50 @@ class KiberniktoAgent(Agent):
     def __init__(
             self,
             *,
-            history_storage: Optional[HistoryStorage] = history_storage,
+            history_storage: HistoryStorage | None = history_storage,
             persona_source: PersonaSource | None = None,
+            persona: bool = True,
+            reaction: str | None = None,
             **kwargs,
     ):
+        """``persona=False`` for delegated experts: they serve the parent agent, not the user.
+
+        ``reaction`` is the emoji a transport shows on the user's message when this agent starts a run.
+        """
+        if persona:
+            kwargs["capabilities"] = [*(kwargs.get("capabilities") or ()), PersonaFirst()]
+        if not callable(settings := kwargs.get("model_settings")):  # Callables are dynamic: left to their owner.
+            kwargs["model_settings"] = with_attribution(settings, kwargs.get("name"))
         super().__init__(**kwargs)
         self._history_storage = history_storage
-        # Persona: {filestore}/{name}-instructions.txt or WHO_AM_I, a Handlebars template compiled once.
-        self.instructions(compile_persona(persona_source_text(self.name), persona_source or self.default_persona_source()))
+        self._reaction = reaction
+        if persona:
+            # Persona: {filestore}/{name}-instructions.txt or WHO_AM_I, a Handlebars template compiled once.
+            text = compile_persona(persona_source_text(self.name), persona_source or self.default_persona_source())
+            self.instructions(name=PERSONA_INSTRUCTION)(text)
         self.instructions(self._current_date_prompt)
+
+    @property
+    def history_storage(self) -> HistoryStorage | None:
+        """Per-chat history backend this agent reads and writes; ``None`` when history is off."""
+        return self._history_storage
+
+    @property
+    def reaction(self) -> str | None:
+        """Emoji set on the user's message when this agent starts a run; ``None`` = no reaction."""
+        return self._reaction
 
     @staticmethod
     def default_persona_source() -> PersonaSource:
         """Values for ``{{name}}``/``{{traits}}`` when none is injected; transports override."""
         return StaticPersona()
 
-    @staticmethod
-    def _current_date_prompt(ctx: RunContext[KiberniktoDeps]) -> str:
-        """Today's date each run; deps may carry a timezone (Telegram), else the default."""
-        return f"Current date: {get_user_date(getattr(ctx.deps, 'timezone', None) or DEFAULT_TIMEZONE)}."
-
     async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
+        """``chat_id`` opts this run into stored history; it is deliberately not read from ``deps.chat_id``.
+
+        Identity (deps) and persistence (this argument) differ on purpose: delegated experts share the
+        parent's deps but must not write the chat's history, and peer envelopes run history-free.
+        """
         if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:
             kwargs['message_history'] = await self._history_storage.get_conversation(chat_id)
             await self._repair_history_images(kwargs, chat_id)
@@ -89,6 +100,12 @@ class KiberniktoAgent(Agent):
             await self._history_storage.add_messages(chat_id=chat_id, messages=messages)
 
         return run_result
+
+    @staticmethod
+    def _current_date_prompt(ctx: RunContext[KiberniktoDeps]) -> str:
+        """Today's date each run in ``deps.timezone``; plain or missing deps get the default zone."""
+        timezone = ctx.deps.timezone if isinstance(ctx.deps, KiberniktoDeps) else None
+        return f"Current date: {get_user_date(timezone or DEFAULT_TIMEZONE)}."
 
     async def _repair_history_images(self, kwargs: dict, chat_id: int) -> None:
         """Replace dead history image links with text and persist the fixed history once."""
@@ -182,4 +199,16 @@ agent = KiberniktoAgent(
     name=AGENT_KIBERNIKTO_SETTINGS.NAME,
     deps_type=KiberniktoDeps,
 )
+
+
+async def _store_exists(store_name: str, media_ref: str) -> bool:
+    """Check a media ref in the named media store (``default`` or ``telegram``)."""
+    return await get_media_store(store_name).exists(media_ref)
+
+
+async def _store_save(store_name: str, media_ref: str, data: bytes) -> None:
+    """Save downloaded bytes under the exact ref recorded in history."""
+    chat_id, name = media_ref.split('/', 1)
+    ext = name.rsplit('.', 1)[-1] if '.' in name else 'bin'
+    await get_media_store(store_name).save(int(chat_id), data, ext=ext, name=name)
 

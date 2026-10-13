@@ -25,8 +25,8 @@ fields change often — read them in source, don't trust a remembered list.
 | Base agent, history, attachments | `kibernikto/ai/agent/core/kibernikto_agent.py` |
 | Model string → model | `kibernikto/ai/agent/utils.py` (`infer_kibernikto_model`) |
 | Telegram agent + active-agent setter | `kibernikto/ai/agent/telegram/telegram_agent.py` |
-| Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/extended/orchestrators.py` |
-| Expert agents, `CreditTier`, `chat_memory` capabilities | `kibernikto/ai/agent/harness/` |
+| Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/telegram/multi_agent.py` |
+| Harness capabilities (transport-free, keyed on `KiberniktoDeps.chat_id`): `CreditTier`, `chat_memory`, delegation roster, web layout, experts | `kibernikto/ai/agent/harness/` |
 | Bot, Dispatcher, middleware order, lifecycle | `kibernikto/telegram/agent/telegram_app.py` |
 | Handlers / middlewares / preprocessing | `kibernikto/telegram/handlers/`, `kibernikto/telegram/middleware/`, `kibernikto/telegram/pre_processors/` |
 | Telegram peers (bot-to-bot subagents) | `kibernikto/ai/agent/telegram/peer_agent.py`, `kibernikto/telegram/peer_hub.py` |
@@ -57,17 +57,27 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
   Intentional — don't "fix" it.
 - Importing an expert module builds its model. Report (needs `VSEGPT_API_KEY`) and scheduler
   (no execution daemon) are opt-in: keep them out of `harness/__init__.py` and default wiring.
+- `KiberniktoAgent(reaction=emoji)`: `telegram/agent_reaction.py` `AgentReaction` sets it on `deps.message`.
+  Delegates react at run start; the root (first starter, `deps.extra["reaction_root"]`) only on its own tool
+  calls except `skip_tools` (`delegate_task`) — plain chatter gets none. Delegates react only via
+  `SubAgents(shared_capabilities=[AgentReaction()])` (wired in `multi_agent.py`). Last emoji stays; peer
+  envelopes and Telegram errors never react/fail.
+- Bot menu = `handlers/commands.py` `COMMANDS`, published on startup by `set_bot_commands`; `/help` renders
+  the same tuple. New command → add it there.
 - Experts are plain `KiberniktoAgent`s delegated via the real `SubAgents(agents=[SubAgent(a)])`;
   only a parent with the `CreditTier` capability (`harness/credit_tier.py`, wired in
-  `orchestrators.py`) selects tier models and spends credits. Peer envelopes set
-  `TelegramDeps.billable=False`; explicit `run(model=...)`/`override(model=...)` beat the tier.
+  `multi_agent.py`) selects tier models and spends credits. Peer envelopes set
+  `KiberniktoDeps.billable=False`; explicit `run(model=...)`/`override(model=...)` beat the tier.
 - `chat_data` (`ConversationInfo`) stores credits only; legacy JSON keys are ignored on load.
-  `build_deps` loads it once into `TelegramDeps.chat_info` (read-only; tier selection reuses it) and
+  `build_deps` loads it once into `KiberniktoDeps.chat_info` (read-only; tier selection reuses it) and
   writes nothing; `CreditTier.after_run` re-reads before charging so a mid-run top-up survives.
   Credits are kept out of the prompt. Timezone is `utils.time_utils.DEFAULT_TIMEZONE` (Moscow).
 - Instructions per run, in order: persona (`{FILESTORE}/{NAME}-instructions.txt` **replaces** `WHO_AM_I`;
-  read once at agent construction → restart to apply), `Current date: …` (day granularity, cache-friendly),
-  then Telegram bot identity and chat context.
+  read once at agent construction → restart to apply; unknown `{{field}}` fails at startup, escape as `\{{`
+  or disable with `AGENT_KIBERNIKTO_PERSONA_TEMPLATE=false`), capability guidance (memory, roster), `Current date: …`
+  (day granularity, cache-friendly), then Telegram bot identity and chat context. pydantic_ai sorts static text
+  before callables, so a templated persona would sink: the persona is the named part `agent:persona` and
+  `PersonaFirst` (`core/persona.py`) moves it back to the top. Experts pass `persona=False`: no `WHO_AM_I`, date kept.
 - Persona text is a Handlebars template (`core/persona.py`, stock `TemplateStr`, needs `pydantic-ai-slim[spec]`)
   rendered against `Persona(name, traits)` — never against deps (aiogram `Message` inside). No `{{` → plain static
   string. Compiled at construction: an unknown field (`{{nmae}}`) raises then; no HTML escaping. Values come from
@@ -81,8 +91,10 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
   600 s TTL, never persisted; includes `pinned:` text. Pin/title/photo service messages hit
   `handle_chat_changed` → `forget_chat_context`. Failed getChat falls back to the update's `Chat`.
 - Web: `ExaSearch` when `EXA_API_KEY` is set, else `Researcher(subagents=[])` spilling oversized
-  tool output under `{FILESTORE}/tool-output` (1-day TTL). On the parent (tier model) by default;
-  `AGENT_KIBERNIKTO_WEB_MODEL_NAME` moves it into a `web_researcher` delegate on that model.
+  tool output under `{FILESTORE}/tool-output` (1-day TTL), on the parent (tier model). Setting
+  `AGENT_KIBERNIKTO_WEB_MODEL_NAME` drops those tools: web becomes a tool-less `web_researcher` delegate on a
+  search-native model (e.g. `routerai:perplexity/sonar-reasoning-pro`). The roster text is ours
+  (`harness/delegation.py`: `KiberniktoSubAgents` + `DELEGATION_GUIDE`; web wiring in `harness/web.py`), not the harness default.
 - Memory is stock harness, on the parent: `chat_memory(name)` = `Memory` (namespace = chat id,
   store from `get_memory_store()`: file → `{FILESTORE}/memory`, sqlite → `*.memory.db`, pg →
   `PostgresMemoryStore`) + `ConversationSearch` over our own `HistoryStorage`, bound per run to
@@ -108,6 +120,8 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
 - Every successful Stars payment (`/pay` top-up or subscription) adds 1 credit per Star to
   `chat_data`; no charge-id dedup by decision (a crash-redelivered update may credit twice). Top-ups work with `SUBSCRIPTION_ENABLED=false`.
   Admins (`TG_MASTER_ID(S)`, `TG_ADMIN_COMMANDS_ALLOWED`) adjust balances directly: `/pay ±N tg_id`, `/balance tg_id`.
+- `/reset` (private: the user; groups: admins only, needs `TG_ADMIN_COMMANDS_ALLOWED`) asks for inline
+  confirmation, then erases that chat's history and notebook (`storage/chat_wipe.py`). Credits and media stay.
 - The subscription period is fixed at 30 days (`DEFAULT_SUBSCRIPTION_PERIOD`) by design.
   The paywall has no admin exemption, and each checked message queries Telegram for transactions.
 - ServiceMiddleware skips admins. Don't reintroduce the old `or 1 == 1` forwarding shortcut.

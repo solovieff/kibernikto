@@ -29,9 +29,12 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 
 logger = logging.getLogger(__name__)
+
+IMAGE_ENGINE_NAME = "image_engine"
 
 _IMAGE_SYSTEM_PROMPT = (
     "You are an image engine. Produce a single image that best matches the "
@@ -60,8 +63,14 @@ def _get_image_agent() -> Agent:
             "Set AGENT_KIBERNIKTO_IMAGE_MODEL_NAME to enable image generation."
         )
 
-    _image_agent = Agent(model=model, system_prompt=_IMAGE_SYSTEM_PROMPT)
+    _image_agent = KiberniktoAgent(model=model, name=IMAGE_ENGINE_NAME, system_prompt=_IMAGE_SYSTEM_PROMPT,
+                                   persona=False, history_storage=None)
     return _image_agent
+
+
+def _extra_headers(agent: Agent) -> dict[str, str]:
+    """Agent's attribution headers for raw client calls that bypass pydantic-ai's request path."""
+    return dict((agent.model_settings or {}).get("extra_headers", {}))
 
 
 # ── Input helpers ─────────────────────────────────────────────────────────────
@@ -162,6 +171,7 @@ async def _openrouter_generate_images(
         messages=_build_openrouter_messages(request),
         modalities=["image", "text"],
         extra_body={"image_config": {"aspect_ratio": aspect_ratio, "image_size": image_size}},
+        extra_headers=_extra_headers(agent),
     )
 
     if not completion.choices:
@@ -211,6 +221,7 @@ async def _images_generate(
         size=size,
         response_format="b64_json",
         extra_body={"aspect_ratio": aspect_ratio},
+        extra_headers=_extra_headers(agent),
     )
     data_item = response.data[0] if response.data else None
     if not data_item or not getattr(data_item, "b64_json", None):

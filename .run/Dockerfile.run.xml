@@ -2,9 +2,9 @@
   <configuration default="false" name="Dockerfile" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
     <deployment type="dockerfile">
       <settings>
-        <option name="command" value="" />
-        <option name="containerName" value="" />
-        <option name="commandLineOptions" value="--env-file $PROJECT_DIR$/env/docker.env -v $PROJECT_DIR$/kibernikto-data:/data --restart unless-stopped" />
+        <option name="imageTag" value="kibernikto" />
+        <option name="containerName" value="kibernikto" />
+        <option name="commandLineOptions" value="--env-file $PROJECT_DIR$/env/docker.env -v $PROJECT_DIR$/.kbnkt_filestore:/data" />
         <option name="sourceFilePath" value="Dockerfile" />
       </settings>
     </deployment>

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import RunContext
 from pydantic_ai.messages import ImageUrl
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
@@ -26,16 +26,19 @@ IMAGE_SYSTEM_PROMPT = (
 
 # Vision model for image recognition.
 _VISION_MODEL_NAME = "openrouter:google/gemini-2.5-flash"
-_vision_agent: Agent | None = None
+_vision_agent: KiberniktoAgent | None = None
 
 
-def _get_vision_agent() -> Agent:
+def _get_vision_agent() -> KiberniktoAgent:
     """Lazy vision agent for image recognition."""
     global _vision_agent
     if _vision_agent is None:
-        _vision_agent = Agent(
+        _vision_agent = KiberniktoAgent(
             model=infer_kibernikto_model(_VISION_MODEL_NAME),
+            name="image-vision",
             system_prompt="Describe the image in detail. Answer in Russian unless asked otherwise.",
+            persona=False,
+            history_storage=None,
         )
     return _vision_agent
 
@@ -44,10 +47,12 @@ def _get_vision_agent() -> Agent:
 
 image_agent = KiberniktoAgent(
     model=infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.POOR_MODEL),
-    name="image_expert",
+    name="image-agent",
     description="Describes, generates and edits images.",
     system_prompt=IMAGE_SYSTEM_PROMPT,
     deps_type=KiberniktoDeps,
+    persona=False,
+    reaction="✍",
 )
 
 

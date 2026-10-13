@@ -1,12 +1,13 @@
 import dataclasses
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Dict, List, Protocol, runtime_checkable
 
 from pydantic import TypeAdapter
 from pydantic_ai.messages import FilePart, ModelMessage, ModelRequest, ModelResponse, ThinkingPart
 
-from kibernikto.storage.models import ConversationInfo
+if TYPE_CHECKING:  # Annotation-only: a runtime import closes storage.models -> core.config -> agent -> storage.base.
+    from kibernikto.storage.models import ConversationInfo
 
 _DEFAULT_HISTORY_SIZE = 13
 

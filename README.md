@@ -65,7 +65,7 @@ One folder per bot in `deploy/tg_bots/`. Plain Docker, storage, backups and roll
 ## Telegram peer agents
 
 Add a Telegram bot alongside local experts with
-`build_subagents_agent_with_tg_peers([TelegramPeerAgent(...)])`.
+`build_multi_agent_with_tg_peers([TelegramPeerAgent(...)])`.
 
 - [Peer API, access rules and limitations](docs/telegram-peers.md)
 - [Runnable caller + poetry-worker example](examples/telegram_peers.py)

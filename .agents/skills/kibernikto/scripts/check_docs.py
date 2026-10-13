@@ -117,21 +117,23 @@ def runtime_checks(blocks: list[tuple[str, str]], run_tests: bool) -> dict[str, 
         for file, block in blocks:
             if file == "SKILL.md" and "asyncio.run(smoke())" in block:
                 exec(compile(block, file, "exec"), {"__name__": "__docs_smoke__"})
-        from kibernikto.ai.agent.extended.orchestrators import build_subagents_agent_with_tg_peers
+        from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent_with_tg_peers
         from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
         from pydantic_ai_harness.subagents import SubAgent
 
         peer = TelegramPeerAgent(peer=200, name="offline", description="Offline test peer")
         assert SubAgent(peer).agent is peer
-        parent = build_subagents_agent_with_tg_peers([peer])
+        parent = build_multi_agent_with_tg_peers([peer])
         assert parent is not None
     result: dict[str, object] = {"imports": len(imports), "core_smoke": "passed",
                                 "real_subagent_and_builder": "passed"}
     if run_tests:
         # Restore real inference in modules whose import bound the mocked function.
         from kibernikto.ai.agent import utils
-        from kibernikto.ai.agent.extended import orchestrators
-        orchestrators.infer_kibernikto_model = utils.infer_kibernikto_model
+        from kibernikto.ai.agent.telegram import multi_agent
+        from kibernikto.ai.agent.harness import web
+        for module in (multi_agent, web):
+            module.infer_kibernikto_model = utils.infer_kibernikto_model
         # Example tests intentionally load a temporary bot.env. The audit hook still
         # rejects production .env files; the child cwd/home/storage stay isolated.
         os.environ.pop("PYTHON_DOTENV_DISABLED", None)

@@ -25,6 +25,7 @@ from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.telegram.utils.conversation import is_private_peer_request, reply
 from kibernikto.utils.time_utils import DEFAULT_TIMEZONE
 
+from .agent_reaction import AgentReaction
 from .chat_context import get_chat_context
 from .deps import TelegramDeps
 from .group_message import annotate_group_message
@@ -55,6 +56,8 @@ class TelegramAgent(KiberniktoAgent):
             **kwargs,
     ) -> None:
         kwargs.setdefault("deps_type", TelegramDeps)
+        # Own reaction on the user's message; delegates get theirs via SubAgents(shared_capabilities=...).
+        kwargs["capabilities"] = [*(kwargs.get("capabilities") or ()), AgentReaction()]
         super().__init__(**kwargs)
         self._pre_processor = pre_processor or TelegramMessagePreprocessor()
         self.capture_peer_media = capture_peer_media
@@ -228,6 +231,7 @@ kibernikto_telegram_agent: TelegramAgent = TelegramAgent(
     model=kibernikto_model,
     model_settings=kibernikto_agent.model_settings,
     name=AGENT_KIBERNIKTO_SETTINGS.NAME,
+    reaction=AGENT_KIBERNIKTO_SETTINGS.REACTION,
 )
 
 

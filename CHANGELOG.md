@@ -11,9 +11,22 @@ bot entry point (`kibernikto --env_file_path=...`) is unchanged.
 - `KiberniktoAgent` (a `pydantic_ai.Agent`) with per-chat history; `--multi-agent` builds a
   credit-tiered parent (`CreditTier` capability) with per-chat memory (harness `Memory` +
   `ConversationSearch`), web research (Exa when `EXA_API_KEY` is set, else the harness
-  `Researcher`; optional delegate via `AGENT_KIBERNIKTO_WEB_MODEL_NAME`) and an image expert.
+  `Researcher`; or a tool-less delegate on a search-native model via `AGENT_KIBERNIKTO_WEB_MODEL_NAME`)
+  and an image expert. Experts run without the persona.
+- Harness capabilities are transport-free: `kibernikto.ai.agent.harness` (`CreditTier`, `chat_memory`,
+  delegation, web) keys on `KiberniktoDeps.chat_id` / `billable` / `chat_info` / `timezone`, so they work
+  on a plain `KiberniktoAgent`. The Telegram multi-agent assembly is `kibernikto.ai.agent.telegram.multi_agent`
+  (`build_multi_agent`, `build_multi_agent_with_tg_peers`).
 - Persona: `WHO_AM_I` / `{NAME}-instructions.txt` may be a Handlebars template
   (`{{name}}`, `{{traits.x}}`; `AGENT_KIBERNIKTO_PERSONA_NAME`, `AGENT_KIBERNIKTO_PERSONA_TRAITS`).
+  An unknown `{{field}}` fails at startup: escape literal braces as `\{{`, or set
+  `AGENT_KIBERNIKTO_PERSONA_TEMPLATE=false` to treat the persona as plain text.
+- `/reset`: erases a chat's history and the bot's notes after confirmation (credits stay);
+  in groups only admins can do it.
+- Agent reactions: `KiberniktoAgent(reaction=emoji)` + `AgentReaction` mark the user's message —
+  delegates on start (`image-agent` ✍, `web-agent` 👨‍💻, peers 🤝), the parent (`AGENT_KIBERNIKTO_REACTION`,
+  default 👀) only on its own tool calls. Plain chatter gets none.
+- Bot menu: commands are published via `set_my_commands` on startup; `/help` renders the same list.
 - Telegram peer sub-agents: other Telegram bots as delegated experts, text or multimodal.
 - Storage: history/chat data/memory in files, SQLite or PostgreSQL; media in files or S3.
 - Public image hosting: `imgbb` (default) or **`s3`** with a public base URL.

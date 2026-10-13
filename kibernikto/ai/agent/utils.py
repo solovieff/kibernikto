@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from os import getenv
 from typing import Literal
 
+from pydantic_ai import ModelSettings
 from pydantic_ai.models import Model, infer_model
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings, OpenRouterReasoning
@@ -104,3 +105,16 @@ def openai_compatible_provider(name: str) -> KiberniktoOpenAIProvider:
 
 def openrouter_provider() -> OpenRouterProvider:
     return OpenRouterProvider(app_url=APP_SETTINGS.URL, app_title=APP_SETTINGS.INSTANCE_NAME)
+
+
+def attribution_headers(label: str | None = None) -> dict[str, str]:
+    """Gateway attribution (OpenRouter-style ``X-Title`` / ``HTTP-Referer``): ``{instance}:{label}``."""
+    title = f"{APP_SETTINGS.INSTANCE_NAME}:{label}" if label else APP_SETTINGS.INSTANCE_NAME
+    return {"X-Title": title, "HTTP-Referer": APP_SETTINGS.URL}
+
+
+def with_attribution(settings: ModelSettings | None, label: str | None) -> ModelSettings:
+    """Add attribution headers to model settings; explicitly passed ``extra_headers`` win."""
+    merged = ModelSettings(**(settings or {}))
+    merged["extra_headers"] = {**attribution_headers(label), **merged.get("extra_headers", {})}
+    return merged

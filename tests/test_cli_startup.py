@@ -136,8 +136,8 @@ class CliStartupTests(unittest.TestCase):
             ),
             "kibernikto.ai.agent.telegram.telegram_agent": telegram,
             "kibernikto.storage.config": SimpleNamespace(validate_storage=lambda: record("storage")),
-            "kibernikto.ai.agent.extended.orchestrators": SimpleNamespace(
-                kibernikto_subagents_agent=multi_agent,
+            "kibernikto.ai.agent.telegram.multi_agent": SimpleNamespace(
+                kibernikto_multi_agent=multi_agent,
             ),
         }
         root = SimpleNamespace(ai=SimpleNamespace(agent=SimpleNamespace(
@@ -195,7 +195,7 @@ class CliStartupTests(unittest.TestCase):
     def test_multi_agent_registers_and_polls_selected_agent(self) -> None:
         events, loader, default_app, multi_app = self.run_startup(["--multi-agent"])
         loader.assert_called_once_with(dotenv_path=".env")
-        self.assertIn(("import:kibernikto.ai.agent.extended.orchestrators", "selected-file"), events)
+        self.assertIn(("import:kibernikto.ai.agent.telegram.multi_agent", "selected-file"), events)
         self.assertEqual([name for name, _ in events if not name.startswith("import:")], [
             "dotenv:.env", "logger", "banner", "storage", "set_agent", "summary:multi-agent", "poll_multi",
         ])

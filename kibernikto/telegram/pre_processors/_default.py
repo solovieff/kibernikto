@@ -132,6 +132,9 @@ class TelegramMessagePreprocessor:
 
         try:
             transcription = await self._transcribe_openai(str(local_path))
+        except Exception as exc:
+            logging.error("Error transcribing voice: %s", exc)
+            return [f"[Voice transcription error: {exc}]"]
         finally:
             media_store.cleanup_tmp(local_path)
 
@@ -200,10 +203,10 @@ class TelegramMessagePreprocessor:
                 model=SETTINGS.OPENAI_API_MODEL,
                 language=SETTINGS.OPENAI_API_LANGUAGE,
                 file=audio_file,
-                response_format="text",
             )
 
-        return transcription.text if hasattr(transcription, "text") else transcription
+        # Default JSON format: every OpenAI-compatible gateway (routerai, ...) returns `.text`.
+        return transcription.text
 
 
 _SELF = "bot (you)"

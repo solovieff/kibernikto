@@ -1,19 +1,19 @@
 # Telegram peer sub-agents
 
 `TelegramPeerAgent` is a `KiberniktoAgent`. Use the opt-in public builder;
-the original `build_subagents_agent()` and its singleton are unchanged:
+the original `build_multi_agent()` and its singleton are unchanged:
 
 ```python
 from dotenv import load_dotenv
 load_dotenv('caller.env')  # Before importing configuration-dependent agents.
 
-from kibernikto.ai.agent.extended.orchestrators import build_subagents_agent_with_tg_peers
+from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent_with_tg_peers
 from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
 from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
 
 poet = TelegramPeerAgent(peer='@YourPoetBot', name='poet',
                          description='Пишет стихи по заданной теме, размеру и настроению.')
-agent = build_subagents_agent_with_tg_peers([poet])
+agent = build_multi_agent_with_tg_peers([poet])
 set_telegram_agent(agent)
 agent.to_telegram().run_polling()
 ```
@@ -32,7 +32,7 @@ caller config. The worker's actual instructions configure its behavior; the
 peer description only tells the caller when to delegate. Nothing is sent on startup.
 
 Alternatively, register it exactly like an existing expert in
-`kibernikto/ai/agent/extended/orchestrators.py`:
+`kibernikto/ai/agent/telegram/multi_agent.py`:
 
 ```python
 from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
@@ -101,7 +101,7 @@ an ordinary text reply or a standalone photo/file does not complete that call.
 ## Opt-in multimodal transport
 
 ```python
-from kibernikto.ai.agent.extended.orchestrators import build_subagents_agent_with_tg_peers
+from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent_with_tg_peers
 from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
 
 vision = TelegramPeerAgent(
@@ -110,7 +110,7 @@ vision = TelegramPeerAgent(
     description='Describes the selected image and returns a report.',
     multimodal=True,
 )
-agent = build_subagents_agent_with_tg_peers([vision])
+agent = build_multi_agent_with_tg_peers([vision])
 agent.capture_peer_media = True  # Opt in before processing Telegram updates.
 ```
 

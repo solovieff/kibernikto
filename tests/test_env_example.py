@@ -54,8 +54,8 @@ class EnvExampleTests(unittest.TestCase):
         script = textwrap.dedent("""\
             import os, sys
             os.environ['OPENROUTER_API_KEY'] = 'offline-placeholder'
-            from kibernikto.ai.agent.extended.orchestrators import kibernikto_subagents_agent
-            assert kibernikto_subagents_agent is not None
+            from kibernikto.ai.agent.telegram.multi_agent import kibernikto_multi_agent
+            assert kibernikto_multi_agent is not None
             assert 'kibernikto.ai.agent.harness.report_agent' not in sys.modules
             assert 'kibernikto.ai.agent.harness.scheduler_agent' not in sys.modules
             """)

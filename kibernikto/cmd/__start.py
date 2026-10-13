@@ -29,10 +29,10 @@ def start(outer_env=False):
 
     if args.multi_agent:
         from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
-        from kibernikto.ai.agent.extended.orchestrators import kibernikto_subagents_agent
+        from kibernikto.ai.agent.telegram.multi_agent import kibernikto_multi_agent
 
         # Use the pre-built subagents agent (SubAgents delegation with all expert sub-agents).
-        set_telegram_agent(kibernikto_subagents_agent)
+        set_telegram_agent(kibernikto_multi_agent)
         print_agent_summary('multi-agent')
     else:
         print_agent_summary('default')

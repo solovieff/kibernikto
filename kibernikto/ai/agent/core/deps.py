@@ -6,15 +6,19 @@ is the side-channel that lets a tool deliver binary results (images, files,
 audio, ...) to the user even though a tool's *return value* only ever flows
 back to the model, never to the end user.
 
-The base :class:`KiberniktoDeps` is provider/transport agnostic. Transport
-layers subclass it to attach their own context — see
-:class:`kibernikto.telegram.agent.telegram_agent.TelegramDeps`.
+The base :class:`KiberniktoDeps` is transport agnostic: it carries the conversation
+identity every harness capability keys on (history, memory, credits, scheduling).
+Transport layers subclass it to attach their own context — see
+:class:`kibernikto.ai.agent.telegram.deps.TelegramDeps`.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic_ai.messages import BinaryContent, UserContent
+
+if TYPE_CHECKING:
+    from kibernikto.storage.models import ConversationInfo
 
 
 @dataclass
@@ -26,6 +30,18 @@ class KiberniktoDeps:
     sends ``result.output`` (text) together with these attachments after the
     run finishes.
     """
+
+    chat_id: int | None = None
+    """Conversation key: history, memory namespace, credits. ``None`` = anonymous run, nothing per-chat."""
+
+    billable: bool = True
+    """``False`` skips credit tiering and charging (e.g. a peer envelope served for another bot)."""
+
+    chat_info: ConversationInfo | None = None
+    """Run-start snapshot of ``chat_data`` (credits); read-only — writers reload before saving."""
+
+    timezone: str | None = None
+    """IANA zone for dates shown to the model; ``None`` falls back to ``DEFAULT_TIMEZONE``."""
 
     attachments: list[BinaryContent] = field(default_factory=list)
     """Binaries produced by tools to be delivered to the user (images, files, audio...)."""
@@ -44,7 +60,7 @@ class KiberniktoDeps:
     extra: dict[str, Any] = field(default_factory=dict)
     """Free-form bag for any additional run-scoped data tools want to share."""
 
-    conversation_context: Optional[str] = None
+    conversation_context: str | None = None
     """Pre-built one-line string about the current conversation (user/chat facts).
 
     Populated by the transport layer (e.g. the Telegram agent) before each run;

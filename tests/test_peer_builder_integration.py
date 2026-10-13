@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from tests.test_telegram_peer import message
-from tests.test_peer_builder import orchestrators
+from tests.test_peer_builder import multi_agent
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
@@ -29,8 +29,8 @@ class PublicBuilderIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
         bot.send_message = AsyncMock(side_effect=send)
         poet = TelegramPeerAgent(peer=200, name='poet', description='Writes poems', bot=bot, hub=app.peer_hub)
-        with patch.object(orchestrators, 'infer_kibernikto_model', return_value=TestModel()):
-            agent = orchestrators.build_subagents_agent_with_tg_peers([poet])
+        with patch.object(multi_agent, 'infer_kibernikto_model', return_value=TestModel()):
+            agent = multi_agent.build_multi_agent_with_tg_peers([poet])
 
         def model(messages, info):
             returns = [p for m in messages for p in m.parts if isinstance(p, ToolReturnPart)]
@@ -55,8 +55,8 @@ class PublicBuilderIntegrationTests(unittest.IsolatedAsyncioTestCase):
         bot.send_message = AsyncMock(return_value=message(10, sender=100))
         peer = TelegramPeerAgent(peer=200, name='poet', description='Writes poems',
                                  bot=bot, hub=app.peer_hub, timeout=0.2)
-        with patch.object(orchestrators, 'infer_kibernikto_model', return_value=TestModel()):
-            agent = orchestrators.build_subagents_agent_with_tg_peers([peer])
+        with patch.object(multi_agent, 'infer_kibernikto_model', return_value=TestModel()):
+            agent = multi_agent.build_multi_agent_with_tg_peers([peer])
 
         def model(messages, info):
             returns = [p for m in messages for p in m.parts if isinstance(p, ToolReturnPart)]

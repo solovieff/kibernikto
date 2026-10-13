@@ -12,8 +12,8 @@ from pydantic_ai.exceptions import UserError
 from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError
-from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.storage.singletons import chat_data
 
@@ -32,15 +32,8 @@ def credit_tier(credits: int) -> Tier:
     return "medium"
 
 
-def _billable_chat(deps: object) -> int | None:
-    """Chat to bill and tier by; None for non-Telegram deps or non-billable (peer envelope) runs."""
-    if not isinstance(deps, TelegramDeps) or not deps.billable:
-        return None
-    return deps.chat_id
-
-
 @dataclass
-class CreditTier(AbstractCapability[TelegramDeps]):
+class CreditTier(AbstractCapability[KiberniktoDeps]):
     """Pick the model by the chat's credit tier once per run, then charge ``effort`` after success.
 
     Explicit ``run(model=...)`` / ``agent.override(model=...)`` still win over the selection;
@@ -54,10 +47,10 @@ class CreditTier(AbstractCapability[TelegramDeps]):
     def get_serialization_name(cls) -> str | None:
         return None  # Holds live Model instances — not spec-constructible.
 
-    def get_model(self) -> ModelSelector[TelegramDeps]:
+    def get_model(self) -> ModelSelector[KiberniktoDeps]:
         return self._select
 
-    async def before_run(self, ctx: RunContext[TelegramDeps]) -> None:
+    async def before_run(self, ctx: RunContext[KiberniktoDeps]) -> None:
         if AGENT_KIBERNIKTO_SETTINGS.ALLOW_ZERO_CREDITS:
             return
         chat_id = _billable_chat(ctx.deps)
@@ -67,7 +60,19 @@ class CreditTier(AbstractCapability[TelegramDeps]):
         if info.credits <= 0:
             raise InsufficientCreditsError()
 
-    async def _select(self, ctx: ModelSelectionContext[TelegramDeps]) -> Model:
+    async def after_run(self, ctx: RunContext[KiberniktoDeps], *, result: AgentRunResult[Any]) -> AgentRunResult[Any]:
+        chat_id = _billable_chat(ctx.deps)
+        if chat_id is None:
+            return result
+        info = await chat_data.load(chat_id)  # Fresh read: a top-up landed mid-run must not be overwritten.
+        previous = credit_tier(info.credits)
+        info.charge(effort=self.effort)
+        await chat_data.save(chat_id, info)
+        if (current := credit_tier(info.credits)) != previous:
+            logger.info("Model tier changed for chat %s: %s -> %s", chat_id, previous, current)
+        return result
+
+    async def _select(self, ctx: ModelSelectionContext[KiberniktoDeps]) -> Model:
         if ctx.run_step > 1 and ctx.model is not None:
             return ctx.model  # Tier is pinned for the whole run: no storage hit per tool step.
         chat_id = _billable_chat(ctx.deps)
@@ -83,14 +88,9 @@ class CreditTier(AbstractCapability[TelegramDeps]):
             self.models[name] = infer_kibernikto_model(name)
         return self.models[name]
 
-    async def after_run(self, ctx: RunContext[TelegramDeps], *, result: AgentRunResult[Any]) -> AgentRunResult[Any]:
-        chat_id = _billable_chat(ctx.deps)
-        if chat_id is None:
-            return result
-        info = await chat_data.load(chat_id)  # Fresh read: a top-up landed mid-run must not be overwritten.
-        previous = credit_tier(info.credits)
-        info.charge(effort=self.effort)
-        await chat_data.save(chat_id, info)
-        if (current := credit_tier(info.credits)) != previous:
-            logger.info("Model tier changed for chat %s: %s -> %s", chat_id, previous, current)
-        return result
+
+def _billable_chat(deps: object) -> int | None:
+    """Chat to bill and tier by; None without Kibernikto deps, a chat, or for non-billable (peer envelope) runs."""
+    if not isinstance(deps, KiberniktoDeps) or not deps.billable:
+        return None
+    return deps.chat_id

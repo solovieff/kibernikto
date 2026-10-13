@@ -5,14 +5,12 @@ from aiogram.types import Message
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 
 
+def is_admin_id(user_id: int) -> bool:
+    return user_id == TELEGRAM_SETTINGS.MASTER_ID or user_id in TELEGRAM_SETTINGS.MASTER_IDS
+
+
 def is_from_admin(message: types.Message):
-    if message.from_user.id == TELEGRAM_SETTINGS.MASTER_ID:
-        return True
-
-    if message.from_user.id in TELEGRAM_SETTINGS.MASTER_IDS:
-        return True
-
-    return False
+    return is_admin_id(message.from_user.id)
 
 
 def admin_or_public(message: types.Message):

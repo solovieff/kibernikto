@@ -95,6 +95,17 @@ class PersonaTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(Exception, 'nmae'):
             KiberniktoAgent(name='p5', history_storage=None)
 
+    async def test_escaped_braces_stay_literal(self) -> None:
+        self.write_persona('p7', r'Answer as \{{answer}}, you are {{name}}.')
+        agent = KiberniktoAgent(name='p7', history_storage=None, persona_source=StaticPersona(name='K'))
+        self.assertIn('Answer as {{answer}}, you are K.', await first_instructions(agent))
+
+    async def test_template_switch_off_keeps_braces_literal_and_never_fails(self) -> None:
+        self.write_persona('p8', 'Format: {{answer}} {{nmae}}')
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'PERSONA_TEMPLATE', False):
+            prompt = await first_instructions(KiberniktoAgent(name='p8', history_storage=None))
+        self.assertTrue(prompt.startswith('Format: {{answer}} {{nmae}}\n\nCurrent date: '), prompt)
+
     async def test_identity_prompt_uses_telegram_display_name(self) -> None:
         set_bot_identity(BotIdentity(username='cyber_bot', full_name='Кибер Никто', short_description='тень'))
         prompt = await first_instructions(TelegramAgent(name='p6', history_storage=None), TelegramDeps())

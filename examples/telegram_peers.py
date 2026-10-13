@@ -86,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent, set_telegram_agent
 
     if args.peer is not None:
-        from kibernikto.ai.agent.extended.orchestrators import build_subagents_agent_with_tg_peers
+        from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent_with_tg_peers
         from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
 
         if args.multimodal:
@@ -95,7 +95,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
         else:
             peer = TelegramPeerAgent(peer=args.peer, name=args.peer_name, description=args.peer_description)
-        agent = build_subagents_agent_with_tg_peers([peer])
+        agent = build_multi_agent_with_tg_peers([peer])
         if args.multimodal:
             agent.capture_peer_media = True
     else:

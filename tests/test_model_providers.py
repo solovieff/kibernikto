@@ -10,11 +10,16 @@ os.environ['AGENT_KIBERNIKTO_MODEL_NAME'] = 'openrouter:test/offline'
 os.environ['APP_STORAGE_DATA_BACKEND'] = 'file'
 os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
+from pydantic_ai import ModelSettings
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.openrouter import OpenRouterModel
 
 from kibernikto.ai.agent import utils
 from kibernikto.ai.agent.core import image
+from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.config import APP_SETTINGS
 from kibernikto.ai.agent.utils import (
     OPENAI_COMPATIBLE_PROVIDERS, KiberniktoOpenAIProvider, MissingProviderKeyError,
     infer_kibernikto_model, register_openai_compatible,
@@ -80,6 +85,40 @@ class ImageRoutingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self._route('routerai:img'), 'chat')
         self.assertEqual(await self._route('vsegpt:img'), 'images')
         self.assertEqual(await self._route('beget:img'), 'images')
+
+
+class AttributionHeadersTest(unittest.IsolatedAsyncioTestCase):
+    async def _sent_headers(self, **kwargs) -> dict[str, str]:
+        seen: dict[str, str] = {}
+
+        def reply(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            seen.update((info.model_settings or {}).get('extra_headers', {}))
+            return ModelResponse(parts=[TextPart('ok')])
+
+        agent = KiberniktoAgent(model=FunctionModel(reply), persona=False, history_storage=None, **kwargs)
+        await agent.run('hi')
+        return seen
+
+    async def test_agent_name_labels_every_request(self) -> None:
+        headers = await self._sent_headers(name='expert', model_settings=ModelSettings(temperature=0.1))
+        self.assertEqual(headers, {'X-Title': f'{APP_SETTINGS.INSTANCE_NAME}:expert',
+                                   'HTTP-Referer': APP_SETTINGS.URL})
+
+    async def test_explicit_headers_win(self) -> None:
+        headers = await self._sent_headers(name='expert',
+                                           model_settings=ModelSettings(extra_headers={'X-Title': 'mine'}))
+        self.assertEqual(headers['X-Title'], 'mine')
+        self.assertEqual(headers['HTTP-Referer'], APP_SETTINGS.URL)
+
+    async def test_raw_image_calls_carry_headers(self) -> None:
+        create = AsyncMock(return_value=MagicMock(data=[]))
+        model = MagicMock(model_name='img')
+        model._provider.client.images.generate = create
+        agent = MagicMock(model=model, model_settings=utils.with_attribution(None, image.IMAGE_ENGINE_NAME))
+        with patch.object(image, '_get_image_agent', return_value=agent):
+            await image._images_generate('a cat')
+        self.assertEqual(create.await_args.kwargs['extra_headers']['X-Title'],
+                         f'{APP_SETTINGS.INSTANCE_NAME}:{image.IMAGE_ENGINE_NAME}')
 
 
 if __name__ == '__main__':

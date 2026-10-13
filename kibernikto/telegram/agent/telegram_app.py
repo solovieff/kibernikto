@@ -46,7 +46,8 @@ class TelegramApp:
         """
         from kibernikto.config import APP_SETTINGS
         from kibernikto.telegram.config import TELEGRAM_SETTINGS
-        from kibernikto.telegram.handlers import commands_router, conversation_router, payments_router
+        from kibernikto.telegram.handlers import commands_router, conversation_router, payments_router, reset_router
+        from kibernikto.telegram.handlers.commands import set_bot_commands
         from kibernikto.telegram.middleware.middleware_firewall import FirewallMiddleware
         from kibernikto.telegram.middleware.middleware_service import (
             ErrorsMiddleware,
@@ -68,6 +69,7 @@ class TelegramApp:
 
         dispatcher.include_router(commands_router)
         dispatcher.include_router(payments_router)
+        dispatcher.include_router(reset_router)
         dispatcher.include_router(conversation_router)
 
         # Startup hook: DB tables + bot identity + optional greeting.
@@ -81,6 +83,7 @@ class TelegramApp:
 
             identity = await fetch_bot_identity(bot)
             set_bot_identity(identity)
+            await set_bot_commands(bot)
             logger.info("Bot started as @%s | %s", identity.username, identity.as_prompt())
             if TELEGRAM_SETTINGS.SAY_HI:
                 from kibernikto.telegram.utils.conversation import send_random_sticker

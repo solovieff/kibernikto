@@ -16,6 +16,9 @@ class AgentKiberniktoSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='AGENT_KIBERNIKTO_')
 
     NAME: str = Field(default="kibernikto", description="Default kibernikto agent")
+    REACTION: str | None = Field(
+        default="👀", description="Parent agent's reaction on the user's message at run start; empty = none",
+    )
 
     HISTORY_SIZE: int = Field(default=6, description="History size")
     KEEP_THINKING_IN_HISTORY: bool = Field(
@@ -30,8 +33,8 @@ class AgentKiberniktoSettings(BaseSettings):
     )
     WEB_MODEL_NAME: str | None = Field(
         default=None,
-        description="Set: web research runs as a delegated expert on this model; "
-                    "unset: parent capability on the tier model",
+        description="Set: web is a tool-less delegate on this search-native model (e.g. perplexity/sonar); "
+                    "unset: Exa/Researcher tools on the tier model",
     )
 
     MODEL_MAX_TOKENS: int = Field(default=1300, description="Model max tokens")
@@ -42,6 +45,7 @@ class AgentKiberniktoSettings(BaseSettings):
     )
 
     WHO_AM_I: str = Field(default=DEFAULT_SYSTEM_PROMPT, description="Who am I (Handlebars template allowed)")
+    PERSONA_TEMPLATE: bool = Field(default=True, description="Render the persona as Handlebars; false = always plain text, `{{` stays literal")
     PERSONA_NAME: str | None = Field(default=None, description="{{name}} override; unset = Telegram bot name")
     PERSONA_TRAITS: dict[str, int] = Field(
         default_factory=dict, description='{{traits}} for the persona template, JSON: {"sarcasm": 10}'

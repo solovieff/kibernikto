@@ -49,8 +49,8 @@ class PeerExampleTests(unittest.TestCase):
                 'TelegramAgent': worker_factory, 'set_telegram_agent': events.register,
             },
             'kibernikto.ai.agent.telegram.peer_agent': {'TelegramPeerAgent': peer_factory},
-            'kibernikto.ai.agent.extended.orchestrators': {
-                'build_subagents_agent_with_tg_peers': builder,
+            'kibernikto.ai.agent.telegram.multi_agent': {
+                'build_multi_agent_with_tg_peers': builder,
             },
         }
         modules: dict[str, ModuleType] = {}
@@ -89,7 +89,7 @@ class PeerExampleTests(unittest.TestCase):
         )
         fixture.builder.assert_not_called()
         fixture.peer_factory.assert_not_called()
-        self.assertNotIn('kibernikto.ai.agent.extended.orchestrators', fixture.imported)
+        self.assertNotIn('kibernikto.ai.agent.telegram.multi_agent', fixture.imported)
         self.assertEqual(fixture.events.mock_calls, [call.configure_logger(), call.validate(), call.register(fixture.agent), call.poll()])
         fixture.agent.to_telegram.assert_called_once_with()
         fixture.agent.run.assert_not_called()
