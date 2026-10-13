@@ -50,7 +50,7 @@ async def send_random_sticker(chat_id: int, sticker_list: List[str], bot: Bot) -
 def is_reply(message: Message) -> bool:
     """True if ``message`` is a reply to one of the bot's own messages."""
     replied = message.reply_to_message
-    return bool(replied and replied.from_user.id == message.bot.id)
+    return bool(replied and replied.from_user and replied.from_user.id == message.bot.id)
 
 
 def get_message_text(message: Message) -> Optional[str]:

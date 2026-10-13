@@ -15,7 +15,7 @@ from aiogram.types import Chat, Message, User
 from pydantic_ai import ModelHTTPError
 
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
-from kibernikto.ai.agent.core.errors import RULES, map_model_error
+from kibernikto.ai.agent.core.errors import InsufficientCreditsError, RULES, map_model_error
 from kibernikto.ai.agent.telegram.telegram_agent import user_facing_model_error
 
 IMAGE_BODY = {'message': 'No endpoints found that support image input', 'code': 404,
@@ -77,6 +77,18 @@ def _private_message() -> Message:
 
 
 class ProcessMessageTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exhausted_credits_return_top_up_hint_without_error(self) -> None:
+        from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+
+        agent = TelegramAgent(model=None, history_storage=None)
+        message = _private_message()
+        with patch.object(agent, '_pre_processor', AsyncMock(process_tg_message=AsyncMock(return_value=['hi']))), \
+                patch.object(agent, 'build_deps', AsyncMock(return_value=TelegramDeps(message=message))), \
+                patch.object(agent, 'run', AsyncMock(side_effect=InsufficientCreditsError())):
+            result = await agent.process_message(message)
+        self.assertIn('/pay', result)
+        self.assertIn('/balance', result)
+
     async def test_model_error_propagates_to_dispatcher(self) -> None:
         from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
 

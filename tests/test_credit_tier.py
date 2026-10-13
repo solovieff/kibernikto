@@ -18,6 +18,7 @@ from pydantic_ai_harness.exa import ExaSearch
 from pydantic_ai_harness.subagents import SubAgents
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.errors import InsufficientCreditsError
 from kibernikto.ai.agent.harness.credit_tier import CreditTier
 from kibernikto.ai.agent.extended.orchestrators import build_subagents_agent
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
@@ -60,12 +61,13 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         settings = patch.multiple(AGENT_KIBERNIKTO_SETTINGS, POOR_CREDITS=30, RICH_CREDITS=500,
-                                  POOR_MODEL=POOR, MEDIUM_MODEL=MEDIUM, RICH_MODEL=RICH)
+                                  POOR_MODEL=POOR, MEDIUM_MODEL=MEDIUM, RICH_MODEL=RICH, ALLOW_ZERO_CREDITS=True)
         settings.start()
         self.addCleanup(settings.stop)
         self.tier = CreditTier(models={name: named_model(name, tool_step=True) for name in (POOR, MEDIUM, RICH)})
+        self.history = MemoryHistoryStorage()
         self.agent = TelegramAgent(model=named_model('fallback'), name='credit-test',
-                                   history_storage=MemoryHistoryStorage(), capabilities=[self.tier])
+                                   history_storage=self.history, capabilities=[self.tier])
 
         @self.agent.tool_plain
         def ping() -> str:
@@ -89,6 +91,52 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         result = await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7, chat_info=self.chat_data.rows[7]))
         self.assertEqual(result.output, RICH)
         self.assertEqual(self.chat_data.loads, 1)  # Charge only: tier came from the snapshot.
+
+    async def test_exhausted_balance_continues_on_poor_model_by_default(self) -> None:
+        for credits in (0, -5):
+            await self.set_credits(7, credits)
+            result = await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+            self.assertEqual(result.output, POOR)
+            self.assertEqual(self.chat_data.rows[7].credits, 0)
+
+    async def test_strict_policy_blocks_exhausted_balance_even_with_model_override(self) -> None:
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
+            for credits in (0, -5):
+                await self.set_credits(7, credits)
+                with self.assertRaises(InsufficientCreditsError):
+                    await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+                model = TestModel(custom_output_text='must not run')
+                with self.agent.override(model=model), self.assertRaises(InsufficientCreditsError):
+                    await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+                self.assertIsNone(model.last_model_request_parameters)
+                self.assertEqual(self.chat_data.rows[7].credits, credits)
+                self.assertFalse(await self.history.get_conversation(7))
+
+    async def test_strict_policy_allows_last_credit_then_top_up_restores_access(self) -> None:
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
+            await self.set_credits(7, 1)
+            result = await self.agent.run('hi', deps=TelegramDeps(chat_id=7))
+            self.assertEqual(result.output, POOR)
+            self.assertEqual(self.chat_data.rows[7].credits, 0)
+            with self.assertRaises(InsufficientCreditsError):
+                await self.agent.run('hi', deps=TelegramDeps(chat_id=7))
+            await self.set_credits(7, 100)
+            result = await self.agent.run('hi', deps=TelegramDeps(chat_id=7))
+            self.assertEqual(result.output, MEDIUM)
+            self.assertEqual(self.chat_data.rows[7].credits, 99)
+
+    async def test_strict_policy_does_not_block_non_billable_peers(self) -> None:
+        await self.set_credits(7, 0)
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
+            result = await self.agent.run('hi', deps=TelegramDeps(chat_id=7, billable=False))
+        self.assertEqual(result.output, 'fallback')
+        self.assertEqual(self.chat_data.loads, 0)
+
+    async def test_strict_policy_uses_deps_snapshot(self) -> None:
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
+            with self.assertRaises(InsufficientCreditsError):
+                await self.agent.run('hi', deps=TelegramDeps(chat_id=7, chat_info=ConversationInfo(credits=0)))
+        self.assertEqual(self.chat_data.loads, 0)
 
     async def test_charge_rereads_so_mid_run_top_up_survives(self) -> None:
         await self.set_credits(7, 100)

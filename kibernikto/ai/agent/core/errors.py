@@ -10,6 +10,13 @@ from typing import Callable
 from pydantic_ai import ModelHTTPError
 
 
+class InsufficientCreditsError(Exception):
+    """A billable run was refused because its chat has no credits left."""
+
+    def __init__(self) -> None:
+        super().__init__('Кредиты закончились. Пополни баланс: /pay. Проверить баланс: /balance.')
+
+
 @dataclass(frozen=True)
 class ModelErrorInfo:
     """Category of a model failure plus the message shown to the chat user."""

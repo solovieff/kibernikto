@@ -39,6 +39,9 @@ def should_react(message: Message) -> bool:
     from kibernikto.ai.agent.telegram.identity import BotIdentity, get_bot_identity
     from kibernikto.telegram.utils.conversation import is_reply, get_message_text
 
+    if is_reply(message):
+        return True
+
     message_text = get_message_text(message)
     if not message_text:
         return False
@@ -47,7 +50,5 @@ def should_react(message: Message) -> bool:
     own = [me.full_name, f"@{me.username}" if me.username else None]
     calls = [*TELEGRAM_SETTINGS.REACTION_CALLS, *filter(None, own)]
     haystack = message_text.lower()
-    mentioned = any(call.lower() in haystack for call in calls)
-
-    return is_reply(message) or mentioned
+    return any(call.lower() in haystack for call in calls)
 

@@ -47,6 +47,11 @@ or any [pydantic-ai model string](https://ai.pydantic.dev/models/overview/). A n
 
 ## Deploy
 
+Both Dockerfiles default to `--multi-agent`. In this mode,
+`AGENT_KIBERNIKTO_ALLOW_ZERO_CREDITS=true` (default) keeps chats on the poor model
+when credits run out; `false` blocks billable agent runs at balance ≤ 0 with a `/pay` hint.
+Charging stops at zero. Non-billable peer envelopes are exempt; subscription checks are independent.
+
 [`deploy/`](deploy/README.md) is a ready server layout: copy it, add a deploy key and env, run as root:
 
 ```shell

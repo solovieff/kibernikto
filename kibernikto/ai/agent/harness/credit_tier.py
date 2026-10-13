@@ -12,6 +12,7 @@ from pydantic_ai.exceptions import UserError
 from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.errors import InsufficientCreditsError
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.storage.singletons import chat_data
@@ -55,6 +56,16 @@ class CreditTier(AbstractCapability[TelegramDeps]):
 
     def get_model(self) -> ModelSelector[TelegramDeps]:
         return self._select
+
+    async def before_run(self, ctx: RunContext[TelegramDeps]) -> None:
+        if AGENT_KIBERNIKTO_SETTINGS.ALLOW_ZERO_CREDITS:
+            return
+        chat_id = _billable_chat(ctx.deps)
+        if chat_id is None:
+            return
+        info = ctx.deps.chat_info or await chat_data.load(chat_id)
+        if info.credits <= 0:
+            raise InsufficientCreditsError()
 
     async def _select(self, ctx: ModelSelectionContext[TelegramDeps]) -> Model:
         if ctx.run_step > 1 and ctx.model is not None:

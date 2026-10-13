@@ -49,6 +49,7 @@ class AgentKiberniktoSettings(BaseSettings):
 
     # Credits & model balancing for the CreditTier capability
     TRIAL_CREDITS: int = Field(default=260, description="Initial credits for a new user")
+    ALLOW_ZERO_CREDITS: bool = Field(default=True, description="Continue on the poor model at zero or negative credits")
     POOR_CREDITS: int = Field(default=30, description="Below this — poor model")
     RICH_CREDITS: int = Field(default=500, description="Above this — rich model")
     POOR_MODEL: str = Field(default="openrouter:google/gemini-2.5-flash", description="Model when credits are low")
@@ -75,6 +76,7 @@ def agent_summary(name: str, agent_settings: AgentKiberniktoSettings = AGENT_KIB
         'POOR_CREDITS': s.POOR_CREDITS,
         'RICH_CREDITS': s.RICH_CREDITS,
         'TRIAL_CREDITS': s.TRIAL_CREDITS,
+        'ALLOW_ZERO_CREDITS': s.ALLOW_ZERO_CREDITS,
         'HISTORY_SIZE': s.HISTORY_SIZE,
         'MODEL_MAX_TOKENS': s.MODEL_MAX_TOKENS,
         'MODEL_TEMPERATURE': s.MODEL_TEMPERATURE,

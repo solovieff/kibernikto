@@ -13,7 +13,7 @@ from kibernikto.telegram.peer_protocol import PeerEnvelope, PeerProtocolError, d
 from pydantic_ai import AgentRunResult, ModelHTTPError, RunContext
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.ai.agent.core.errors import map_model_error
+from kibernikto.ai.agent.core.errors import InsufficientCreditsError, map_model_error
 from kibernikto.ai.agent.core.kibernikto_agent import agent as kibernikto_agent
 from kibernikto.ai.agent.core.kibernikto_agent import model as kibernikto_model
 from kibernikto.ai.agent.core.image import generate_image
@@ -118,8 +118,8 @@ class TelegramAgent(KiberniktoAgent):
     async def process_message(self, message: Message) -> AgentRunResult | PeerEnvelope | str | None:
         """Run the agent on ``message`` with per-chat history.
 
-        Returns the :class:`AgentRunResult` on success, an error ``str`` on a
-        model failure, or ``None`` when the message carried nothing to answer.
+        Returns the :class:`AgentRunResult` on success, a ``str`` when credits
+        are exhausted, or ``None`` when the message carried nothing to answer.
         Tools queue binaries on ``deps.attachments``; ``KiberniktoAgent.run``
         folds them into the response so :meth:`reply_to` delivers them as media.
         """
@@ -182,6 +182,8 @@ class TelegramAgent(KiberniktoAgent):
                 result._peer_request_id = envelope.request_id
             return result
         except Exception as error:
+            if envelope is None and isinstance(error, InsufficientCreditsError):
+                return str(error)
             if envelope is None:
                 raise
             logger.exception(error)

@@ -32,3 +32,4 @@ WORKDIR /data
 VOLUME ["/data"]
 
 ENTRYPOINT ["kibernikto"]
+CMD ["--multi-agent"]
