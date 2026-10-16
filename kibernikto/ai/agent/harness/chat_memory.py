@@ -33,47 +33,16 @@ CHAT_MEMORY_GUIDANCE = (
 )
 
 
+from kibernikto.ai.agent.harness.conversation_memory import (
+    ConversationMemory,
+    conversation_namespace as chat_namespace,
+    ConversationHistorySource as ChatHistorySource,
+    ConversationSearchBound as ChatConversationSearch,
+)
+
+
 def chat_memory(name: str, *, store: MemoryStore | None = None,
                 history: HistoryStorage | None = None) -> list[AbstractCapability[KiberniktoDeps]]:
-    """Notebook (auto-injected ``MEMORY.md`` + write/read/search tools) and BM25 recall of the chat's full history."""
-    return [
-        Memory(store or get_memory_store(), agent_name=name, namespace=chat_namespace,
-               guidance=CHAT_MEMORY_GUIDANCE, heading=CHAT_MEMORY_HEADING),
-        # scope='all' is safe: the per-run source only ever enumerates the caller's own chat.
-        ChatConversationSearch(ChatHistorySource(history or get_history_storage(name)), scope="all"),
-    ]
-
-
-def chat_namespace(ctx: RunContext[KiberniktoDeps]) -> str:
-    """Memory tenant = the conversation (``ctx.conversation_id``); resolved by app code, never by the model."""
-    return ctx.conversation_id or NO_CHAT_NAMESPACE
-
-
-@dataclass(frozen=True)
-class ChatHistorySource:  # satisfies conversation_search.HistorySource (structural)
-    """One conversation's full persisted history as a single searchable run; empty without a conversation_id."""
-
-    storage: HistoryStorage
-    conversation_id: str | None = None
-
-    @property
-    def run_id(self) -> str:
-        return f"chat-{self.conversation_id}"
-
-    async def list_runs(self) -> list[RunRecord]:
-        if not self.conversation_id:
-            return []
-        return [RunRecord(run_id=self.run_id, conversation_id=self.conversation_id)]
-
-    async def run_history(self, *, run_id: str) -> list[ModelMessage]:
-        if not self.conversation_id or run_id != self.run_id:
-            return []
-        return await self.storage.get_full_conversation(self.conversation_id, limit=FULL_HISTORY_LIMIT)
-
-
-@dataclass
-class ChatConversationSearch(ConversationSearch[KiberniktoDeps]):
-    """``ConversationSearch`` bound per run to the caller's conversation; the source is the isolation boundary."""
-
-    async def for_run(self, ctx: RunContext[KiberniktoDeps]) -> ChatConversationSearch:
-        return replace(self, source=replace(self.source, conversation_id=ctx.conversation_id or None))
+    """Legacy helper: returns individual capabilities wrapped by ConversationMemory."""
+    mem = ConversationMemory(name, store=store, history=history)
+    return list(mem.capabilities)

@@ -5,23 +5,29 @@ import logging
 import random
 import re
 from collections import OrderedDict
+from collections.abc import Sequence
 from typing import Optional
 
 from aiogram.enums import ChatType
 from aiogram.types import Message, BufferedInputFile, ReplyParameters
 from kibernikto.telegram.peer_protocol import PeerEnvelope, PeerProtocolError, download_envelope, FILENAME
-from pydantic_ai import AgentRunResult, ModelHTTPError, RunContext
+from pydantic_ai import Agent, AgentRunResult, ModelHTTPError, ModelSettings, RunContext
+from pydantic_ai.messages import UserContent
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError, map_model_error
 from kibernikto.ai.agent.core.image import generate_image
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
-from kibernikto.ai.agent.core.persona import PersonaSource
-from kibernikto.storage.singletons import chat_data
+from kibernikto.ai.agent.core.persona import (
+    PERSONA_INSTRUCTION, PersonaFirst, PersonaSource, compile_persona, persona_source_text,
+)
+from kibernikto.ai.agent.harness.conversation_history import ConversationHistory
+from kibernikto.ai.agent.utils import build_kibernikto_model, with_attribution
+from kibernikto.storage.base import HistoryStorage
+from kibernikto.storage.singletons import chat_data, history_storage
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
 from kibernikto.telegram.utils.conversation import is_private_peer_request, reply
-from kibernikto.utils.time_utils import DEFAULT_TIMEZONE
+from kibernikto.utils.time_utils import DEFAULT_TIMEZONE, get_user_date
 
 from .agent_reaction import AgentReaction
 from .chat_context import get_chat_context
@@ -36,8 +42,17 @@ def user_facing_model_error(error: ModelHTTPError) -> str:
     return map_model_error(error).user_message
 
 
-class TelegramAgent(KiberniktoAgent):
-    """A :class:`KiberniktoAgent` that speaks Telegram.
+def default_model_settings() -> ModelSettings:
+    """Default model settings built from ``AGENT_KIBERNIKTO_SETTINGS``."""
+    return ModelSettings(
+        max_tokens=AGENT_KIBERNIKTO_SETTINGS.MODEL_MAX_TOKENS,
+        temperature=AGENT_KIBERNIKTO_SETTINGS.MODEL_TEMPERATURE,
+        parallel_tool_calls=AGENT_KIBERNIKTO_SETTINGS.MODEL_PARALLEL_TOOL_CALLS,
+    )
+
+
+class TelegramAgent(Agent[TelegramDeps]):
+    """An :class:`Agent` that speaks Telegram.
 
     Owns both ends of the conversation: :meth:`process_message` turns an
     aiogram ``Message`` into agent input and runs it with per-chat history,
@@ -46,28 +61,81 @@ class TelegramAgent(KiberniktoAgent):
     with :func:`set_telegram_agent` before the dispatcher starts.
     """
 
+    _materialize_attachments = staticmethod(ConversationHistory._materialize_attachments)
+
     def __init__(
             self,
             *,
+            history_storage: HistoryStorage | None = history_storage,
+            persona_source: PersonaSource | None = None,
+            persona: bool = True,
+            reaction: str | None = ...,
             pre_processor: Optional[TelegramMessagePreprocessor] = None,
             capture_peer_media: bool = False,
             **kwargs,
     ) -> None:
+        kwargs.setdefault("name", AGENT_KIBERNIKTO_SETTINGS.NAME)
         kwargs.setdefault("deps_type", TelegramDeps)
-        kwargs.setdefault("reaction", AGENT_KIBERNIKTO_SETTINGS.REACTION)
-        # Own reaction on the user's message; delegates get theirs via SubAgents(shared_capabilities=...).
-        kwargs["capabilities"] = [*(kwargs.get("capabilities") or ()), AgentReaction()]
+        reaction_val = AGENT_KIBERNIKTO_SETTINGS.REACTION if reaction is ... else reaction
+        if "model" not in kwargs:
+            kwargs["model"] = build_kibernikto_model(
+                AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME,
+                AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS,
+            )
+        if "model_settings" not in kwargs:
+            kwargs["model_settings"] = default_model_settings()
+
+        self._active_runs: dict[str, RunContext[TelegramDeps]] = {}
+        self._history_storage = history_storage
+        self._reaction = reaction_val
+
+        self._conv_history = ConversationHistory(
+            history_storage,
+            history_size=AGENT_KIBERNIKTO_SETTINGS.HISTORY_SIZE,
+            keep_thinking=AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY,
+            active_runs=self._active_runs,
+        )
+
+        caps = [*(kwargs.get("capabilities") or ()), self._conv_history]
+        if reaction_val is not None:
+            caps.append(AgentReaction())
+        if persona:
+            caps.append(PersonaFirst())
+        kwargs["capabilities"] = caps
+
+        if not callable(settings := kwargs.get("model_settings")):
+            kwargs["model_settings"] = with_attribution(settings, kwargs.get("name"))
+
         super().__init__(**kwargs)
+
         self._pre_processor = pre_processor or TelegramMessagePreprocessor()
         self.capture_peer_media = capture_peer_media
         self._peer_requests: OrderedDict[tuple[int, int, str], None] = OrderedDict()
-        # Instructions survive history window truncation — always sent each turn.
-        # Base KiberniktoAgent injects personality; here we add bot identity + per-run user/chat context.
+
+        if persona:
+            text = compile_persona(persona_source_text(self.name), persona_source or self.default_persona_source())
+            self.instructions(name=PERSONA_INSTRUCTION)(text)
+
+        self.instructions(self._current_date_prompt)
         self.instructions(self._bot_identity_prompt)
         self.instructions(self._user_context_prompt)
-        # Reusable image-generation tool: delivers its result via deps.attachments.
+
         if AGENT_KIBERNIKTO_SETTINGS.IMAGE_MODEL_NAME:
             self.tool(generate_image)
+
+    @property
+    def history_storage(self) -> HistoryStorage | None:
+        return self._history_storage
+
+    @property
+    def reaction(self) -> str | None:
+        return self._reaction
+
+    @staticmethod
+    def _current_date_prompt(ctx: RunContext[TelegramDeps]) -> str:
+        timezone = ctx.deps.timezone if isinstance(ctx.deps, TelegramDeps) else None
+        return f"Current date: {get_user_date(timezone or DEFAULT_TIMEZONE)}."
+
 
     @staticmethod
     def default_persona_source() -> PersonaSource:
@@ -176,9 +244,13 @@ class TelegramAgent(KiberniktoAgent):
             user_message = annotate_group_message(list(user_message), author, deps.timezone or DEFAULT_TIMEZONE)
             deps.user_message_parts = list(user_message)
 
+        cid = None if envelope is not None else str(message.chat.id)
+        if cid is not None and self._conv_history.steer_active_run(cid, user_message, deps):
+            return None
+
         try:
             result = await self.run(
-                user_message, conversation_id=None if envelope is not None else str(message.chat.id), deps=deps
+                user_message, conversation_id=cid, deps=deps
             )
             if result is not None and deps.message is not None and deps.message is not message:
                 result._reply_message = deps.message
@@ -216,6 +288,22 @@ class TelegramAgent(KiberniktoAgent):
             return
         if result is not None:
             await reply(target, result)
+
+    async def run(
+            self,
+            user_prompt: str | Sequence[UserContent] | None = None,
+            *,
+            conversation_id: str | int | None = None,
+            **kwargs,
+    ) -> AgentRunResult | None:
+        """Run the agent on ``user_prompt`` with ``conversation_id``."""
+        cid = str(conversation_id) if conversation_id is not None and conversation_id != "" else None
+        if cid is not None and user_prompt is not None and self._conv_history.steer_active_run(cid, user_prompt, kwargs.get("deps")):
+            return None
+        res = await super().run(user_prompt, conversation_id=cid if cid is not None else "", **kwargs)
+        if res is not None:
+            self._materialize_attachments(res, kwargs.get("deps"))
+        return res
 
     def to_telegram(self):  # noqa: ANN201 — returns TelegramApp
         """Build a runnable Telegram bot wired to this agent (``to_web`` analog).

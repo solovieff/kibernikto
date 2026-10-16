@@ -102,10 +102,10 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
         await storage.add_messages('4', _image_turn(dead))
         agent = KiberniktoAgent(model=FunctionModel(model), history_storage=storage)
 
-        # Offline: the instance probes are replaced, so aiohttp is never reached.
-        agent.image_head = AsyncMock(return_value=False)
-        agent.image_fetch = AsyncMock(return_value=b'')
-        with patch('kibernikto.ai.agent.core.kibernikto_agent.check_history_images', wraps=check_history_images) as wrapped:
+        # Offline: the probes in conversation_history are replaced, so aiohttp is never reached.
+        with patch('kibernikto.ai.agent.harness.conversation_history.head_alive', AsyncMock(return_value=False)), \
+             patch('kibernikto.ai.agent.harness.conversation_history.fetch_bytes', AsyncMock(return_value=b'')), \
+             patch('kibernikto.ai.agent.harness.conversation_history.check_history_images', wraps=check_history_images) as wrapped:
             await agent.run('next', conversation_id='4')
 
         sent = seen[0]
@@ -137,10 +137,9 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
         await storage.add_messages('4', _image_turn(dead))
 
         agent = KiberniktoAgent(model=FunctionModel(model), history_storage=storage)
-        agent.image_head = AsyncMock(return_value=False)
-        agent.image_fetch = AsyncMock(return_value=b'')
-
-        await agent.run('next', conversation_id='4')
+        with patch('kibernikto.ai.agent.harness.conversation_history.head_alive', AsyncMock(return_value=False)), \
+             patch('kibernikto.ai.agent.harness.conversation_history.fetch_bytes', AsyncMock(return_value=b'')):
+            await agent.run('next', conversation_id='4')
 
         full = await storage.get_full_conversation('4')
         self.assertEqual(full[0].parts[0].content, 'ancient fact before window')

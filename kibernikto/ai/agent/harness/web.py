@@ -13,9 +13,11 @@ from pydantic_ai_harness.subagents import SubAgent
 from pydantic_ai_harness.tool_output_limits import LocalFileStore
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from pydantic_ai import Agent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.storage.config import STORAGE_SETTINGS
+from kibernikto.utils.time_utils import DEFAULT_TIMEZONE, get_user_date
 
 WEB_EXPERT_NAME = "web-agent"
 WEB_EXPERT_DESCRIPTION = (
@@ -41,17 +43,21 @@ def web_layout() -> tuple[list[AbstractCapability], list[SubAgent]]:
     return [_web_tools()], []
 
 
-def _web_expert(model_name: str) -> KiberniktoAgent:
+def _web_expert(model_name: str) -> Agent:
     """Search-native model (e.g. perplexity/sonar) does the searching: no tools, no persona."""
-    return KiberniktoAgent(
+    agent = Agent(
         model=infer_kibernikto_model(model_name),
         name=WEB_EXPERT_NAME,
         description=WEB_EXPERT_DESCRIPTION,
         instructions=WEB_EXPERT_INSTRUCTIONS,
-        history_storage=None,
-        persona=False,
-        reaction="👨‍💻",
     )
+    def current_date_prompt(ctx) -> str:
+        timezone = ctx.deps.timezone if isinstance(ctx.deps, KiberniktoDeps) else None
+        return f"Current date: {get_user_date(timezone or DEFAULT_TIMEZONE)}."
+
+    agent.instructions(current_date_prompt)
+    agent.reaction = "👨‍💻"
+    return agent
 
 
 def _web_tools() -> AbstractCapability:

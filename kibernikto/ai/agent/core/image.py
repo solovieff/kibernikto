@@ -29,7 +29,6 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 
 logger = logging.getLogger(__name__)
@@ -63,8 +62,12 @@ def _get_image_agent() -> Agent:
             "Set AGENT_KIBERNIKTO_IMAGE_MODEL_NAME to enable image generation."
         )
 
-    _image_agent = KiberniktoAgent(model=model, name=IMAGE_ENGINE_NAME, system_prompt=_IMAGE_SYSTEM_PROMPT,
-                                   persona=False, history_storage=None)
+    _image_agent = Agent(
+        model=model,
+        name=IMAGE_ENGINE_NAME,
+        system_prompt=_IMAGE_SYSTEM_PROMPT,
+        deps_type=KiberniktoDeps,
+    )
     return _image_agent
 
 

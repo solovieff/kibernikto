@@ -32,6 +32,7 @@ from kibernikto.storage.models import ConversationInfo
 from kibernikto.utils.time_utils import get_user_date
 
 POOR, MEDIUM, RICH = 'test:poor', 'test:medium', 'test:rich'
+POOR_PREFIXED = 'openrouter:test/poor'
 
 
 class CountingChatData:
@@ -65,10 +66,10 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         settings = patch.multiple(AGENT_KIBERNIKTO_SETTINGS, POOR_CREDITS=30, RICH_CREDITS=500,
-                                  POOR_MODEL=POOR, MEDIUM_MODEL=MEDIUM, RICH_MODEL=RICH, ALLOW_ZERO_CREDITS=True)
+                                  POOR_MODEL=POOR_PREFIXED, MEDIUM_MODEL=MEDIUM, RICH_MODEL=RICH, ALLOW_ZERO_CREDITS=True)
         settings.start()
         self.addCleanup(settings.stop)
-        self.tier = CreditTier(models={name: named_model(name, tool_step=True) for name in (POOR, MEDIUM, RICH)})
+        self.tier = CreditTier(models={name: named_model(name, tool_step=True) for name in (POOR, POOR_PREFIXED, MEDIUM, RICH)})
         self.history = MemoryHistoryStorage()
         self.agent = TelegramAgent(model=named_model('fallback'), name='credit-test',
                                    history_storage=self.history, capabilities=[self.tier])
@@ -82,7 +83,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         self.chat_data.loads = 0
 
     async def test_tier_selects_model_and_charges_once(self) -> None:
-        for credits, expected in ((5, POOR), (100, MEDIUM), (900, RICH)):
+        for credits, expected in ((5, POOR_PREFIXED), (100, MEDIUM), (900, RICH)):
             with self.subTest(credits=credits):
                 await self.set_credits('7', credits)
                 result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
@@ -100,7 +101,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         for credits in (0, -5):
             await self.set_credits('7', credits)
             result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
-            self.assertEqual(result.output, POOR)
+            self.assertEqual(result.output, POOR_PREFIXED)
             self.assertEqual(self.chat_data.rows['7'].credits, 0)
 
     async def test_strict_policy_blocks_exhausted_balance_even_with_model_override(self) -> None:
@@ -120,7 +121,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
             await self.set_credits('7', 1)
             result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
-            self.assertEqual(result.output, POOR)
+            self.assertEqual(result.output, POOR_PREFIXED)
             self.assertEqual(self.chat_data.rows['7'].credits, 0)
             with self.assertRaises(InsufficientCreditsError):
                 await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())

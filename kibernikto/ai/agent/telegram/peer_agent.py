@@ -11,12 +11,11 @@ from typing import Literal
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNetworkError, TelegramRetryAfter
-from pydantic_ai import AgentRunResult, ToolFailed, UserError
+from pydantic_ai import Agent, AgentRunResult, ToolFailed, UserError
 from pydantic_ai.messages import BinaryContent, ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model, ModelRequestParameters
 from pydantic_ai.settings import ModelSettings
 
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.telegram.peer_protocol import PeerEnvelope, PeerProtocolError
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
@@ -96,7 +95,7 @@ class _TelegramModel(Model):
         return ModelResponse(parts=[TextPart(answer)], model_name=self.model_name, provider_name=self.system)
 
 
-class TelegramPeerAgent(KiberniktoAgent):
+class TelegramPeerAgent(Agent[TelegramDeps]):
     """Remote peer accepted by ``SubAgent(peer)`` without a local LLM.
 
     Text is the default. ``multimodal=True`` uses atomic v1 byte envelopes with
@@ -126,13 +125,17 @@ class TelegramPeerAgent(KiberniktoAgent):
             raise ValueError('peer must be a positive private chat ID or @username')
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError('timeout must be finite and positive')
-        super().__init__(model=_TelegramModel(), name=name, description=description, history_storage=None,
-                         reaction=reaction)
+        super().__init__(model=_TelegramModel(), name=name, description=description, deps_type=TelegramDeps)
         self.peer = peer
         self.timeout = timeout
         self._peer_bot = bot
         self._peer_hub = hub
         self.multimodal = multimodal
+        self._reaction = reaction
+
+    @property
+    def reaction(self) -> str | None:
+        return self._reaction
 
     async def run(self, user_prompt: str | None = None, *, deps: TelegramDeps | None = None,
                   **kwargs: object) -> AgentRunResult[str]:

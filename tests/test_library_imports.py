@@ -45,7 +45,17 @@ class LibraryImportsTests(unittest.TestCase):
             from kibernikto.ai.agent import KiberniktoAgent, KiberniktoDeps
             from kibernikto.ai.agent.core import KiberniktoAgent as CoreAgent, KiberniktoDeps as CoreDeps
             from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent as DirectAgent
-            from kibernikto.ai.agent.harness import CreditTier, KiberniktoSubAgents, chat_memory, web_layout
+            from kibernikto.ai.agent.harness import (
+                ConversationMemory,
+                CreditTier,
+                KiberniktoSubAgents,
+                chat_memory,
+                web_layout,
+            )
+
+            assert ConversationMemory is not None
+            assert CreditTier is not None
+            assert chat_memory is not None
 
             assert KiberniktoAgent is CoreAgent is DirectAgent
             assert KiberniktoDeps is CoreDeps
@@ -115,7 +125,7 @@ class LibraryImportsTests(unittest.TestCase):
         previous = tg_mod._telegram_agent
         try:
             tg_mod._telegram_agent = None
-            with patch.object(ka_mod, "build_kibernikto_model", return_value=sentinel_model) as build_m:
+            with patch.object(tg_mod, "build_kibernikto_model", return_value=sentinel_model) as build_m:
                 default_agent = tg_mod.get_telegram_agent()
                 second_call = tg_mod.get_telegram_agent()
             build_m.assert_called_once_with(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME, AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS)

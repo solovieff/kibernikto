@@ -78,7 +78,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         await agent.run('hello', conversation_id='5', deps=TelegramDeps())
         instructions = self.model.requests[-1].instructions or ''
         self.assertTrue(instructions.startswith('PERSONA-MARK'), instructions[:120])
-        self.assertIn('## Chat memory', instructions)
+        self.assertIn('## Conversation memory', instructions)
 
     async def test_orchestrator_instructions_start_with_persona(self) -> None:
         # Plain and templated personas: a template is a callable, which pydantic_ai sorts after static text.
@@ -91,7 +91,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
                 instructions = self.model.requests[-1].instructions or ''
                 self.assertTrue(instructions.startswith(rendered), instructions[:120])
                 self.assertEqual(instructions.count('PERSONA-MARK'), 1)
-                for guidance in ('## Chat memory', 'search_conversation_history', 'delegate_task'):
+                for guidance in ('## Conversation memory', 'search_conversation_history', 'delegate_task'):
                     self.assertIn(guidance, instructions)
 
     async def test_injected_memory_is_not_persisted_into_history(self) -> None:
@@ -121,6 +121,16 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(dict(self.store.files), {'5/mem-core/MEMORY.md': '- likes cats\n'})
         await agent.run('tool:search_conversation_history:cats', conversation_id='5', deps=KiberniktoDeps())
         self.assertIn('likes cats', self.model.tool_returns()[0])
+
+    async def test_conversation_memory_class_capability(self) -> None:
+        from kibernikto.ai.agent.harness.conversation_memory import ConversationMemory
+        mem = ConversationMemory('mem-cls', store=self.store, history=self.history)
+        agent = TelegramAgent(model=FunctionModel(self.model), name='mem-cls', history_storage=self.history,
+                              capabilities=[mem])
+        await agent.run('tool:write_memory:- likes dogs', conversation_id='10', deps=TelegramDeps())
+        self.assertEqual(dict(self.store.files), {'10/mem-cls/MEMORY.md': '- likes dogs\n'})
+        await agent.run('hello', conversation_id='10', deps=TelegramDeps())
+        self.assertIn('likes dogs', repr(self.model.requests[-1]))
 
     async def test_orchestrator_parent_carries_memory_and_search(self) -> None:
         capabilities = build_multi_agent().root_capability.capabilities

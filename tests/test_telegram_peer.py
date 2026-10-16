@@ -67,9 +67,9 @@ class PeerTests(unittest.IsolatedAsyncioTestCase):
     async def test_peer_is_a_real_subagent_and_returns_real_history(self):
         from pydantic_ai import Agent
         from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
+        from pydantic_ai import Agent
         from pydantic_ai.models.function import FunctionModel
         from pydantic_ai_harness.subagents import SubAgent, SubAgents
-        from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
         from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
         from kibernikto.telegram.peer_hub import PeerHub
         from kibernikto.telegram.middleware.middleware_peer import PeerMiddleware
@@ -87,7 +87,7 @@ class PeerTests(unittest.IsolatedAsyncioTestCase):
 
         bot.send_message = AsyncMock(side_effect=send)
         peer = TelegramPeerAgent(peer=200, name='remote', description='Remote expert', bot=bot, hub=hub)
-        self.assertIsInstance(peer, KiberniktoAgent)
+        self.assertIsInstance(peer, Agent)
 
         def parent_model(messages, info):
             if any(isinstance(p, ToolReturnPart) for m in messages for p in m.parts):

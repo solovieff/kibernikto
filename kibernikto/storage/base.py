@@ -46,8 +46,25 @@ def _sanitize(messages: List[ModelMessage], *, keep_thinking: bool = False) -> L
     """
     cleaned: List[ModelMessage] = []
     for msg in messages:
-        if isinstance(msg, ModelRequest) and msg.instructions is not None:
-            msg = dataclasses.replace(msg, instructions=None)
+        if isinstance(msg, ModelRequest):
+            parts = []
+            for part in msg.parts:
+                # Strip injected memory notebook snapshot from stored history
+                content = getattr(part, "content", None)
+                if isinstance(content, list):
+                    filtered_subparts = [
+                        sub for sub in content
+                        if not (hasattr(sub, "metadata") and isinstance(sub.metadata, str) and "pydantic-ai-harness.memory" in sub.metadata)
+                    ]
+                    if len(filtered_subparts) != len(content):
+                        if not filtered_subparts:
+                            continue
+                        part = dataclasses.replace(part, content=filtered_subparts)
+                elif hasattr(part, "metadata") and isinstance(part.metadata, str) and "pydantic-ai-harness.memory" in part.metadata:
+                    continue
+                parts.append(part)
+            if msg.instructions is not None or len(parts) != len(msg.parts):
+                msg = dataclasses.replace(msg, instructions=None, parts=parts)
         if isinstance(msg, ModelResponse):
             parts = []
             for part in msg.parts:
