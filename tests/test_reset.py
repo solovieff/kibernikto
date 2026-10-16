@@ -118,7 +118,7 @@ class ResetHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_confirm_wipes_the_prompt_chat(self) -> None:
         edit, _ = await self.press(CONFIRM, 'private', USER)
-        self.assertEqual(self.wipe.await_args.args, (200,))
+        self.assertEqual(self.wipe.await_args.args, ('200',))
         edit.assert_awaited_once_with('✅ History and notes erased.')
 
     async def test_cancel_wipes_nothing(self) -> None:

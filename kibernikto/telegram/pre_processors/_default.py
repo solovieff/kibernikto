@@ -92,7 +92,7 @@ class TelegramMessagePreprocessor:
             try:
                 photo_bytes = photo_file.getvalue() if hasattr(photo_file, "getvalue") else photo_file
                 ext = os.path.splitext(file.file_path)[1] or ".jpg"
-                media_ref = await media_store.save(message.chat.id, photo_bytes, ext=ext,
+                media_ref = await media_store.save(str(message.chat.id), photo_bytes, ext=ext,
                                                    name=f"{photo.file_unique_id}{ext}")
             except Exception as exc:
                 logging.error("Error saving photo to media store: %s", exc)

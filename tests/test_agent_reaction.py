@@ -66,7 +66,7 @@ def lookup() -> str:
 
 
 async def run(agent: TelegramAgent, message: Message | None = None, **deps: bool) -> str:
-    result = await agent.run('hi', deps=TelegramDeps(chat_id=42, message=message, **deps))
+    result = await agent.run('hi', deps=TelegramDeps(message=message, **deps))
     return result.output
 
 

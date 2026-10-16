@@ -104,7 +104,6 @@ class TelegramAgent(KiberniktoAgent):
         """
         deps = TelegramDeps(
             is_personal=message.chat.type == ChatType.PRIVATE,
-            chat_id=message.chat.id,
             app_chat_info=message.chat.description,
             app_chat_name=message.chat.title,
             user_id=message.from_user.id if message.from_user else None,
@@ -112,17 +111,18 @@ class TelegramAgent(KiberniktoAgent):
             user_full_name=message.from_user.full_name if message.from_user else None,
             message=message,
         )
-        deps.chat_info = await chat_data.load(message.chat.id)
+        deps.chat_info = await chat_data.load(str(message.chat.id))
         # Credits stay out of the prompt for now; prepend them here when the model needs its balance.
         deps.conversation_context = f"[Current conversation context] {await get_chat_context(message)}"
         deps.timezone = DEFAULT_TIMEZONE
         return deps
 
     async def process_message(self, message: Message) -> AgentRunResult | PeerEnvelope | str | None:
-        """Run the agent on ``message`` with per-chat history.
+        """Run the agent on ``message`` with per-conversation history.
 
         Returns the :class:`AgentRunResult` on success, a ``str`` when credits
-        are exhausted, or ``None`` when the message carried nothing to answer.
+        are exhausted, or ``None`` when the message carried nothing to answer
+        (or was steered into an already active run for this conversation).
         Tools queue binaries on ``deps.attachments``; ``KiberniktoAgent.run``
         folds them into the response so :meth:`reply_to` delivers them as media.
         """
@@ -179,9 +179,11 @@ class TelegramAgent(KiberniktoAgent):
 
         try:
             result = await self.run(
-                user_message, chat_id=None if envelope is not None else message.chat.id, deps=deps
+                user_message, conversation_id=None if envelope is not None else str(message.chat.id), deps=deps
             )
-            if envelope is not None:
+            if result is not None and deps.message is not None and deps.message is not message:
+                result._reply_message = deps.message
+            if envelope is not None and result is not None:
                 result._peer_request_id = envelope.request_id
             return result
         except Exception as error:
@@ -199,8 +201,9 @@ class TelegramAgent(KiberniktoAgent):
         Delivers the model text together with any binaries tools produced,
         which ``KiberniktoAgent.run`` already folded into the response.
         """
+        target = getattr(result, '_reply_message', None) or message
         request_id = result.request_id if isinstance(result, PeerEnvelope) else getattr(result, '_peer_request_id', None)
-        if request_id is not None and is_private_peer_request(message):
+        if request_id is not None and is_private_peer_request(target):
             envelope = result if isinstance(result, PeerEnvelope) else PeerEnvelope.create(
                 'result', result.output, list(result.response.files), request_id=request_id)
             try:
@@ -208,12 +211,12 @@ class TelegramAgent(KiberniktoAgent):
             except PeerProtocolError:
                 envelope = PeerEnvelope.create('error', 'Remote output exceeded transport limits', [], request_id=request_id)
                 wire = envelope.encode()
-            await message.bot.send_document(chat_id=message.chat.id,
+            await target.bot.send_document(chat_id=target.chat.id,
                 document=BufferedInputFile(wire, filename=FILENAME), caption=envelope.caption,
-                parse_mode=None, reply_parameters=ReplyParameters(message_id=message.message_id))
+                parse_mode=None, reply_parameters=ReplyParameters(message_id=target.message_id))
             return
         if result is not None:
-            await reply(message, result)
+            await reply(target, result)
 
     def to_telegram(self):  # noqa: ANN201 — returns TelegramApp
         """Build a runnable Telegram bot wired to this agent (``to_web`` analog).

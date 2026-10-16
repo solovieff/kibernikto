@@ -28,13 +28,14 @@ class MediaFileStore:  # satisfies MediaStore (structural)
 
     # ── durable media ──────────────────────────────────────────────────────
 
-    async def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str:
-        """Persist bytes under ``media/{chat_id}/``; returns a media ref ``"{chat_id}/{file}"``."""
-        chat_dir = self._media_dir / str(chat_id)
+    async def save(self, conversation_id: str, data: bytes, ext: str = "bin", name: str | None = None) -> str:
+        """Persist bytes under ``media/{conversation_id}/``; returns a media ref ``"{conversation_id}/{file}"``."""
+        cid = str(conversation_id)
+        chat_dir = self._media_dir / cid
         chat_dir.mkdir(parents=True, exist_ok=True)
         file_name = name or f"{uuid.uuid4().hex[:12]}.{ext.lstrip('.')}"
         await asyncio.to_thread((chat_dir / file_name).write_bytes, data)
-        return f"{chat_id}/{file_name}"
+        return f"{cid}/{file_name}"
 
     def path(self, media_ref: str) -> Path:
         """Resolve a media ref to a local path."""

@@ -10,26 +10,28 @@ logger = logging.getLogger(__name__)
 
 
 class SqlChatDataStorage:  # satisfies ChatDataStore (structural)
-    """Per-chat data via SQLAlchemy — same interface as file-based ChatDataStorage."""
+    """Per-conversation data via SQLAlchemy — same interface as file-based ChatDataStorage."""
 
-    async def load(self, chat_id: int) -> ConversationInfo:
+    async def load(self, conversation_id: str) -> ConversationInfo:
+        cid = str(conversation_id)
         async with await get_session() as session:
-            row = await session.get(ChatDataRow, chat_id)
+            row = await session.get(ChatDataRow, cid)
             if row is not None and row.data:
                 try:
                     return ConversationInfo.model_validate(row.data)
                 except Exception as exc:
-                    logger.warning("Failed to parse chat data for %s: %s", chat_id, exc)
+                    logger.warning("Failed to parse chat data for %s: %s", cid, exc)
         info = ConversationInfo()
-        await self.save(chat_id, info)
+        await self.save(cid, info)
         return info
 
-    async def save(self, chat_id: int, info: ConversationInfo) -> None:
+    async def save(self, conversation_id: str, info: ConversationInfo) -> None:
+        cid = str(conversation_id)
         data = info.model_dump(mode="json")
         async with await get_session() as session:
-            row = await session.get(ChatDataRow, chat_id)
+            row = await session.get(ChatDataRow, cid)
             if row is None:
-                row = ChatDataRow(chat_id=chat_id, data=data)
+                row = ChatDataRow(conversation_id=cid, data=data)
                 session.add(row)
             else:
                 row.data = data

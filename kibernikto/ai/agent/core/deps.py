@@ -6,8 +6,8 @@ is the side-channel that lets a tool deliver binary results (images, files,
 audio, ...) to the user even though a tool's *return value* only ever flows
 back to the model, never to the end user.
 
-The base :class:`KiberniktoDeps` is transport agnostic: it carries the conversation
-identity every harness capability keys on (history, memory, credits, scheduling).
+The base :class:`KiberniktoDeps` is transport agnostic: conversation identity
+lives on ``RunContext.conversation_id`` (from ``agent.run(..., conversation_id=...)``).
 Transport layers subclass it to attach their own context — see
 :class:`kibernikto.ai.agent.telegram.deps.TelegramDeps`.
 """
@@ -30,9 +30,6 @@ class KiberniktoDeps:
     sends ``result.output`` (text) together with these attachments after the
     run finishes.
     """
-
-    chat_id: int | None = None
-    """Conversation key: history, memory namespace, credits. ``None`` = anonymous run, nothing per-chat."""
 
     billable: bool = True
     """``False`` skips credit tiering and charging (e.g. a peer envelope served for another bot)."""

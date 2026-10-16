@@ -9,7 +9,7 @@ from kibernikto.ai.agent.core.deps import KiberniktoDeps
 
 @dataclass
 class TelegramDeps(KiberniktoDeps):
-    """Telegram-only context on top of the transport-agnostic base (``chat_id`` = Telegram chat id)."""
+    """Telegram-only context on top of the transport-agnostic base."""
 
     is_personal: bool = True
     user_id: int | None = None

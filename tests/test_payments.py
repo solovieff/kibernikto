@@ -40,14 +40,14 @@ class MemoryChatData:
     """In-memory ChatDataStore: round-trips through JSON like the real backends."""
 
     def __init__(self) -> None:
-        self.rows: dict[int, str] = {}
+        self.rows: dict[str, str] = {}
 
-    async def load(self, chat_id: int) -> ConversationInfo:
-        row = self.rows.get(chat_id)
+    async def load(self, conversation_id: str) -> ConversationInfo:
+        row = self.rows.get(str(conversation_id))
         return ConversationInfo.model_validate_json(row) if row else ConversationInfo()
 
-    async def save(self, chat_id: int, info: ConversationInfo) -> None:
-        self.rows[chat_id] = info.model_dump_json()
+    async def save(self, conversation_id: str, info: ConversationInfo) -> None:
+        self.rows[str(conversation_id)] = info.model_dump_json()
 
 
 def paid_message(bot: Bot, *, amount: int = 52, payload: str = TOPUP_PAYLOAD, charge: str = 'charge',

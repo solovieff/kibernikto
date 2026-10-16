@@ -1,9 +1,11 @@
 import dataclasses
 import logging
 import uuid
+from collections.abc import Sequence
 
-from pydantic_ai import Agent, ModelSettings, AgentRunResult, RunContext
-from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart
+from pydantic_ai import Agent, ModelSettings, AgentRunResult, RunContext, UserError
+from pydantic_ai.capabilities import AbstractCapability, WrapRunHandler
+from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart, UserContent
 from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
@@ -30,6 +32,28 @@ model_settings: ModelSettings = ModelSettings(max_tokens=AGENT_KIBERNIKTO_SETTIN
                                               parallel_tool_calls=AGENT_KIBERNIKTO_SETTINGS.MODEL_PARALLEL_TOOL_CALLS)
 
 
+@dataclasses.dataclass
+class _ActiveConversationTracker(AbstractCapability[KiberniktoDeps]):
+    """Register the live ``RunContext`` per ``conversation_id`` so concurrent calls steer into it."""
+
+    active_runs: dict[str, RunContext[KiberniktoDeps]] = dataclasses.field(default_factory=dict)
+
+    @classmethod
+    def get_serialization_name(cls) -> str | None:
+        return None
+
+    async def wrap_run(self, ctx: RunContext[KiberniktoDeps], *, handler: WrapRunHandler) -> AgentRunResult:
+        cid = ctx.conversation_id or None
+        if cid is not None and self.active_runs.get(cid) is None:
+            self.active_runs[cid] = ctx
+            try:
+                return await handler()
+            finally:
+                if self.active_runs.get(cid) is ctx:
+                    self.active_runs.pop(cid, None)
+        return await handler()
+
+
 class KiberniktoAgent(Agent):
     # Network probes for history image links; overridable per instance (tests stay offline).
     image_head = staticmethod(head_alive)
@@ -48,8 +72,11 @@ class KiberniktoAgent(Agent):
 
         ``reaction`` is the emoji a transport shows on the user's message when this agent starts a run.
         """
+        self._active_runs: dict[str, RunContext[KiberniktoDeps]] = {}
+        caps = [*(kwargs.get("capabilities") or ()), _ActiveConversationTracker(self._active_runs)]
         if persona:
-            kwargs["capabilities"] = [*(kwargs.get("capabilities") or ()), PersonaFirst()]
+            caps.append(PersonaFirst())
+        kwargs["capabilities"] = caps
         if not callable(settings := kwargs.get("model_settings")):  # Callables are dynamic: left to their owner.
             kwargs["model_settings"] = with_attribution(settings, kwargs.get("name"))
         super().__init__(**kwargs)
@@ -63,7 +90,7 @@ class KiberniktoAgent(Agent):
 
     @property
     def history_storage(self) -> HistoryStorage | None:
-        """Per-chat history backend this agent reads and writes; ``None`` when history is off."""
+        """Per-conversation history backend this agent reads and writes; ``None`` when history is off."""
         return self._history_storage
 
     @property
@@ -76,30 +103,73 @@ class KiberniktoAgent(Agent):
         """Values for ``{{name}}``/``{{traits}}`` when none is injected; transports override."""
         return StaticPersona()
 
-    async def run(self, *args, chat_id: int | None = None, **kwargs) -> AgentRunResult:
-        """``chat_id`` opts this run into stored history; it is deliberately not read from ``deps.chat_id``.
+    async def run(
+            self,
+            user_prompt: str | Sequence[UserContent] | None = None,
+            *,
+            conversation_id: str | int | None = None,
+            **kwargs,
+    ) -> AgentRunResult | None:
+        """Run the agent; ``conversation_id`` opts into stored history, capability scoping and mid-run steering.
 
-        Identity (deps) and persistence (this argument) differ on purpose: delegated experts share the
-        parent's deps but must not write the chat's history, and peer envelopes run history-free.
+        When a run for ``conversation_id`` is already in flight on this agent, ``user_prompt`` is enqueued
+        into that active run (``priority='asap'``) and ``None`` is returned so the active run answers once
+        with the combined context. Anonymous runs (``conversation_id=None``) pass ``conversation_id=''`` to
+        pydantic-ai so capabilities see an empty id and skip per-conversation storage/billing.
         """
-        if self._history_storage is not None and chat_id is not None and 'message_history' not in kwargs:
-            kwargs['message_history'] = await self._history_storage.get_conversation(chat_id)
-            await self._repair_history_images(kwargs, chat_id)
+        cid = str(conversation_id) if conversation_id is not None and conversation_id != "" else None
+        if cid is not None and (active_ctx := self._active_runs.get(cid)) is not None and user_prompt is not None:
+            if self._steer_active_run(active_ctx, user_prompt, kwargs.get("deps")):
+                return None
 
-        run_result: AgentRunResult = await super().run(*args, **kwargs)
+        if self._history_storage is not None and cid is not None and "message_history" not in kwargs:
+            kwargs["message_history"] = await self._history_storage.get_conversation(cid)
+            await self._repair_history_images(kwargs, cid)
 
-        self._materialize_attachments(run_result, kwargs.get('deps'))
+        run_result: AgentRunResult = await super().run(
+            user_prompt,
+            conversation_id=cid if cid is not None else "",
+            **kwargs,
+        )
+
+        self._materialize_attachments(run_result, kwargs.get("deps"))
 
         messages = run_result.new_messages()
-        if chat_id is not None:
-            published = await self._persist_generated_images(run_result, chat_id)
+        if cid is not None:
+            published = await self._persist_generated_images(run_result, cid)
             if published:
                 messages = self._annotate_generation(messages, published)
 
-        if self._history_storage is not None and chat_id is not None:
-            await self._history_storage.add_messages(chat_id=chat_id, messages=messages)
+        if self._history_storage is not None and cid is not None:
+            await self._history_storage.add_messages(conversation_id=cid, messages=messages)
 
         return run_result
+
+    @staticmethod
+    def _steer_active_run(
+            active_ctx: RunContext[KiberniktoDeps],
+            user_prompt: str | Sequence[UserContent],
+            new_deps: object,
+    ) -> bool:
+        """Inject ``user_prompt`` into ``active_ctx``; return False if the run already finished."""
+        items: Sequence[UserContent] = [user_prompt] if isinstance(user_prompt, str) else list(user_prompt)
+        try:
+            enqueued = active_ctx.enqueue(*items, priority="asap")
+        except UserError:
+            return False
+        if enqueued is None:
+            return False
+        if isinstance(active_deps := active_ctx.deps, KiberniktoDeps):
+            if isinstance(new_deps, KiberniktoDeps) and new_deps.user_message_parts:
+                active_deps.user_message_parts.extend(new_deps.user_message_parts)
+            else:
+                active_deps.user_message_parts.extend(items)
+            if hasattr(active_deps, "message") and (new_msg := getattr(new_deps, "message", None)) is not None:
+                prev_msg = getattr(active_deps, "message", None)
+                if prev_msg is not None and prev_msg is not new_msg:
+                    active_deps.extra.setdefault("steered_messages", []).append(prev_msg)
+                setattr(active_deps, "message", new_msg)
+        return True
 
     @staticmethod
     def _current_date_prompt(ctx: RunContext[KiberniktoDeps]) -> str:
@@ -107,16 +177,16 @@ class KiberniktoAgent(Agent):
         timezone = ctx.deps.timezone if isinstance(ctx.deps, KiberniktoDeps) else None
         return f"Current date: {get_user_date(timezone or DEFAULT_TIMEZONE)}."
 
-    async def _repair_history_images(self, kwargs: dict, chat_id: int) -> None:
+    async def _repair_history_images(self, kwargs: dict, conversation_id: str) -> None:
         """Replace dead history image links with text and persist the fixed history once."""
         fixed, changed = await check_history_images(
-            kwargs['message_history'], chat_id=chat_id, exists=_store_exists, save=_store_save,
+            kwargs["message_history"], conversation_id=conversation_id, exists=_store_exists, save=_store_save,
             head=self.image_head, fetch=self.image_fetch,
         )
         if not changed:
             return
-        kwargs['message_history'] = fixed
-        await self._history_storage.replace_messages(chat_id, fixed)
+        kwargs["message_history"] = fixed
+        await self._history_storage.replace_messages(conversation_id, fixed)
 
     @staticmethod
     def _annotate_generation(messages: list[ModelMessage], urls: list[str]) -> list[ModelMessage]:
@@ -139,27 +209,27 @@ class KiberniktoAgent(Agent):
         return result
 
     @staticmethod
-    async def _persist_generated_images(run_result: AgentRunResult, chat_id: int) -> list[str]:
+    async def _persist_generated_images(run_result: AgentRunResult, conversation_id: str) -> list[str]:
         """Keep generated binaries out of history: durable copy + public URL.
 
         The ``FilePart`` stays in ``run_result.response`` for delivery; here we
         archive the bytes locally and publish a public URL so the model can
-        re-see the image on later turns (see :meth:`_generation_marker`).
+        re-see the image on later turns (see :meth:`_annotate_generation`).
         Returns the published URLs.
         """
         urls: list[str] = []
         for image in run_result.response.images:
             ext = (image.media_type or "image/png").split("/")[-1].split(";")[0] or "png"
             try:
-                await media_store.save(chat_id, image.data, ext)
+                await media_store.save(conversation_id, image.data, ext)
             except Exception as exc:
-                logger.warning("Failed to save generated image for chat %s: %s", chat_id, exc)
+                logger.warning("Failed to save generated image for conversation %s: %s", conversation_id, exc)
             try:
                 url = await image_hosting.publish(image.data, f"kibernikto-{uuid.uuid4().hex[:8]}.{ext}")
                 if url:
                     urls.append(url)
             except Exception as exc:
-                logger.warning("Failed to publish generated image for chat %s: %s", chat_id, exc)
+                logger.warning("Failed to publish generated image for conversation %s: %s", conversation_id, exc)
         return urls
 
     @staticmethod
@@ -208,7 +278,7 @@ async def _store_exists(store_name: str, media_ref: str) -> bool:
 
 async def _store_save(store_name: str, media_ref: str, data: bytes) -> None:
     """Save downloaded bytes under the exact ref recorded in history."""
-    chat_id, name = media_ref.split('/', 1)
-    ext = name.rsplit('.', 1)[-1] if '.' in name else 'bin'
-    await get_media_store(store_name).save(int(chat_id), data, ext=ext, name=name)
+    conversation_id, name = media_ref.split("/", 1)
+    ext = name.rsplit(".", 1)[-1] if "." in name else "bin"
+    await get_media_store(store_name).save(conversation_id, data, ext=ext, name=name)
 

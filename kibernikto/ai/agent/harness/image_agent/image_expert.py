@@ -51,6 +51,7 @@ image_agent = KiberniktoAgent(
     description="Describes, generates and edits images.",
     system_prompt=IMAGE_SYSTEM_PROMPT,
     deps_type=KiberniktoDeps,
+    history_storage=None,
     persona=False,
     reaction="✍",
 )

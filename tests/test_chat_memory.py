@@ -59,8 +59,8 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.agent = TelegramAgent(model=FunctionModel(self.model), name='mem-test', history_storage=self.history,
                                    capabilities=chat_memory('mem-test', store=self.store, history=self.history))
 
-    async def say(self, chat_id: int, text: str) -> None:
-        await self.agent.run(text, chat_id=chat_id, deps=TelegramDeps(chat_id=chat_id))
+    async def say(self, conversation_id: int | str, text: str) -> None:
+        await self.agent.run(text, conversation_id=str(conversation_id), deps=TelegramDeps())
 
     async def test_notebook_is_scoped_to_chat_and_injected_only_there(self) -> None:
         await self.say(5, 'tool:write_memory:- likes cats')
@@ -75,7 +75,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'WHO_AM_I', 'PERSONA-MARK'):
             agent = TelegramAgent(model=FunctionModel(self.model), name='mem-order', history_storage=self.history,
                                   capabilities=chat_memory('mem-order', store=self.store, history=self.history))
-        await agent.run('hello', chat_id=5, deps=TelegramDeps(chat_id=5))
+        await agent.run('hello', conversation_id='5', deps=TelegramDeps())
         instructions = self.model.requests[-1].instructions or ''
         self.assertTrue(instructions.startswith('PERSONA-MARK'), instructions[:120])
         self.assertIn('## Chat memory', instructions)
@@ -87,7 +87,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
                     patch.object(AGENT_KIBERNIKTO_SETTINGS, 'PERSONA_NAME', 'Kib'):
                 parent = build_multi_agent()
                 with parent.override(model=FunctionModel(self.model)):
-                    await parent.run('hello', chat_id=5, deps=TelegramDeps(chat_id=5))
+                    await parent.run('hello', conversation_id='5', deps=TelegramDeps())
                 instructions = self.model.requests[-1].instructions or ''
                 self.assertTrue(instructions.startswith(rendered), instructions[:120])
                 self.assertEqual(instructions.count('PERSONA-MARK'), 1)
@@ -97,7 +97,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
     async def test_injected_memory_is_not_persisted_into_history(self) -> None:
         await self.say(5, 'tool:write_memory:- likes cats')
         await self.say(5, 'hello')
-        self.assertNotIn('<memory>', repr(await self.history.get_full_conversation(5)))
+        self.assertNotIn('<memory>', repr(await self.history.get_full_conversation('5')))
 
     async def test_search_reaches_beyond_window_and_stays_in_chat(self) -> None:
         await self.say(6, 'pineapple is my password')
@@ -117,9 +117,9 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         agent = KiberniktoAgent(model=FunctionModel(self.model), name='mem-core', history_storage=self.history,
                                 deps_type=KiberniktoDeps,
                                 capabilities=chat_memory('mem-core', store=self.store, history=self.history))
-        await agent.run('tool:write_memory:- likes cats', chat_id=5, deps=KiberniktoDeps(chat_id=5))
+        await agent.run('tool:write_memory:- likes cats', conversation_id='5', deps=KiberniktoDeps())
         self.assertEqual(dict(self.store.files), {'5/mem-core/MEMORY.md': '- likes cats\n'})
-        await agent.run('tool:search_conversation_history:cats', chat_id=5, deps=KiberniktoDeps(chat_id=5))
+        await agent.run('tool:search_conversation_history:cats', conversation_id='5', deps=KiberniktoDeps())
         self.assertIn('likes cats', self.model.tool_returns()[0])
 
     async def test_orchestrator_parent_carries_memory_and_search(self) -> None:
@@ -170,13 +170,13 @@ class PostgresMemoryTests(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     async def test_notebook_persists_per_chat_in_postgres(self) -> None:
-        await self.agent.run('tool:write_memory:- likes cats', chat_id=5, deps=TelegramDeps(chat_id=5))
+        await self.agent.run('tool:write_memory:- likes cats', conversation_id='5', deps=TelegramDeps())
         async with self.pool.acquire() as connection:
             rows = await connection.fetch(f'SELECT path, content FROM {self.TABLE}')
         self.assertEqual([tuple(r) for r in rows], [('5/pg-test/MEMORY.md', '- likes cats\n')])
-        await self.agent.run('hello', chat_id=5, deps=TelegramDeps(chat_id=5))
+        await self.agent.run('hello', conversation_id='5', deps=TelegramDeps())
         self.assertIn('likes cats', repr(self.model.requests[-1]))
-        await self.agent.run('hello', chat_id=6, deps=TelegramDeps(chat_id=6))
+        await self.agent.run('hello', conversation_id='6', deps=TelegramDeps())
         self.assertNotIn('likes cats', repr(self.model.requests[-1]))
 
 

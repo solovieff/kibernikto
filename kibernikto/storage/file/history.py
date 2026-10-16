@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
-    """Durable JSON storage under ``{FILESTORE_LOCATION}/history/{name}/{chat_id}.json``.
+    """Durable JSON storage under ``{FILESTORE_LOCATION}/history/{name}/{conversation_id}.json``.
 
     Standalone ``HistoryStorage`` impl — does **not** inherit ``MemoryHistoryStorage``.
     Keeps its own in-memory cache so repeated reads don't hit disk every turn.
@@ -33,8 +33,8 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
         self._name = name
         self._history_size = history_size
         self._keep_thinking = keep_thinking
-        self._storage: Dict[int, List[ModelMessage]] = defaultdict(list)
-        self._loaded: set[int] = set()
+        self._storage: Dict[str, List[ModelMessage]] = defaultdict(list)
+        self._loaded: set[str] = set()
 
     # ── file helpers ─────────────────────────────────────────────────────────
 
@@ -43,55 +43,59 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
         p.mkdir(parents=True, exist_ok=True)
         return p
 
-    def _path(self, chat_id: int) -> Path:
-        return self._dir() / f"{chat_id}.json"
+    def _path(self, conversation_id: str) -> Path:
+        return self._dir() / f"{conversation_id}.json"
 
-    async def _save(self, chat_id: int) -> None:
-        messages = self._storage.get(chat_id)
+    async def _save(self, conversation_id: str) -> None:
+        messages = self._storage.get(conversation_id)
         if messages is None:
             return
         try:
             raw = serialize_messages(_sanitize(messages, keep_thinking=self._keep_thinking))
-            await asyncio.to_thread(self._path(chat_id).write_text, json.dumps(raw, ensure_ascii=False), "utf-8")
+            await asyncio.to_thread(self._path(conversation_id).write_text, json.dumps(raw, ensure_ascii=False), "utf-8")
         except Exception as exc:
-            logger.error("Failed to save history for chat %s: %s", chat_id, exc)
+            logger.error("Failed to save history for conversation %s: %s", conversation_id, exc)
 
-    async def _load(self, chat_id: int) -> None:
-        if chat_id in self._loaded:
+    async def _load(self, conversation_id: str) -> None:
+        if conversation_id in self._loaded:
             return
-        path = self._path(chat_id)
+        path = self._path(conversation_id)
         if not path.exists():
-            self._storage[chat_id] = []
-            self._loaded.add(chat_id)
+            self._storage[conversation_id] = []
+            self._loaded.add(conversation_id)
             return
         try:
             text = await asyncio.to_thread(path.read_text, "utf-8")
             messages = deserialize_messages(json.loads(text))
             # Migrate old files that still contain instructions / binaries.
             messages = _sanitize(messages, keep_thinking=self._keep_thinking)
-            self._storage[chat_id] = messages
+            self._storage[conversation_id] = messages
         except Exception as exc:
-            logger.warning("Failed to load history for chat %s: %s", chat_id, exc)
-            self._storage[chat_id] = []
-        self._loaded.add(chat_id)
+            logger.warning("Failed to load history for conversation %s: %s", conversation_id, exc)
+            self._storage[conversation_id] = []
+        self._loaded.add(conversation_id)
 
     # ── HistoryStorage ─────────────────────────────────────────────────────
 
-    async def get_conversation(self, chat_id: int) -> List[ModelMessage]:
-        await self._load(chat_id)
-        return _window(self._storage[chat_id], self._history_size)
+    async def get_conversation(self, conversation_id: str) -> List[ModelMessage]:
+        cid = str(conversation_id)
+        await self._load(cid)
+        return _window(self._storage[cid], self._history_size)
 
-    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]:
-        await self._load(chat_id)
-        return self._storage[chat_id][-limit:]
+    async def get_full_conversation(self, conversation_id: str, limit: int = 5000) -> List[ModelMessage]:
+        cid = str(conversation_id)
+        await self._load(cid)
+        return self._storage[cid][-limit:]
 
-    async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
-        await self._load(chat_id)
-        self._storage[chat_id].extend(messages)
-        self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)
-        await self._save(chat_id)
+    async def add_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
+        cid = str(conversation_id)
+        await self._load(cid)
+        self._storage[cid].extend(messages)
+        self._storage[cid] = _sanitize(self._storage[cid], keep_thinking=self._keep_thinking)
+        await self._save(cid)
 
-    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
-        await self._load(chat_id)
-        self._storage[chat_id] = _sanitize(list(messages), keep_thinking=self._keep_thinking)
-        await self._save(chat_id)
+    async def replace_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
+        cid = str(conversation_id)
+        await self._load(cid)
+        self._storage[cid] = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+        await self._save(cid)
