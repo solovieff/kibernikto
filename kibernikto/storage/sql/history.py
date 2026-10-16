@@ -101,16 +101,38 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
         cid = str(conversation_id)
         clean = _sanitize(list(messages), keep_thinking=self._keep_thinking)
         async with await get_session() as session:
-            await session.execute(delete(ChatMessageRow).where(
-                ChatMessageRow.conversation_id == cid,
-                ChatMessageRow.name == self._name,
-            ))
-            for seq, msg in enumerate(clean):
-                session.add(ChatMessageRow(
-                    conversation_id=cid,
-                    name=self._name,
-                    seq=seq,
-                    kind=msg.kind,
-                    payload=_message_adapter.dump_python(msg, mode="json"),
+            if not clean:
+                await session.execute(delete(ChatMessageRow).where(
+                    ChatMessageRow.conversation_id == cid,
+                    ChatMessageRow.name == self._name,
                 ))
+                await session.commit()
+                return
+            stmt = (
+                select(ChatMessageRow)
+                .where(
+                    ChatMessageRow.conversation_id == cid,
+                    ChatMessageRow.name == self._name,
+                )
+                .order_by(ChatMessageRow.seq.desc())
+                .limit(len(clean))
+            )
+            tail_rows = list(reversed((await session.execute(stmt)).scalars().all()))
+            if len(tail_rows) == len(clean):
+                for row, msg in zip(tail_rows, clean, strict=True):
+                    row.kind = msg.kind
+                    row.payload = _message_adapter.dump_python(msg, mode="json")
+            else:
+                await session.execute(delete(ChatMessageRow).where(
+                    ChatMessageRow.conversation_id == cid,
+                    ChatMessageRow.name == self._name,
+                ))
+                for seq, msg in enumerate(clean):
+                    session.add(ChatMessageRow(
+                        conversation_id=cid,
+                        name=self._name,
+                        seq=seq,
+                        kind=msg.kind,
+                        payload=_message_adapter.dump_python(msg, mode="json"),
+                    ))
             await session.commit()
