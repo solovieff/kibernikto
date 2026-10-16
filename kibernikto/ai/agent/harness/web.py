@@ -37,11 +37,8 @@ WEB_SEARCH_GUIDANCE = (
 
 def web_layout() -> tuple[list[AbstractCapability], list[SubAgent]]:
     """(parent capabilities, delegates): WEB_MODEL_NAME set → one delegate; unset → tools on the tier model."""
-    caps = []
-    if os.getenv("EXA_API_KEY"):
-        caps = [ExaSearch(native=True, include_deep_search=False, guidance=WEB_SEARCH_GUIDANCE)]
     if model_name := AGENT_KIBERNIKTO_SETTINGS.WEB_MODEL_NAME:
-        return caps, [SubAgent(_web_expert(model_name))]
+        return [], [SubAgent(_web_expert(model_name))]
     return [_web_tools()], []
 
 

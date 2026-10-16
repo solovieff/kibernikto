@@ -33,7 +33,7 @@ class CheckHistoryImagesTests(unittest.IsolatedAsyncioTestCase):
         self.fetch = AsyncMock(return_value=b'bytes')
 
     async def _run(self, messages: list) -> tuple[list, bool]:
-        return await check_history_images(messages, chat_id=1, exists=self.exists, save=self.save,
+        return await check_history_images(messages, conversation_id='1', exists=self.exists, save=self.save,
                                           head=self.head, fetch=self.fetch)
 
     async def test_dead_link_is_replaced_with_text(self) -> None:
@@ -99,14 +99,14 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
 
         storage = MemoryHistoryStorage(history_size=10)
         dead = ImageUrl(url='https://i.ibb.co/dead.jpg')
-        await storage.add_messages(4, _image_turn(dead))
+        await storage.add_messages('4', _image_turn(dead))
         agent = KiberniktoAgent(model=FunctionModel(model), history_storage=storage)
 
         # Offline: the instance probes are replaced, so aiohttp is never reached.
         agent.image_head = AsyncMock(return_value=False)
         agent.image_fetch = AsyncMock(return_value=b'')
         with patch('kibernikto.ai.agent.core.kibernikto_agent.check_history_images', wraps=check_history_images) as wrapped:
-            await agent.run('next', chat_id=4)
+            await agent.run('next', conversation_id='4')
 
         sent = seen[0]
         sent_contents = [part.content for msg in sent for part in msg.parts if isinstance(part, UserPromptPart)]
@@ -114,7 +114,7 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(dead, [item for item in flat if isinstance(item, ImageUrl)])
         self.assertIn(DEAD_LINK_TEXT, flat)
         self.assertTrue(wrapped.called)
-        stored = await storage.get_full_conversation(4)
+        stored = await storage.get_full_conversation('4')
         stored_items = [i for m in stored if isinstance(m, ModelRequest) for p in m.parts
                         if isinstance(p, UserPromptPart) and isinstance(p.content, list) for i in p.content]
         self.assertNotIn(dead, stored_items)

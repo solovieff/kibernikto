@@ -45,40 +45,35 @@ def chat_memory(name: str, *, store: MemoryStore | None = None,
 
 
 def chat_namespace(ctx: RunContext[KiberniktoDeps]) -> str:
-    """Memory tenant = the conversation (``deps.chat_id``); resolved by app code, never by the model."""
-    chat_id = _chat_id(ctx.deps)
-    return NO_CHAT_NAMESPACE if chat_id is None else str(chat_id)
+    """Memory tenant = the conversation (``ctx.conversation_id``); resolved by app code, never by the model."""
+    return ctx.conversation_id or NO_CHAT_NAMESPACE
 
 
 @dataclass(frozen=True)
 class ChatHistorySource:  # satisfies conversation_search.HistorySource (structural)
-    """One chat's full persisted history as a single searchable run; empty without a chat."""
+    """One conversation's full persisted history as a single searchable run; empty without a conversation_id."""
 
     storage: HistoryStorage
-    chat_id: int | None = None
+    conversation_id: str | None = None
 
     @property
     def run_id(self) -> str:
-        return f"chat-{self.chat_id}"
+        return f"chat-{self.conversation_id}"
 
     async def list_runs(self) -> list[RunRecord]:
-        if self.chat_id is None:
+        if not self.conversation_id:
             return []
-        return [RunRecord(run_id=self.run_id, conversation_id=str(self.chat_id))]
+        return [RunRecord(run_id=self.run_id, conversation_id=self.conversation_id)]
 
     async def run_history(self, *, run_id: str) -> list[ModelMessage]:
-        if self.chat_id is None or run_id != self.run_id:
+        if not self.conversation_id or run_id != self.run_id:
             return []
-        return await self.storage.get_full_conversation(self.chat_id, limit=FULL_HISTORY_LIMIT)
+        return await self.storage.get_full_conversation(self.conversation_id, limit=FULL_HISTORY_LIMIT)
 
 
 @dataclass
 class ChatConversationSearch(ConversationSearch[KiberniktoDeps]):
-    """``ConversationSearch`` bound per run to the caller's chat; the source is the isolation boundary."""
+    """``ConversationSearch`` bound per run to the caller's conversation; the source is the isolation boundary."""
 
     async def for_run(self, ctx: RunContext[KiberniktoDeps]) -> ChatConversationSearch:
-        return replace(self, source=replace(self.source, chat_id=_chat_id(ctx.deps)))
-
-
-def _chat_id(deps: object) -> int | None:
-    return deps.chat_id if isinstance(deps, KiberniktoDeps) else None
+        return replace(self, source=replace(self.source, conversation_id=ctx.conversation_id or None))

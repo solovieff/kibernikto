@@ -45,7 +45,7 @@ async def fetch_bytes(url: str) -> bytes:
 
 
 async def _check_item(item: UserContent, *, head: Head, exists: Exists, fetch: Fetch, save: Save,
-                      chat_id: int) -> UserContent:
+                      conversation_id: str) -> UserContent:
     """Return the item to keep, or a text replacement when the link is dead."""
     if not isinstance(item, ImageUrl):
         return item
@@ -54,7 +54,7 @@ async def _check_item(item: UserContent, *, head: Head, exists: Exists, fetch: F
     store = metadata.get("media_store", "default")
     # HEAD always: a stored copy doesn't prove the link is alive, and the model gets the URL.
     if not await head(item.url):
-        logger.info("Dead image link in history for chat %s, replaced with text", chat_id)
+        logger.info("Dead image link in history for conversation %s, replaced with text", conversation_id)
         return DEAD_LINK_TEXT
     if ref is None or await exists(store, ref):
         return item
@@ -65,7 +65,7 @@ async def _check_item(item: UserContent, *, head: Head, exists: Exists, fetch: F
 async def check_history_images(
     messages: list[ModelMessage],
     *,
-    chat_id: int,
+    conversation_id: str,
     exists: Exists,
     save: Save,
     head: Head = head_alive,
@@ -85,7 +85,8 @@ async def check_history_images(
                 continue
             new_content: list[UserContent] = []
             for item in part.content:
-                checked = await _check_item(item, head=head, exists=exists, fetch=fetch, save=save, chat_id=chat_id)
+                checked = await _check_item(item, head=head, exists=exists, fetch=fetch, save=save,
+                                            conversation_id=conversation_id)
                 changed = changed or checked is not item
                 new_content.append(checked)
             new_parts.append(replace(part, content=new_content))

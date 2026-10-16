@@ -26,7 +26,7 @@ fields change often — read them in source, don't trust a remembered list.
 | Model string → model | `kibernikto/ai/agent/utils.py` (`infer_kibernikto_model`) |
 | Telegram agent + active-agent setter | `kibernikto/ai/agent/telegram/telegram_agent.py` |
 | Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/telegram/multi_agent.py` |
-| Harness capabilities (transport-free, keyed on `KiberniktoDeps.chat_id`): `CreditTier`, `chat_memory`, delegation roster, web layout, experts | `kibernikto/ai/agent/harness/` |
+| Harness capabilities (transport-free, keyed on `RunContext.conversation_id`): `CreditTier`, `chat_memory`, delegation roster, web layout, experts | `kibernikto/ai/agent/harness/` |
 | Bot, Dispatcher, middleware order, lifecycle | `kibernikto/telegram/agent/telegram_app.py` |
 | Handlers / middlewares / preprocessing | `kibernikto/telegram/handlers/`, `kibernikto/telegram/middleware/`, `kibernikto/telegram/pre_processors/` |
 | Telegram peers (bot-to-bot subagents) | `kibernikto/ai/agent/telegram/peer_agent.py`, `kibernikto/telegram/peer_hub.py` |
@@ -51,8 +51,9 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
 - Register a custom agent with `set_telegram_agent(agent)` before polling. `to_telegram()` builds
   the app only; handlers resolve the active agent per update.
 - Use `result.output` (text or structured), never `result.data`.
-- Per-chat history exists only in the overridden async `run` with `chat_id=` and non-None
-  `history_storage`. An explicit `message_history` (even `[]`) skips loading; saving still happens.
+- Per-conversation history and mid-run steering exist in the overridden async `run` with `conversation_id=` and non-None
+  `history_storage`. Concurrent `run(..., conversation_id=X)` calls while a run for `X` is active enqueue the new prompt
+  into the live run (`priority='asap'`) and return `None`. An explicit `message_history` (even `[]`) skips loading; saving still happens.
 - History window alignment walks back to a request and may return more than `HISTORY_SIZE`.
   Intentional — don't "fix" it.
 - Importing an expert module builds its model. Report (needs `VSEGPT_API_KEY`) and scheduler
@@ -95,10 +96,10 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
   `AGENT_KIBERNIKTO_WEB_MODEL_NAME` drops those tools: web becomes a tool-less `web_researcher` delegate on a
   search-native model (e.g. `routerai:perplexity/sonar-reasoning-pro`). The roster text is ours
   (`harness/delegation.py`: `KiberniktoSubAgents` + `DELEGATION_GUIDE`; web wiring in `harness/web.py`), not the harness default.
-- Memory is stock harness, on the parent: `chat_memory(name)` = `Memory` (namespace = chat id,
+- Memory is stock harness, on the parent: `chat_memory(name)` = `Memory` (namespace = `ctx.conversation_id`,
   store from `get_memory_store()`: file → `{FILESTORE}/memory`, sqlite → `*.memory.db`, pg →
   `PostgresMemoryStore`) + `ConversationSearch` over our own `HistoryStorage`, bound per run to
-  the caller's chat. No `StepPersistence`; `ConversationInfo` holds no facts about people.
+  the caller's conversation. No `StepPersistence`; `ConversationInfo` holds no facts about people.
   Live pg check (opt-in): `KIBERNIKTO_TEST_PG_DSN=postgresql+asyncpg://... python -m unittest tests.test_chat_memory`.
 
 **Telegram**
@@ -145,8 +146,8 @@ async def smoke():
     history = MemoryHistoryStorage(history_size=6)
     agent = KiberniktoAgent(model=TestModel(custom_output_text="ok"), name="smoke",
                             history_storage=history)
-    result = await agent.run("Hello", chat_id=42)
-    assert result.output == "ok" and await history.get_conversation(42)
+    result = await agent.run("Hello", conversation_id="42")
+    assert result.output == "ok" and await history.get_conversation("42")
 
 asyncio.run(smoke())
 ```

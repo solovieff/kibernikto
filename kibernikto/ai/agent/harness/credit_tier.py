@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 from pydantic_ai import AgentRunResult, ModelSelectionContext, RunContext
@@ -34,7 +34,7 @@ def credit_tier(credits: int) -> Tier:
 
 @dataclass
 class CreditTier(AbstractCapability[KiberniktoDeps]):
-    """Pick the model by the chat's credit tier once per run, then charge ``effort`` after success.
+    """Pick the model by the conversation's credit tier once per run, then charge ``effort`` after success.
 
     Explicit ``run(model=...)`` / ``agent.override(model=...)`` still win over the selection;
     non-billable runs use the agent's constructor model. Failed runs are never charged.
@@ -42,10 +42,14 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
 
     effort: int = 1
     models: dict[str, Model] = field(default_factory=dict)  # Model-name cache; pre-fill to inject models.
+    conversation_id: str | None = None
 
     @classmethod
     def get_serialization_name(cls) -> str | None:
         return None  # Holds live Model instances — not spec-constructible.
+
+    async def for_run(self, ctx: RunContext[KiberniktoDeps]) -> CreditTier:
+        return replace(self, conversation_id=ctx.conversation_id or None)
 
     def get_model(self) -> ModelSelector[KiberniktoDeps]:
         return self._select
@@ -53,34 +57,34 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
     async def before_run(self, ctx: RunContext[KiberniktoDeps]) -> None:
         if AGENT_KIBERNIKTO_SETTINGS.ALLOW_ZERO_CREDITS:
             return
-        chat_id = _billable_chat(ctx.deps)
-        if chat_id is None:
+        cid = _billable_conversation(ctx.deps, self.conversation_id or ctx.conversation_id)
+        if cid is None:
             return
-        info = ctx.deps.chat_info or await chat_data.load(chat_id)
+        info = (ctx.deps.chat_info if isinstance(ctx.deps, KiberniktoDeps) else None) or await chat_data.load(cid)
         if info.credits <= 0:
             raise InsufficientCreditsError()
 
     async def after_run(self, ctx: RunContext[KiberniktoDeps], *, result: AgentRunResult[Any]) -> AgentRunResult[Any]:
-        chat_id = _billable_chat(ctx.deps)
-        if chat_id is None:
+        cid = _billable_conversation(ctx.deps, self.conversation_id or ctx.conversation_id)
+        if cid is None:
             return result
-        info = await chat_data.load(chat_id)  # Fresh read: a top-up landed mid-run must not be overwritten.
+        info = await chat_data.load(cid)  # Fresh read: a top-up landed mid-run must not be overwritten.
         previous = credit_tier(info.credits)
         info.charge(effort=self.effort)
-        await chat_data.save(chat_id, info)
+        await chat_data.save(cid, info)
         if (current := credit_tier(info.credits)) != previous:
-            logger.info("Model tier changed for chat %s: %s -> %s", chat_id, previous, current)
+            logger.info("Model tier changed for conversation %s: %s -> %s", cid, previous, current)
         return result
 
     async def _select(self, ctx: ModelSelectionContext[KiberniktoDeps]) -> Model:
         if ctx.run_step > 1 and ctx.model is not None:
             return ctx.model  # Tier is pinned for the whole run: no storage hit per tool step.
-        chat_id = _billable_chat(ctx.deps)
-        if chat_id is None:
+        cid = _billable_conversation(ctx.deps, self.conversation_id)
+        if cid is None:
             if ctx.model is None:
                 raise UserError("CreditTier needs a constructor model for non-billable runs")
             return ctx.model
-        info = ctx.deps.chat_info or await chat_data.load(chat_id)  # Reuse the build_deps snapshot.
+        info = (ctx.deps.chat_info if isinstance(ctx.deps, KiberniktoDeps) else None) or await chat_data.load(cid)
         return self._model(info.model_name)
 
     def _model(self, name: str) -> Model:
@@ -89,8 +93,10 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         return self.models[name]
 
 
-def _billable_chat(deps: object) -> int | None:
-    """Chat to bill and tier by; None without Kibernikto deps, a chat, or for non-billable (peer envelope) runs."""
-    if not isinstance(deps, KiberniktoDeps) or not deps.billable:
+def _billable_conversation(deps: object, conversation_id: str | None) -> str | None:
+    """Conversation to bill and tier by; None without a conversation_id or when ``deps.billable`` is False."""
+    if not conversation_id:
         return None
-    return deps.chat_id
+    if isinstance(deps, KiberniktoDeps) and not deps.billable:
+        return None
+    return conversation_id

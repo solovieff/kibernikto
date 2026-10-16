@@ -10,12 +10,12 @@ if TYPE_CHECKING:
 _PAGE = 100
 
 
-async def wipe_chat_memory(chat_id: int, agent_name: str, store: "MemoryStore | None" = None) -> int:
-    """Delete every notebook file of ``agent_name`` in ``chat_id``; returns how many were removed."""
+async def wipe_chat_memory(conversation_id: str, agent_name: str, store: "MemoryStore | None" = None) -> int:
+    """Delete every notebook file of ``agent_name`` in ``conversation_id``; returns how many were removed."""
     if store is None:
         from kibernikto.storage.factory import get_memory_store
         store = get_memory_store()
-    prefix = f"{chat_id}/{agent_name}/"  # Same scope the harness Memory builds: `{namespace}/{agent_name}`.
+    prefix = f"{conversation_id}/{agent_name}/"  # Same scope the harness Memory builds: `{namespace}/{agent_name}`.
     removed = 0
     while paths := await store.list_paths(prefix, limit=_PAGE):
         for path in paths:
@@ -25,9 +25,10 @@ async def wipe_chat_memory(chat_id: int, agent_name: str, store: "MemoryStore | 
     return removed
 
 
-async def wipe_chat(chat_id: int, *, history: HistoryStorage | None, agent_name: str,
+async def wipe_chat(conversation_id: str, *, history: HistoryStorage | None, agent_name: str,
                     memory: "MemoryStore | None" = None) -> int:
-    """Clear the chat's history and notebook; returns the number of notebook files removed."""
+    """Clear the conversation's history and notebook; returns the number of notebook files removed."""
+    cid = str(conversation_id)
     if history is not None:
-        await history.replace_messages(chat_id, [])
-    return await wipe_chat_memory(chat_id, agent_name, memory)
+        await history.replace_messages(cid, [])
+    return await wipe_chat_memory(cid, agent_name, memory)

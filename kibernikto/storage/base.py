@@ -79,22 +79,22 @@ def _window(messages: List[ModelMessage], history_size: int) -> List[ModelMessag
 
 @runtime_checkable
 class HistoryStorage(Protocol):
-    """Any per-chat history backend — in-memory, file, postgres, etc."""
+    """Any per-conversation history backend — in-memory, file, postgres, etc."""
 
-    async def get_conversation(self, chat_id: int) -> List[ModelMessage]: ...
+    async def get_conversation(self, conversation_id: str) -> List[ModelMessage]: ...
 
-    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]: ...
+    async def get_full_conversation(self, conversation_id: str, limit: int = 5000) -> List[ModelMessage]: ...
 
-    async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
+    async def add_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None: ...
 
-    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None: ...
+    async def replace_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None: ...
 
 
 @runtime_checkable
 class MediaStore(Protocol):
     """Any media backend — local filestore, S3, etc.
 
-    ``media_ref`` is backend-agnostic: ``{chat_id}/{file}``. Implementations
+    ``media_ref`` is backend-agnostic: ``{conversation_id}/{file}``. Implementations
     resolve it to a local path (file) or an object key (s3) internally.
 
     The interface is async-only: local-file backends use ``asyncio.to_thread``,
@@ -102,7 +102,7 @@ class MediaStore(Protocol):
     they create a false sense of compatibility across backends.
     """
 
-    async def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str: ...
+    async def save(self, conversation_id: str, data: bytes, ext: str = "bin", name: str | None = None) -> str: ...
 
     async def read(self, media_ref: str) -> bytes: ...
 
@@ -116,32 +116,33 @@ class MediaStore(Protocol):
 
 @runtime_checkable
 class ChatDataStore(Protocol):
-    """Any per-chat data backend (credits, timezone) — file, postgres, etc."""
+    """Any per-conversation data backend (credits) — file, postgres, etc."""
 
-    async def load(self, chat_id: int) -> ConversationInfo: ...
+    async def load(self, conversation_id: str) -> ConversationInfo: ...
 
-    async def save(self, chat_id: int, info: ConversationInfo) -> None: ...
+    async def save(self, conversation_id: str, info: ConversationInfo) -> None: ...
 
 
 class MemoryHistoryStorage:
-    """In-memory per-chat store (lost on restart). One impl of ``HistoryStorage``."""
+    """In-memory per-conversation store (lost on restart). One impl of ``HistoryStorage``."""
 
     def __init__(
         self, history_size: int = _DEFAULT_HISTORY_SIZE, *, keep_thinking: bool = False
     ) -> None:
-        self._storage: Dict[int, List[ModelMessage]] = defaultdict(list)
+        self._storage: Dict[str, List[ModelMessage]] = defaultdict(list)
         self._history_size = history_size
         self._keep_thinking = keep_thinking
 
-    async def get_conversation(self, chat_id: int) -> List[ModelMessage]:
-        return _window(self._storage[chat_id], self._history_size)
+    async def get_conversation(self, conversation_id: str) -> List[ModelMessage]:
+        return _window(self._storage[str(conversation_id)], self._history_size)
 
-    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]:
-        return self._storage[chat_id][-limit:]
+    async def get_full_conversation(self, conversation_id: str, limit: int = 5000) -> List[ModelMessage]:
+        return self._storage[str(conversation_id)][-limit:]
 
-    async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
-        self._storage[chat_id].extend(messages)
-        self._storage[chat_id] = _sanitize(self._storage[chat_id], keep_thinking=self._keep_thinking)
+    async def add_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
+        cid = str(conversation_id)
+        self._storage[cid].extend(messages)
+        self._storage[cid] = _sanitize(self._storage[cid], keep_thinking=self._keep_thinking)
 
-    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
-        self._storage[chat_id] = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+    async def replace_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
+        self._storage[str(conversation_id)] = _sanitize(list(messages), keep_thinking=self._keep_thinking)

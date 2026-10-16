@@ -23,7 +23,7 @@ from kibernikto.ai.agent.core.errors import InsufficientCreditsError
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.harness.credit_tier import CreditTier
 from kibernikto.ai.agent.harness.delegation import DELEGATION_GUIDE
-from kibernikto.ai.agent.harness.web import WEB_EXPERT_DESCRIPTION, WEB_EXPERT_INSTRUCTIONS, WEB_SEARCH_GUIDANCE
+from kibernikto.ai.agent.harness.web import WEB_EXPERT_DESCRIPTION, WEB_EXPERT_INSTRUCTIONS, WEB_EXPERT_NAME, WEB_SEARCH_GUIDANCE
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
 from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
@@ -38,15 +38,15 @@ class CountingChatData:
     """In-memory ChatDataStore that counts loads."""
 
     def __init__(self) -> None:
-        self.rows: dict[int, ConversationInfo] = {}
+        self.rows: dict[str, ConversationInfo] = {}
         self.loads = 0
 
-    async def load(self, chat_id: int) -> ConversationInfo:
+    async def load(self, conversation_id: str) -> ConversationInfo:
         self.loads += 1
-        return self.rows.get(chat_id, ConversationInfo()).model_copy(deep=True)
+        return self.rows.get(str(conversation_id), ConversationInfo()).model_copy(deep=True)
 
-    async def save(self, chat_id: int, info: ConversationInfo) -> None:
-        self.rows[chat_id] = info.model_copy(deep=True)
+    async def save(self, conversation_id: str, info: ConversationInfo) -> None:
+        self.rows[str(conversation_id)] = info.model_copy(deep=True)
 
 
 def named_model(name: str, *, tool_step: bool = False) -> FunctionModel:
@@ -77,84 +77,84 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         def ping() -> str:
             return 'pong'
 
-    async def set_credits(self, chat_id: int, credits: int) -> None:
-        await self.chat_data.save(chat_id, ConversationInfo(credits=credits))
+    async def set_credits(self, conversation_id: int | str, credits: int) -> None:
+        await self.chat_data.save(str(conversation_id), ConversationInfo(credits=credits))
         self.chat_data.loads = 0
 
     async def test_tier_selects_model_and_charges_once(self) -> None:
         for credits, expected in ((5, POOR), (100, MEDIUM), (900, RICH)):
             with self.subTest(credits=credits):
-                await self.set_credits(7, credits)
-                result = await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+                await self.set_credits('7', credits)
+                result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
                 self.assertEqual(result.output, expected)
-                self.assertEqual(self.chat_data.rows[7].credits, credits - 1)
+                self.assertEqual(self.chat_data.rows['7'].credits, credits - 1)
                 self.assertEqual(self.chat_data.loads, 2)  # One select across both steps + one charge.
 
     async def test_build_deps_snapshot_skips_the_select_load(self) -> None:
-        await self.set_credits(7, 900)
-        result = await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7, chat_info=self.chat_data.rows[7]))
+        await self.set_credits('7', 900)
+        result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps(chat_info=self.chat_data.rows['7']))
         self.assertEqual(result.output, RICH)
         self.assertEqual(self.chat_data.loads, 1)  # Charge only: tier came from the snapshot.
 
     async def test_exhausted_balance_continues_on_poor_model_by_default(self) -> None:
         for credits in (0, -5):
-            await self.set_credits(7, credits)
-            result = await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+            await self.set_credits('7', credits)
+            result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
             self.assertEqual(result.output, POOR)
-            self.assertEqual(self.chat_data.rows[7].credits, 0)
+            self.assertEqual(self.chat_data.rows['7'].credits, 0)
 
     async def test_strict_policy_blocks_exhausted_balance_even_with_model_override(self) -> None:
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
             for credits in (0, -5):
-                await self.set_credits(7, credits)
+                await self.set_credits('7', credits)
                 with self.assertRaises(InsufficientCreditsError):
-                    await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+                    await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
                 model = TestModel(custom_output_text='must not run')
                 with self.agent.override(model=model), self.assertRaises(InsufficientCreditsError):
-                    await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+                    await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
                 self.assertIsNone(model.last_model_request_parameters)
-                self.assertEqual(self.chat_data.rows[7].credits, credits)
-                self.assertFalse(await self.history.get_conversation(7))
+                self.assertEqual(self.chat_data.rows['7'].credits, credits)
+                self.assertFalse(await self.history.get_conversation('7'))
 
     async def test_strict_policy_allows_last_credit_then_top_up_restores_access(self) -> None:
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
-            await self.set_credits(7, 1)
-            result = await self.agent.run('hi', deps=TelegramDeps(chat_id=7))
+            await self.set_credits('7', 1)
+            result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
             self.assertEqual(result.output, POOR)
-            self.assertEqual(self.chat_data.rows[7].credits, 0)
+            self.assertEqual(self.chat_data.rows['7'].credits, 0)
             with self.assertRaises(InsufficientCreditsError):
-                await self.agent.run('hi', deps=TelegramDeps(chat_id=7))
-            await self.set_credits(7, 100)
-            result = await self.agent.run('hi', deps=TelegramDeps(chat_id=7))
+                await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
+            await self.set_credits('7', 100)
+            result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
             self.assertEqual(result.output, MEDIUM)
-            self.assertEqual(self.chat_data.rows[7].credits, 99)
+            self.assertEqual(self.chat_data.rows['7'].credits, 99)
 
     async def test_strict_policy_does_not_block_non_billable_peers(self) -> None:
-        await self.set_credits(7, 0)
+        await self.set_credits('7', 0)
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
-            result = await self.agent.run('hi', deps=TelegramDeps(chat_id=7, billable=False))
+            result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps(billable=False))
         self.assertEqual(result.output, 'fallback')
         self.assertEqual(self.chat_data.loads, 0)
 
     async def test_strict_policy_uses_deps_snapshot(self) -> None:
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'ALLOW_ZERO_CREDITS', False):
             with self.assertRaises(InsufficientCreditsError):
-                await self.agent.run('hi', deps=TelegramDeps(chat_id=7, chat_info=ConversationInfo(credits=0)))
+                await self.agent.run('hi', conversation_id='7', deps=TelegramDeps(chat_info=ConversationInfo(credits=0)))
         self.assertEqual(self.chat_data.loads, 0)
 
     async def test_charge_rereads_so_mid_run_top_up_survives(self) -> None:
-        await self.set_credits(7, 100)
-        stale = self.chat_data.rows[7].model_copy(deep=True)
-        await self.set_credits(7, 600)  # Top-up lands after build_deps took its snapshot.
-        await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7, chat_info=stale))
-        self.assertEqual(self.chat_data.rows[7].credits, 599)
+        await self.set_credits('7', 100)
+        stale = self.chat_data.rows['7'].model_copy(deep=True)
+        await self.set_credits('7', 600)  # Top-up lands after build_deps took its snapshot.
+        await self.agent.run('hi', conversation_id='7', deps=TelegramDeps(chat_info=stale))
+        self.assertEqual(self.chat_data.rows['7'].credits, 599)
 
     async def test_build_deps_reads_chat_data_once_writes_nothing_and_hides_credits(self) -> None:
         from aiogram.types import Message
         message = Message.model_validate({'message_id': 1, 'date': 0, 'text': 'hi',
                                           'chat': {'id': 7, 'type': 'private', 'first_name': 'A'},
                                           'from': {'id': 7, 'is_bot': False, 'first_name': 'A'}})
-        await self.set_credits(7, 100)
+        await self.set_credits('7', 100)
         saved = dict(self.chat_data.rows)
         with patch('kibernikto.ai.agent.telegram.telegram_agent.chat_data', self.chat_data), \
                 patch('kibernikto.ai.agent.telegram.telegram_agent.get_chat_context',
@@ -169,7 +169,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
     async def test_instructions_carry_todays_date(self) -> None:
         from pydantic_ai import capture_run_messages
         with capture_run_messages() as messages:
-            await self.agent.run('hi', deps=TelegramDeps(chat_id=7, billable=False, timezone='Asia/Tokyo'))
+            await self.agent.run('hi', deps=TelegramDeps(billable=False, timezone='Asia/Tokyo'))
         instructions = messages[0].instructions
         self.assertIn(f"Current date: {get_user_date('Asia/Tokyo')}.", instructions)
         self.assertIn('(Asia/Tokyo)', instructions)
@@ -177,12 +177,12 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
     async def test_works_on_a_plain_kibernikto_agent_without_telegram(self) -> None:
         agent = KiberniktoAgent(model=named_model('fallback'), name='credit-core', history_storage=None,
                                 deps_type=KiberniktoDeps, capabilities=[self.tier])
-        await self.set_credits(7, 900)
-        result = await agent.run('hi', deps=KiberniktoDeps(chat_id=7))
+        await self.set_credits('7', 900)
+        result = await agent.run('hi', conversation_id='7', deps=KiberniktoDeps())
         self.assertEqual(result.output, RICH)
-        self.assertEqual(self.chat_data.rows[7].credits, 899)
+        self.assertEqual(self.chat_data.rows['7'].credits, 899)
         anonymous = await agent.run('hi', deps=KiberniktoDeps())
-        self.assertEqual(anonymous.output, 'fallback')  # No chat: nothing to tier or bill.
+        self.assertEqual(anonymous.output, 'fallback')  # No conversation_id: nothing to tier or bill.
 
     async def test_orchestrator_parent_is_credit_tiered(self) -> None:
         capabilities = build_multi_agent().root_capability.capabilities
@@ -210,7 +210,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         names = {type(c).__name__ for c in capabilities}
         self.assertFalse(names & {'ExaSearch', 'WebSearch', 'WebFetch'}, names)
         sub_agents = next(c for c in capabilities if isinstance(c, SubAgents))
-        web = next(s.agent for s in sub_agents.agents if s.agent.name == 'web_researcher')
+        web = next(s.agent for s in sub_agents.agents if s.agent.name == WEB_EXPERT_NAME)
         self.assertEqual(web.model.model_name, 'test/web')
         # The search-native model does the searching: the delegate carries no web tools.
         web_names = {type(c).__name__ for c in web.root_capability.capabilities}
@@ -220,7 +220,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
             seen.append(info.instructions or '')
             return ModelResponse(parts=[TextPart('ok')])
         with web.override(model=FunctionModel(capture)):
-            await web.run('USD rate?', deps=TelegramDeps(chat_id=7))
+            await web.run('USD rate?', deps=TelegramDeps())
         self.assertTrue(seen[0].startswith(WEB_EXPERT_INSTRUCTIONS), seen[0])
         self.assertNotIn('PERSONA-MARK', seen[0])
         self.assertIn('Current date:', seen[0])
@@ -230,32 +230,32 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
             capabilities = build_multi_agent().root_capability.capabilities
         roster = next(c for c in capabilities if isinstance(c, SubAgents)).get_instructions()
         self.assertTrue(roster.startswith(DELEGATION_GUIDE), roster)
-        self.assertIn(f'- web_researcher: {WEB_EXPERT_DESCRIPTION}', roster)
+        self.assertIn(f'- {WEB_EXPERT_NAME}: {WEB_EXPERT_DESCRIPTION}', roster)
         self.assertIn('- image-agent: ', roster)
         self.assertNotIn('delegate self-contained', roster)
 
     async def test_non_billable_peer_run_uses_fallback_and_is_free(self) -> None:
-        await self.set_credits(7, 100)
-        result = await self.agent.run('hi', deps=TelegramDeps(chat_id=7, billable=False))
+        await self.set_credits('7', 100)
+        result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps(billable=False))
         self.assertEqual(result.output, 'fallback')
-        self.assertEqual(self.chat_data.rows[7].credits, 100)
+        self.assertEqual(self.chat_data.rows['7'].credits, 100)
         self.assertEqual(self.chat_data.loads, 0)
 
     async def test_explicit_override_wins(self) -> None:
-        await self.set_credits(7, 100)
+        await self.set_credits('7', 100)
         with self.agent.override(model=TestModel(custom_output_text='override')):
-            result = await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
+            result = await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
         self.assertEqual(result.output, 'override')
-        self.assertEqual(self.chat_data.rows[7].credits, 99)  # Charging is independent of the model.
+        self.assertEqual(self.chat_data.rows['7'].credits, 99)  # Charging is independent of the model.
 
     async def test_failed_run_is_not_charged(self) -> None:
-        await self.set_credits(7, 100)
+        await self.set_credits('7', 100)
         def boom(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
             raise RuntimeError('provider down')
         self.tier.models[MEDIUM] = FunctionModel(boom)
         with self.assertRaises(RuntimeError):
-            await self.agent.run('hi', chat_id=7, deps=TelegramDeps(chat_id=7))
-        self.assertEqual(self.chat_data.rows[7].credits, 100)
+            await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
+        self.assertEqual(self.chat_data.rows['7'].credits, 100)
 
 
 if __name__ == '__main__':

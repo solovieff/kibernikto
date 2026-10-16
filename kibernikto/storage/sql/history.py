@@ -40,13 +40,14 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
         self._history_size = history_size
         self._keep_thinking = keep_thinking
 
-    async def _read_tail(self, chat_id: int, limit: int) -> List[ModelMessage]:
-        """Read the last ``limit`` messages for *chat_id*, oldest-first."""
+    async def _read_tail(self, conversation_id: str, limit: int) -> List[ModelMessage]:
+        """Read the last ``limit`` messages for *conversation_id*, oldest-first."""
+        cid = str(conversation_id)
         async with await get_session() as session:
             stmt = (
                 select(ChatMessageRow.payload)
                 .where(
-                    ChatMessageRow.chat_id == chat_id,
+                    ChatMessageRow.conversation_id == cid,
                     ChatMessageRow.name == self._name,
                 )
                 .order_by(ChatMessageRow.seq.desc())
@@ -58,35 +59,36 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
             try:
                 messages.append(_message_adapter.validate_python(raw))
             except Exception as exc:
-                logger.warning("Skipping unparseable message for chat %s: %s", chat_id, exc)
+                logger.warning("Skipping unparseable message for conversation %s: %s", cid, exc)
         return messages
 
-    async def _next_seq(self, session, chat_id: int) -> int:
+    async def _next_seq(self, session, conversation_id: str) -> int:
         stmt = select(func.coalesce(func.max(ChatMessageRow.seq), -1)).where(
-            ChatMessageRow.chat_id == chat_id,
+            ChatMessageRow.conversation_id == conversation_id,
             ChatMessageRow.name == self._name,
         )
         return (await session.execute(stmt)).scalar_one() + 1
 
     # ── HistoryStorage ─────────────────────────────────────────────────────
 
-    async def get_conversation(self, chat_id: int) -> List[ModelMessage]:
+    async def get_conversation(self, conversation_id: str) -> List[ModelMessage]:
         # Fetch the tail with slack so _window can align to a request boundary.
-        tail = await self._read_tail(chat_id, self._history_size * STORAGE_SETTINGS.HISTORY_WINDOW_SLACK)
+        tail = await self._read_tail(conversation_id, self._history_size * STORAGE_SETTINGS.HISTORY_WINDOW_SLACK)
         return _window(tail, self._history_size)
 
-    async def get_full_conversation(self, chat_id: int, limit: int = 5000) -> List[ModelMessage]:
-        return await self._read_tail(chat_id, limit)
+    async def get_full_conversation(self, conversation_id: str, limit: int = 5000) -> List[ModelMessage]:
+        return await self._read_tail(conversation_id, limit)
 
-    async def add_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
+    async def add_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
         if not messages:
             return
+        cid = str(conversation_id)
         clean = _sanitize(messages, keep_thinking=self._keep_thinking)
         async with await get_session() as session:
-            seq = await self._next_seq(session, chat_id)
+            seq = await self._next_seq(session, cid)
             for msg in clean:
                 session.add(ChatMessageRow(
-                    chat_id=chat_id,
+                    conversation_id=cid,
                     name=self._name,
                     seq=seq,
                     kind=msg.kind,
@@ -95,16 +97,17 @@ class SqlHistoryStorage:  # satisfies HistoryStorage (structural)
                 seq += 1
             await session.commit()
 
-    async def replace_messages(self, chat_id: int, messages: List[ModelMessage]) -> None:
+    async def replace_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
+        cid = str(conversation_id)
         clean = _sanitize(list(messages), keep_thinking=self._keep_thinking)
         async with await get_session() as session:
             await session.execute(delete(ChatMessageRow).where(
-                ChatMessageRow.chat_id == chat_id,
+                ChatMessageRow.conversation_id == cid,
                 ChatMessageRow.name == self._name,
             ))
             for seq, msg in enumerate(clean):
                 session.add(ChatMessageRow(
-                    chat_id=chat_id,
+                    conversation_id=cid,
                     name=self._name,
                     seq=seq,
                     kind=msg.kind,

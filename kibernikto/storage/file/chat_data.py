@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatDataStorage:  # satisfies ChatDataStore (structural)
-    """Per-chat JSON storage under ``{FILESTORE_LOCATION}/chat_data/{chat_id}.json``."""
+    """Per-conversation JSON storage under ``{FILESTORE_LOCATION}/chat_data/{conversation_id}.json``."""
 
     def __init__(self, root: Path | None = None) -> None:
         self._root = root or Path(STORAGE_SETTINGS.FILESTORE_LOCATION).expanduser()
@@ -19,23 +19,24 @@ class ChatDataStorage:  # satisfies ChatDataStore (structural)
         p.mkdir(parents=True, exist_ok=True)
         return p
 
-    def _path(self, chat_id: int) -> Path:
-        return self._dir() / f"{chat_id}.json"
+    def _path(self, conversation_id: str) -> Path:
+        return self._dir() / f"{conversation_id}.json"
 
-    async def load(self, chat_id: int) -> ConversationInfo:
-        """Load ConversationInfo for chat_id, creating defaults on first use."""
-        path = self._path(chat_id)
+    async def load(self, conversation_id: str) -> ConversationInfo:
+        """Load ConversationInfo for conversation_id, creating defaults on first use."""
+        cid = str(conversation_id)
+        path = self._path(cid)
         if path.exists():
             try:
                 text = await asyncio.to_thread(path.read_text, "utf-8")
                 return ConversationInfo.model_validate_json(text)
             except Exception as exc:
-                logger.warning("Failed to load chat data for %s: %s", chat_id, exc)
+                logger.warning("Failed to load chat data for %s: %s", cid, exc)
         info = ConversationInfo()
-        await self.save(chat_id, info)
+        await self.save(cid, info)
         return info
 
-    async def save(self, chat_id: int, info: ConversationInfo) -> None:
+    async def save(self, conversation_id: str, info: ConversationInfo) -> None:
         """Persist ConversationInfo to JSON."""
-        path = self._path(chat_id)
+        path = self._path(str(conversation_id))
         await asyncio.to_thread(path.write_text, info.model_dump_json(indent=2), "utf-8")

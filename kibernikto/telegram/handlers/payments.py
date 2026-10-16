@@ -43,9 +43,10 @@ async def _admin_grant(message: Message, amount_raw: str, target_raw: str) -> No
     if delta is None or target is None or delta == 0:
         await message.answer('Usage: /pay <±credits> <tg_id>. Example: /pay 100 123456789')
         return
-    info = await chat_data.load(target)
+    cid = str(target)
+    info = await chat_data.load(cid)
     balance = info.adjust_credits(delta)
-    await chat_data.save(target, info)
+    await chat_data.save(cid, info)
     logger.info('Admin %s adjusted chat %s by %+d credits, balance %s', message.from_user.id, target, delta, balance)
     await message.answer(f'✅ Chat {target}: {delta:+d} credits. Balance: {balance}.')
 
@@ -80,7 +81,7 @@ async def cmd_pay(message: Message, command: CommandObject) -> None:
 async def cmd_balance(message: Message, command: CommandObject) -> None:
     args = (command.args or '').split()
     if not args:
-        info = await chat_data.load(message.chat.id)
+        info = await chat_data.load(str(message.chat.id))
         await message.answer(f'💳 Balance: {info.credits} credits. Top up: /pay [stars]')
         return
     if not _is_admin(message):
@@ -90,7 +91,7 @@ async def cmd_balance(message: Message, command: CommandObject) -> None:
     if target is None:
         await message.answer('Usage: /balance [tg_id]')
         return
-    info = await chat_data.load(target)
+    info = await chat_data.load(str(target))
     await message.answer(f'💳 Chat {target}: {info.credits} credits.')
 
 
@@ -119,7 +120,7 @@ async def handle_successful_payment(message: Message) -> None:
         logger.warning('Unexpected successful payment in chat %s', message.chat.id)
         return
     # Credits live in the shared per-chat bucket; subscription renewals top up too, as in the old bot.
-    chat_id = message.chat.id
+    chat_id = str(message.chat.id)
     info = await chat_data.load(chat_id)
     info.add_credits(payment.total_amount)
     await chat_data.save(chat_id, info)

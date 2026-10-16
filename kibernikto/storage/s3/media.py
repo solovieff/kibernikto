@@ -43,13 +43,14 @@ class S3MediaStore:  # satisfies MediaStore (structural)
             self._client = None
             logger.info("S3 client closed.")
 
-    async def save(self, chat_id: int, data: bytes, ext: str = "bin", name: str | None = None) -> str:
-        """Upload bytes to S3; returns a media ref ``{chat_id}/{file}``."""
+    async def save(self, conversation_id: str, data: bytes, ext: str = "bin", name: str | None = None) -> str:
+        """Upload bytes to S3; returns a media ref ``{conversation_id}/{file}``."""
+        cid = str(conversation_id)
         client = await self._get_client()
         file_name = name or f"{uuid.uuid4().hex[:12]}.{ext.lstrip('.')}"
-        key = self._key(f"{chat_id}/{file_name}")
+        key = self._key(f"{cid}/{file_name}")
         await client.put_object(Bucket=self._bucket, Key=key, Body=data)
-        return f"{chat_id}/{file_name}"
+        return f"{cid}/{file_name}"
 
     async def read(self, media_ref: str) -> bytes:
         """Read bytes from S3."""

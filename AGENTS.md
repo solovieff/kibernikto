@@ -12,7 +12,7 @@ Kibernikto is a multi-agent AI framework with Telegram bot integration, built on
 
 ### Imports
 - In __init__ files maximum same packes relative imports. No __all__ etc.
-- `chat_id` enables per-chat history for async `run` when `history_storage` is not `None`; omit it and automatic history is skipped
+- `chat_id` is Telegram-only; `conversation_id` (`str`) on `KiberniktoAgent.run` enables per-conversation history (when `history_storage` is not `None`), capability scoping (`CreditTier`, `chat_memory`) and mid-run steering; omit it and automatic history is skipped
 
 ### Model Providers
 - `openrouter:foo/bar` and OpenAI-compatible gateways (`vsegpt:`, `routerai:`, `beget:`) — routed by `infer_kibernikto_model`
