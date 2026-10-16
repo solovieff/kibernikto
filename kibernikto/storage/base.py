@@ -145,4 +145,13 @@ class MemoryHistoryStorage:
         self._storage[cid] = _sanitize(self._storage[cid], keep_thinking=self._keep_thinking)
 
     async def replace_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
-        self._storage[str(conversation_id)] = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+        cid = str(conversation_id)
+        clean = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+        if not clean:
+            self._storage[cid] = []
+            return
+        stored = self._storage[cid]
+        if len(clean) >= len(stored):
+            self._storage[cid] = clean
+        else:
+            stored[-len(clean):] = clean

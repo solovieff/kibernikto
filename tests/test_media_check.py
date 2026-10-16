@@ -120,6 +120,33 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(dead, stored_items)
         self.assertIn(DEAD_LINK_TEXT, stored_items)
 
+    async def test_repairing_dead_link_in_window_preserves_older_history(self) -> None:
+        from pydantic_ai.models.function import AgentInfo, FunctionModel
+        from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+        from kibernikto.storage.base import MemoryHistoryStorage
+
+        def model(messages, info: AgentInfo) -> ModelResponse:
+            return ModelResponse(parts=[TextPart(content='done')])
+
+        storage = MemoryHistoryStorage(history_size=2)
+        await storage.add_messages('4', [
+            ModelRequest(parts=[UserPromptPart(content='ancient fact before window')]),
+            ModelResponse(parts=[TextPart(content='noted')]),
+        ])
+        dead = ImageUrl(url='https://i.ibb.co/dead.jpg')
+        await storage.add_messages('4', _image_turn(dead))
+
+        agent = KiberniktoAgent(model=FunctionModel(model), history_storage=storage)
+        agent.image_head = AsyncMock(return_value=False)
+        agent.image_fetch = AsyncMock(return_value=b'')
+
+        await agent.run('next', conversation_id='4')
+
+        full = await storage.get_full_conversation('4')
+        self.assertEqual(full[0].parts[0].content, 'ancient fact before window')
+        self.assertEqual(full[1].parts[0].content, 'noted')
+        self.assertEqual(full[2].parts[0].content, ['look', DEAD_LINK_TEXT])
+
 
 if __name__ == '__main__':
     unittest.main()

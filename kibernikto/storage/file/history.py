@@ -97,5 +97,11 @@ class FileStoreHistoryStorage:  # satisfies HistoryStorage (structural)
     async def replace_messages(self, conversation_id: str, messages: List[ModelMessage]) -> None:
         cid = str(conversation_id)
         await self._load(cid)
-        self._storage[cid] = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+        clean = _sanitize(list(messages), keep_thinking=self._keep_thinking)
+        if not clean:
+            self._storage[cid] = []
+        elif len(clean) >= len(self._storage[cid]):
+            self._storage[cid] = clean
+        else:
+            self._storage[cid][-len(clean):] = clean
         await self._save(cid)

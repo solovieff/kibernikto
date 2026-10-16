@@ -82,6 +82,15 @@ class FileHistoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_texts(await self.storage.get_full_conversation(3)), ['new', 'answer to new'])
         self.assertEqual(_texts(await self.make().get_full_conversation(3)), ['new', 'answer to new'])
 
+    async def test_replace_tail_preserves_older_messages_beyond_window(self) -> None:
+        await self.storage.add_messages(3, _turn('ancient'))
+        await self.storage.add_messages(3, _turn('recent'))
+        await self.storage.replace_messages(3, _turn('repaired'))
+        self.assertEqual(
+            _texts(await self.make().get_full_conversation(3)),
+            ['ancient', 'answer to ancient', 'repaired', 'answer to repaired'],
+        )
+
     async def test_corrupt_file_degrades_to_empty_history(self) -> None:
         path = self.root / 'history' / 't'
         path.mkdir(parents=True)
@@ -143,6 +152,17 @@ class SqlHistoryTests(unittest.IsolatedAsyncioTestCase):
         await self.storage.replace_messages(9, _turn('new'))
         self.assertEqual(_texts(await self.storage.get_full_conversation(9)), ['new', 'answer to new'])
         self.assertEqual(_texts(await other.get_full_conversation(9)), ['theirs', 'answer to theirs'])
+
+    async def test_replace_tail_preserves_older_rows_beyond_window(self) -> None:
+        await self.storage.add_messages(9, _turn('ancient'))
+        await self.storage.add_messages(9, _turn('recent'))
+        await self.storage.replace_messages(9, _turn('repaired'))
+        self.assertEqual(
+            _texts(await self.storage.get_full_conversation(9)),
+            ['ancient', 'answer to ancient', 'repaired', 'answer to repaired'],
+        )
+        await self.storage.replace_messages(9, [])
+        self.assertEqual(await self.storage.get_full_conversation(9), [])
 
 
 class MediaFileStoreTests(unittest.IsolatedAsyncioTestCase):
