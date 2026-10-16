@@ -106,7 +106,8 @@ class CliStartupTests(unittest.TestCase):
         default_app, multi_app = Mock(), Mock()
         default_agent = Mock(to_telegram=Mock(return_value=default_app))
         multi_agent = Mock(to_telegram=Mock(return_value=multi_app))
-        telegram = SimpleNamespace(kibernikto_telegram_agent=default_agent)
+        state: dict[str, object] = {"active": default_agent}
+        telegram = SimpleNamespace(get_telegram_agent=lambda: state["active"])
 
         def record(name: str) -> None:
             events.append((name, os.environ.get(env_key)))
@@ -119,7 +120,7 @@ class CliStartupTests(unittest.TestCase):
         def set_agent(agent: object) -> None:
             record("set_agent")
             self.assertIs(agent, multi_agent)
-            telegram.kibernikto_telegram_agent = agent
+            state["active"] = agent
 
         telegram.set_telegram_agent = set_agent
         default_app.run_polling.side_effect = lambda: record("poll_default")
@@ -137,7 +138,7 @@ class CliStartupTests(unittest.TestCase):
             "kibernikto.ai.agent.telegram.telegram_agent": telegram,
             "kibernikto.storage.config": SimpleNamespace(validate_storage=lambda: record("storage")),
             "kibernikto.ai.agent.telegram.multi_agent": SimpleNamespace(
-                kibernikto_multi_agent=multi_agent,
+                build_multi_agent=lambda: multi_agent,
             ),
         }
         root = SimpleNamespace(ai=SimpleNamespace(agent=SimpleNamespace(

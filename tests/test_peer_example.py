@@ -32,18 +32,10 @@ class PeerExampleTests(unittest.TestCase):
         peer_factory = Mock(return_value=object())
         builder = Mock(return_value=agent)
         worker_factory = Mock(return_value=agent)
-        model = object()
-        model_settings = object()
         exports = {
             'kibernikto.config': {'configure_logger': events.configure_logger},
             'kibernikto.storage.config': {
                 'STORAGE_SETTINGS': settings, 'validate_storage': events.validate,
-            },
-            'kibernikto.ai.agent.core.config': {
-                'AGENT_KIBERNIKTO_SETTINGS': SimpleNamespace(NAME='configured_bot'),
-            },
-            'kibernikto.ai.agent.core.kibernikto_agent': {
-                'model': model, 'model_settings': model_settings,
             },
             'kibernikto.ai.agent.telegram.telegram_agent': {
                 'TelegramAgent': worker_factory, 'set_telegram_agent': events.register,
@@ -77,16 +69,13 @@ class PeerExampleTests(unittest.TestCase):
         return SimpleNamespace(
             example=example, directory=directory, env_file=env_file,
             settings=settings, events=events, agent=agent, peer_factory=peer_factory,
-            builder=builder, worker_factory=worker_factory, model=model,
-            model_settings=model_settings, imported=imported,
+            builder=builder, worker_factory=worker_factory, imported=imported,
         )
 
     def test_worker_registers_configured_agent_then_polls_without_delegation(self) -> None:
         fixture = self.startup_fixture()
         fixture.example.main(['--env-file', str(fixture.env_file)])
-        fixture.worker_factory.assert_called_once_with(
-            model=fixture.model, model_settings=fixture.model_settings, name='configured_bot',
-        )
+        fixture.worker_factory.assert_called_once_with()
         fixture.builder.assert_not_called()
         fixture.peer_factory.assert_not_called()
         self.assertNotIn('kibernikto.ai.agent.telegram.multi_agent', fixture.imported)

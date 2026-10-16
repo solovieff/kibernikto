@@ -111,7 +111,7 @@ class ConversationHandlerTests(unittest.IsolatedAsyncioTestCase):
         agent.process_message = AsyncMock(side_effect=ModelHTTPError(404, 'm', IMAGE_BODY))
         with patch.object(Message, 'answer', new_callable=AsyncMock) as answer, \
                 patch.object(Message, 'bot', new_callable=lambda: AsyncMock(), create=True), \
-                patch.object(conversation._agent_module, 'kibernikto_telegram_agent', agent):
+                patch.object(conversation._agent_module, 'get_telegram_agent', return_value=agent):
             with self.assertRaises(ModelHTTPError):
                 await conversation._process_and_reply(message)
         hint = answer.await_args.args[0]
@@ -127,7 +127,7 @@ class ConversationHandlerTests(unittest.IsolatedAsyncioTestCase):
         agent.process_message = AsyncMock(side_effect=RuntimeError('boom'))
         with patch.object(Message, 'answer', new_callable=AsyncMock) as answer, \
                 patch.object(Message, 'bot', new_callable=lambda: AsyncMock(), create=True), \
-                patch.object(conversation._agent_module, 'kibernikto_telegram_agent', agent):
+                patch.object(conversation._agent_module, 'get_telegram_agent', return_value=agent):
             with self.assertRaises(RuntimeError):
                 await conversation._process_and_reply(message)
         self.assertIn('администратор', answer.await_args.args[0])

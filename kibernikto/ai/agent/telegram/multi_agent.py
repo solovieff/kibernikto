@@ -51,6 +51,8 @@ def build_multi_agent_with_tg_peers(
 def _build_parent(delegates: list[SubAgent]) -> TelegramAgent:
     """Credit-tiered parent; the constructor model serves non-billable (peer envelope) runs."""
     name = AGENT_KIBERNIKTO_SETTINGS.NAME
+    if image_agent.model is None:
+        image_agent.model = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.POOR_MODEL)
     web_capabilities, web_experts = web_layout()
     sub_agents = KiberniktoSubAgents(
         agents=[*(SubAgent(agent) for agent in _EXPERT_AGENTS), *web_experts, *delegates],
@@ -75,7 +77,3 @@ def _common_model_settings() -> ModelSettings:
         temperature=AGENT_KIBERNIKTO_SETTINGS.MODEL_TEMPERATURE,
         parallel_tool_calls=AGENT_KIBERNIKTO_SETTINGS.MODEL_PARALLEL_TOOL_CALLS,
     )
-
-
-# Pre-built singleton — used by --multi-agent flag.
-kibernikto_multi_agent = build_multi_agent()

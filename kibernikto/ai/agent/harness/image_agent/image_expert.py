@@ -11,7 +11,6 @@ import logging
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ImageUrl
 
-from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.utils import infer_kibernikto_model
@@ -46,7 +45,7 @@ def _get_vision_agent() -> KiberniktoAgent:
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
 image_agent = KiberniktoAgent(
-    model=infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.POOR_MODEL),
+    model=None,
     name="image-agent",
     description="Describes, generates and edits images.",
     system_prompt=IMAGE_SYSTEM_PROMPT,

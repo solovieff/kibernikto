@@ -49,13 +49,13 @@ class EnvExampleTests(unittest.TestCase):
                                   capture_output=True, text=True, timeout=120)
         self.assertEqual(proc.returncode, 0, proc.stderr[-2000:])
 
-    def test_multi_agent_imports_with_only_the_main_provider_key(self) -> None:
-        # Disabled experts (report: vsegpt) must not be built at import time on a fresh install.
+    def test_multi_agent_builds_with_only_the_main_provider_key(self) -> None:
+        # Disabled experts (report: vsegpt) must not be built on a fresh install.
         script = textwrap.dedent("""\
             import os, sys
             os.environ['OPENROUTER_API_KEY'] = 'offline-placeholder'
-            from kibernikto.ai.agent.telegram.multi_agent import kibernikto_multi_agent
-            assert kibernikto_multi_agent is not None
+            from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
+            assert build_multi_agent() is not None
             assert 'kibernikto.ai.agent.harness.report_agent' not in sys.modules
             assert 'kibernikto.ai.agent.harness.scheduler_agent' not in sys.modules
             """)

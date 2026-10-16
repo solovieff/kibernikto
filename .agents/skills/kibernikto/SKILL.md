@@ -56,8 +56,9 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
   into the live run (`priority='asap'`) and return `None`. An explicit `message_history` (even `[]`) skips loading; saving still happens.
 - History window alignment walks back to a request and may return more than `HISTORY_SIZE`.
   Intentional — don't "fix" it.
-- Importing an expert module builds its model. Report (needs `VSEGPT_API_KEY`) and scheduler
-  (no execution daemon) are opt-in: keep them out of `harness/__init__.py` and default wiring.
+- Importing core, harness or Telegram agent modules does not construct provider models or default agent
+  instances. Report (needs `VSEGPT_API_KEY`) and scheduler (no execution daemon) stay opt-in and out of
+  `harness/__init__.py` and default wiring.
 - `KiberniktoAgent(reaction=emoji)`: `telegram/agent_reaction.py` `AgentReaction` sets it on `deps.message`.
   Delegates react at run start; the root (first starter, `deps.extra["reaction_root"]`) only on its own tool
   calls except `skip_tools` (`delegate_task`) — plain chatter gets none. Delegates react only via

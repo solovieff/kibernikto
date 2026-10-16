@@ -6,7 +6,6 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-from pydantic_ai import capabilities
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai_harness.exa import ExaSearch
 from pydantic_ai_harness.researcher import Researcher

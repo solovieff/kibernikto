@@ -3,7 +3,7 @@ import json
 import typing
 import re
 
-from aiogram.client.session import aiohttp
+import aiohttp
 
 
 def split_text(text: str, length: int = 4096) -> typing.List[str]:

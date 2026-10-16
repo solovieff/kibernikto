@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from pydantic_ai import Agent, ModelSettings, AgentRunResult, RunContext, UserError
 from pydantic_ai.capabilities import AbstractCapability, WrapRunHandler
 from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart, UserContent
-from pydantic_ai.models import Model
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
@@ -24,12 +23,16 @@ from kibernikto.utils.time_utils import DEFAULT_TIMEZONE, get_user_date
 logger = logging.getLogger(__name__)
 
 
-model: Model = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
+def default_model_settings() -> ModelSettings:
+    """Default model settings built from ``AGENT_KIBERNIKTO_SETTINGS``."""
+    return ModelSettings(
+        max_tokens=AGENT_KIBERNIKTO_SETTINGS.MODEL_MAX_TOKENS,
+        temperature=AGENT_KIBERNIKTO_SETTINGS.MODEL_TEMPERATURE,
+        parallel_tool_calls=AGENT_KIBERNIKTO_SETTINGS.MODEL_PARALLEL_TOOL_CALLS,
+    )
 
 
-model_settings: ModelSettings = ModelSettings(max_tokens=AGENT_KIBERNIKTO_SETTINGS.MODEL_MAX_TOKENS,
-                                              temperature=AGENT_KIBERNIKTO_SETTINGS.MODEL_TEMPERATURE,
-                                              parallel_tool_calls=AGENT_KIBERNIKTO_SETTINGS.MODEL_PARALLEL_TOOL_CALLS)
+model_settings: ModelSettings = default_model_settings()
 
 
 @dataclasses.dataclass
@@ -73,6 +76,12 @@ class KiberniktoAgent(Agent):
         ``reaction`` is the emoji a transport shows on the user's message when this agent starts a run.
         """
         self._active_runs: dict[str, RunContext[KiberniktoDeps]] = {}
+        kwargs.setdefault("name", AGENT_KIBERNIKTO_SETTINGS.NAME)
+        kwargs.setdefault("deps_type", KiberniktoDeps)
+        if "model" not in kwargs:
+            kwargs["model"] = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
+        if "model_settings" not in kwargs:
+            kwargs["model_settings"] = default_model_settings()
         caps = [*(kwargs.get("capabilities") or ()), _ActiveConversationTracker(self._active_runs)]
         if persona:
             caps.append(PersonaFirst())
@@ -261,14 +270,6 @@ class KiberniktoAgent(Agent):
             # the Telegram reply layer never sees the image.
             content = BinaryImage.narrow_type(binary) if not isinstance(binary, BinaryImage) else binary
             response.parts.append(FilePart(content=content))
-
-
-agent = KiberniktoAgent(
-    model=model,
-    model_settings=model_settings,
-    name=AGENT_KIBERNIKTO_SETTINGS.NAME,
-    deps_type=KiberniktoDeps,
-)
 
 
 async def _store_exists(store_name: str, media_ref: str) -> bool:

@@ -29,15 +29,14 @@ def start(outer_env=False):
 
     if args.multi_agent:
         from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
-        from kibernikto.ai.agent.telegram.multi_agent import kibernikto_multi_agent
+        from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
 
-        # Use the pre-built subagents agent (SubAgents delegation with all expert sub-agents).
-        set_telegram_agent(kibernikto_multi_agent)
+        set_telegram_agent(build_multi_agent())
         print_agent_summary('multi-agent')
     else:
         print_agent_summary('default')
 
-    _tg_agent.kibernikto_telegram_agent.to_telegram().run_polling()
+    _tg_agent.get_telegram_agent().to_telegram().run_polling()
 
 
 if __name__ == '__main__':

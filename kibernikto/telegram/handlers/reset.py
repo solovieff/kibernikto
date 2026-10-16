@@ -53,7 +53,7 @@ async def handle_reset_choice(query: CallbackQuery) -> None:
         await prompt.edit_text('Cancelled.')
         await query.answer()
         return
-    agent = _agent_module.kibernikto_telegram_agent
+    agent = _agent_module.get_telegram_agent()
     notes = await wipe_chat(str(prompt.chat.id), history=agent.history_storage, agent_name=agent.name)
     logger.info('User %s reset chat %s (%d note files)', query.from_user.id, prompt.chat.id, notes)
     await prompt.edit_text('✅ History and notes erased.')

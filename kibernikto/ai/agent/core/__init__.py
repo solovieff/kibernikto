@@ -1,2 +1,2 @@
 from .deps import KiberniktoDeps
-from .kibernikto_agent import agent, model
+from .kibernikto_agent import KiberniktoAgent

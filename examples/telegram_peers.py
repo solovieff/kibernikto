@@ -99,12 +99,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.multimodal:
             agent.capture_peer_media = True
     else:
-        from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-        from kibernikto.ai.agent.core.kibernikto_agent import model, model_settings
-
-        agent = TelegramAgent(
-            model=model, model_settings=model_settings, name=AGENT_KIBERNIKTO_SETTINGS.NAME,
-        )
+        agent = TelegramAgent()
     if args.instructions is not None:
         agent.instructions(args.instructions)
     set_telegram_agent(agent)

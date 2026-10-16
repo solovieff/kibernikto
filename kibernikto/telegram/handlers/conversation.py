@@ -23,7 +23,7 @@ async def _process_and_reply(message: Message) -> None:
     A single "typing…" action is shown; Telegram keeps it up until the answer
     arrives, so there is no need to refresh it on a loop.
     """
-    agent = _agent_module.kibernikto_telegram_agent
+    agent = _agent_module.get_telegram_agent()
 
     await message.bot.send_chat_action(message.chat.id, "typing")
     try:

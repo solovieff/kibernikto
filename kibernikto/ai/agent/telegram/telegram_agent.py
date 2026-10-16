@@ -14,8 +14,6 @@ from pydantic_ai import AgentRunResult, ModelHTTPError, RunContext
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError, map_model_error
-from kibernikto.ai.agent.core.kibernikto_agent import agent as kibernikto_agent
-from kibernikto.ai.agent.core.kibernikto_agent import model as kibernikto_model
 from kibernikto.ai.agent.core.image import generate_image
 from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.core.persona import PersonaSource
@@ -56,6 +54,7 @@ class TelegramAgent(KiberniktoAgent):
             **kwargs,
     ) -> None:
         kwargs.setdefault("deps_type", TelegramDeps)
+        kwargs.setdefault("reaction", AGENT_KIBERNIKTO_SETTINGS.REACTION)
         # Own reaction on the user's message; delegates get theirs via SubAgents(shared_capabilities=...).
         kwargs["capabilities"] = [*(kwargs.get("capabilities") or ()), AgentReaction()]
         super().__init__(**kwargs)
@@ -228,22 +227,23 @@ class TelegramAgent(KiberniktoAgent):
         return TelegramApp.from_agent(self)
 
 
-#: Default agent used by the conversation handlers, built from the same
-#: env-derived config as the core ``kibernikto_agent`` singleton.
-kibernikto_telegram_agent: TelegramAgent = TelegramAgent(
-    model=kibernikto_model,
-    model_settings=kibernikto_agent.model_settings,
-    name=AGENT_KIBERNIKTO_SETTINGS.NAME,
-    reaction=AGENT_KIBERNIKTO_SETTINGS.REACTION,
-)
+_telegram_agent: TelegramAgent | None = None
 
 
-def set_telegram_agent(agent: TelegramAgent) -> TelegramAgent:
+def get_telegram_agent() -> TelegramAgent:
+    """Return the active Telegram agent, building the default one on first call."""
+    global _telegram_agent
+    if _telegram_agent is None:
+        _telegram_agent = TelegramAgent()
+    return _telegram_agent
+
+
+def set_telegram_agent(agent: TelegramAgent) -> TelegramAgent | None:
     """Swap the active agent used by the conversation handlers.
 
     Handlers resolve the agent at call time, so this takes effect as long as
     it runs before the dispatcher starts polling. Returns the previous agent.
     """
-    global kibernikto_telegram_agent
-    previous, kibernikto_telegram_agent = kibernikto_telegram_agent, agent
+    global _telegram_agent
+    previous, _telegram_agent = _telegram_agent, agent
     return previous
