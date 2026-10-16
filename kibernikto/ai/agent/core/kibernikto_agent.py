@@ -13,7 +13,7 @@ from kibernikto.ai.agent.core.media_check import check_history_images, fetch_byt
 from kibernikto.ai.agent.core.persona import (
     PERSONA_INSTRUCTION, PersonaFirst, PersonaSource, StaticPersona, compile_persona, persona_source_text,
 )
-from kibernikto.ai.agent.utils import infer_kibernikto_model, with_attribution
+from kibernikto.ai.agent.utils import build_kibernikto_model, infer_kibernikto_model, with_attribution
 from kibernikto.storage.base import HistoryStorage
 from kibernikto.storage.factory import get_media_store
 from kibernikto.storage.singletons import history_storage, media_store
@@ -79,7 +79,10 @@ class KiberniktoAgent(Agent):
         kwargs.setdefault("name", AGENT_KIBERNIKTO_SETTINGS.NAME)
         kwargs.setdefault("deps_type", KiberniktoDeps)
         if "model" not in kwargs:
-            kwargs["model"] = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
+            kwargs["model"] = build_kibernikto_model(
+                AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME,
+                AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS,
+            )
         if "model_settings" not in kwargs:
             kwargs["model_settings"] = default_model_settings()
         caps = [*(kwargs.get("capabilities") or ()), _ActiveConversationTracker(self._active_runs)]

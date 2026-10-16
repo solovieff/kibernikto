@@ -121,5 +121,51 @@ class AttributionHeadersTest(unittest.IsolatedAsyncioTestCase):
                          f'{APP_SETTINGS.INSTANCE_NAME}:{image.IMAGE_ENGINE_NAME}')
 
 
+class FallbackModelTest(unittest.IsolatedAsyncioTestCase):
+    def test_build_kibernikto_model_without_fallbacks_returns_primary(self) -> None:
+        from kibernikto.ai.agent.utils import build_kibernikto_model
+        with patch.dict(os.environ, _KEYS):
+            model = build_kibernikto_model('beget:some-model')
+            self.assertIsInstance(model, OpenAIChatModel)
+
+    def test_build_kibernikto_model_with_fallbacks_returns_fallback_model(self) -> None:
+        from pydantic_ai.models.fallback import FallbackModel
+        from kibernikto.ai.agent.utils import build_kibernikto_model
+        with patch.dict(os.environ, _KEYS):
+            model = build_kibernikto_model('beget:some-model', ['openrouter:vendor/fallback'])
+            self.assertIsInstance(model, FallbackModel)
+
+    async def test_fallback_model_fails_over_on_model_api_error(self) -> None:
+        from pydantic_ai.exceptions import ModelHTTPError
+        from pydantic_ai.models.fallback import FallbackModel
+        from pydantic_ai.models.function import AgentInfo, FunctionModel
+        from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+
+        def fail_call(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            raise ModelHTTPError(status_code=429, model_name='primary', body='Provider overloaded')
+
+        def ok_call(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            return ModelResponse(parts=[TextPart('recovered by fallback')])
+
+        fallback_model = FallbackModel(FunctionModel(fail_call), FunctionModel(ok_call))
+        agent = KiberniktoAgent(model=fallback_model, history_storage=None, persona=False)
+        result = await agent.run('ping')
+        self.assertEqual(result.output, 'recovered by fallback')
+
+    def test_kibernikto_agent_uses_fallback_models_from_settings(self) -> None:
+        from pydantic_ai.models.fallback import FallbackModel
+        with patch.dict(os.environ, {
+            **_KEYS,
+            'AGENT_KIBERNIKTO_MODEL_NAME': 'beget:primary',
+            'AGENT_KIBERNIKTO_FALLBACK_MODELS': '["openrouter:vendor/fb1", "beget:fb2"]',
+        }):
+            from kibernikto.ai.agent.core.config import AgentKiberniktoSettings
+            from kibernikto.ai.agent.core import kibernikto_agent as ka_mod
+            settings = AgentKiberniktoSettings()
+            with patch.object(ka_mod, 'AGENT_KIBERNIKTO_SETTINGS', settings):
+                agent = ka_mod.KiberniktoAgent(history_storage=None)
+                self.assertIsInstance(agent.model, FallbackModel)
+
+
 if __name__ == '__main__':
     unittest.main()

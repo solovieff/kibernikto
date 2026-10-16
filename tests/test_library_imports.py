@@ -89,9 +89,9 @@ class LibraryImportsTests(unittest.TestCase):
         from kibernikto.ai.agent.core.deps import KiberniktoDeps
 
         sentinel_model = TestModel()
-        with patch.object(ka_mod, "infer_kibernikto_model", return_value=sentinel_model) as infer:
+        with patch.object(ka_mod, "build_kibernikto_model", return_value=sentinel_model) as build_m:
             agent = ka_mod.KiberniktoAgent(history_storage=None)
-        infer.assert_called_once_with(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
+        build_m.assert_called_once_with(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME, AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS)
         self.assertIs(agent.model, sentinel_model)
         self.assertEqual(agent.name, AGENT_KIBERNIKTO_SETTINGS.NAME)
         self.assertIs(agent.deps_type, KiberniktoDeps)
@@ -101,9 +101,9 @@ class LibraryImportsTests(unittest.TestCase):
     def test_kibernikto_agent_explicit_none_model_skips_default_inference(self) -> None:
         from kibernikto.ai.agent.core import kibernikto_agent as ka_mod
 
-        with patch.object(ka_mod, "infer_kibernikto_model") as infer:
+        with patch.object(ka_mod, "build_kibernikto_model") as build_m:
             agent = ka_mod.KiberniktoAgent(model=None, history_storage=None)
-        infer.assert_not_called()
+        build_m.assert_not_called()
         self.assertIsNone(agent.model)
 
     def test_get_and_set_telegram_agent_lazy_default_and_swap(self) -> None:
@@ -115,10 +115,10 @@ class LibraryImportsTests(unittest.TestCase):
         previous = tg_mod._telegram_agent
         try:
             tg_mod._telegram_agent = None
-            with patch.object(ka_mod, "infer_kibernikto_model", return_value=sentinel_model) as infer:
+            with patch.object(ka_mod, "build_kibernikto_model", return_value=sentinel_model) as build_m:
                 default_agent = tg_mod.get_telegram_agent()
                 second_call = tg_mod.get_telegram_agent()
-            infer.assert_called_once_with(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME)
+            build_m.assert_called_once_with(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME, AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS)
             self.assertIs(default_agent, second_call)
             self.assertEqual(default_agent.reaction, AGENT_KIBERNIKTO_SETTINGS.REACTION)
 

@@ -16,7 +16,8 @@ class PeerBuilderTests(unittest.TestCase):
     def test_old_builder_is_unchanged_and_peers_are_opt_in(self):
         original = list(multi_agent._EXPERT_AGENTS)
         peer = TelegramPeerAgent(peer=200, name='remote', description='Remote expert')
-        with patch.object(multi_agent, 'infer_kibernikto_model', return_value=TestModel()), \
+        with patch.object(multi_agent, 'build_kibernikto_model', return_value=TestModel()), \
+             patch.object(multi_agent, 'infer_kibernikto_model', return_value=TestModel()), \
              patch.object(multi_agent, 'KiberniktoSubAgents', wraps=multi_agent.KiberniktoSubAgents) as capability:
             old = multi_agent.build_multi_agent()
             old_members = capability.call_args.kwargs['agents']
@@ -35,7 +36,8 @@ class PeerBuilderTests(unittest.TestCase):
 
     def test_empty_peers_keeps_local_experts(self):
         self.assertTrue(hasattr(multi_agent, 'build_multi_agent_with_tg_peers'))
-        with patch.object(multi_agent, 'infer_kibernikto_model', return_value=TestModel()), \
+        with patch.object(multi_agent, 'build_kibernikto_model', return_value=TestModel()), \
+             patch.object(multi_agent, 'infer_kibernikto_model', return_value=TestModel()), \
              patch.object(multi_agent, 'KiberniktoSubAgents', wraps=multi_agent.KiberniktoSubAgents) as capability:
             multi_agent.build_multi_agent_with_tg_peers([])
             self.assertEqual([s.agent for s in capability.call_args.kwargs['agents']], multi_agent._EXPERT_AGENTS)

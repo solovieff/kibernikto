@@ -14,7 +14,7 @@ from kibernikto.ai.agent.harness.credit_tier import CreditTier
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
 from kibernikto.ai.agent.harness.image_agent import image_agent
 from kibernikto.ai.agent.harness.web import web_layout
-from kibernikto.ai.agent.utils import infer_kibernikto_model
+from kibernikto.ai.agent.utils import build_kibernikto_model, infer_kibernikto_model
 from kibernikto.storage.factory import get_history_storage
 
 from .agent_reaction import AgentReaction
@@ -61,7 +61,7 @@ def _build_parent(delegates: list[SubAgent]) -> TelegramAgent:
         shared_capabilities=[AgentReaction()],  # Each delegate marks the user's message with its own emoji.
     )
     return TelegramAgent(
-        model=infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME),
+        model=build_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME, AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS),
         model_settings=_common_model_settings(),
         name=name,
         reaction=AGENT_KIBERNIKTO_SETTINGS.REACTION,

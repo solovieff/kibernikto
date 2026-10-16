@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from collections.abc import Sequence
 from os import getenv
 from typing import Literal
 
@@ -92,6 +93,23 @@ def infer_kibernikto_model(model: str | None) -> Model | None:
         return OpenRouterModel(model_name, provider=openrouter_provider(), settings=settings)
 
     return infer_model(model=model)
+
+
+def build_kibernikto_model(primary: str | None, fallbacks: Sequence[str] = ()) -> Model | None:
+    """Resolve a primary model and optional fallbacks into a Model (or FallbackModel).
+
+    Returns ``None`` when ``primary`` is empty. If ``fallbacks`` are provided,
+    wraps the resolved models in a ``FallbackModel``.
+    """
+    primary_model = infer_kibernikto_model(primary)
+    if primary_model is None:
+        return None
+    fallback_models = [m for fb in fallbacks if (m := infer_kibernikto_model(fb)) is not None]
+    if not fallback_models:
+        return primary_model
+    from pydantic_ai.models.fallback import FallbackModel
+
+    return FallbackModel(primary_model, *fallback_models)
 
 
 def openai_compatible_provider(name: str) -> KiberniktoOpenAIProvider:

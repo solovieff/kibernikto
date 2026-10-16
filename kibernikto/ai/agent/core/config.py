@@ -27,6 +27,10 @@ class AgentKiberniktoSettings(BaseSettings):
                     "off = drop (reasoning is replayed to the provider on every turn)",
     )
     MODEL_NAME: str = Field(default="openrouter:anthropic/claude-sonnet-5", description="Model name")
+    FALLBACK_MODELS: list[str] = Field(
+        default_factory=list,
+        description="Fallback models in priority order; when set, default model is wrapped in FallbackModel",
+    )
     IMAGE_MODEL_NAME: str | None = Field(
         default=None,
         description="Provider-prefixed model used by the image-generation sub-agent",
