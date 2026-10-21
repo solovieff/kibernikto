@@ -15,6 +15,7 @@ from pydantic_ai.messages import UserContent
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError, map_model_error
 from kibernikto.ai.agent.core.image import generate_image
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.core.persona import PersonaCapability, PersonaSource
 from kibernikto.ai.agent.harness.conversation_history import ConversationHistory, is_steered
 from kibernikto.ai.agent.utils import build_kibernikto_model, with_attribution
@@ -31,6 +32,7 @@ from .chat_context import get_chat_context
 from .deps import TelegramDeps
 from .group_message import annotate_group_message
 from .identity import TelegramPersona, get_bot_identity
+from .telegram_capability import TelegramCapability
 
 logger = logging.getLogger(__name__)
 
@@ -276,6 +278,22 @@ class TelegramAgent(Agent[TelegramDeps]):
 
 
 _telegram_agent: TelegramAgent | None = None
+
+
+def build_telegram_agent(
+        *,
+        history_storage: HistoryStorage | None = history_storage,
+        persona_source: PersonaSource | None = None,
+        reaction: str | None = ...,
+        **kwargs,
+) -> Agent[TelegramDeps]:
+    """Kibernikto agent for Telegram: history, persona named after the bot, Telegram context and reactions."""
+    kwargs.setdefault("deps_type", TelegramDeps)
+    emoji = AGENT_KIBERNIKTO_SETTINGS.REACTION if reaction is ... else reaction
+    kwargs["metadata"] = {**(kwargs.get("metadata") or {}), "reaction": emoji}
+    kwargs["capabilities"] = [*(kwargs.get("capabilities") or ()), TelegramCapability()]
+    return build_kibernikto_agent(history_storage=history_storage,
+                                  persona_source=persona_source or TelegramPersona(), **kwargs)
 
 
 def get_telegram_agent() -> TelegramAgent:
