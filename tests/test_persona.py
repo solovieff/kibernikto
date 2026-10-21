@@ -14,11 +14,11 @@ os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
 from aiogram import Bot
 from aiogram.types import BotDescription, BotShortDescription, User
-from pydantic_ai import capture_run_messages
+from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.models.test import TestModel
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.core.persona import Persona, StaticPersona
 from kibernikto.ai.agent.telegram import identity
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
@@ -39,7 +39,7 @@ class FixedPersona:
         return self.persona
 
 
-async def first_instructions(agent: KiberniktoAgent, deps: object = None) -> str:
+async def first_instructions(agent: Agent, deps: object = None) -> str:
     """One offline run; returns the rendered instructions the model saw."""
     with capture_run_messages() as messages, agent.override(model=TestModel(call_tools=[])):
         await agent.run('hi', deps=deps)
@@ -62,7 +62,7 @@ class PersonaTests(unittest.IsolatedAsyncioTestCase):
     async def test_template_renders_source_values_each_run_without_html_escaping(self) -> None:
         self.write_persona('p1', TEMPLATE)
         source = FixedPersona()
-        agent = KiberniktoAgent(name='p1', history_storage=None, persona_source=source)
+        agent = build_kibernikto_agent(name='p1', history_storage=None, persona_source=source)
         self.assertIn('You are Wraith & co.\nsarcasm: 10\nsarcasm=10', await first_instructions(agent))
         source.persona = Persona(name='Shade', traits={'sarcasm': 2})
         self.assertIn('You are Shade & co.\nsarcasm: 2\nsarcasm=2', await first_instructions(agent))
@@ -79,31 +79,31 @@ class PersonaTests(unittest.IsolatedAsyncioTestCase):
     async def test_static_traits_come_from_env_settings(self) -> None:
         self.write_persona('p3', 'joy={{traits.joy}} missing=[{{traits.nope}}]')
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'PERSONA_TRAITS', {'joy': 3}):
-            agent = KiberniktoAgent(name='p3', history_storage=None, persona_source=StaticPersona(name='K'))
+            agent = build_kibernikto_agent(name='p3', history_storage=None, persona_source=StaticPersona(name='K'))
             self.assertIn('joy=3 missing=[]', await first_instructions(agent))
 
     async def test_plain_text_persona_is_unchanged_and_falls_back_to_who_am_i(self) -> None:
         self.write_persona('p4', 'Plain persona, no templates.')
-        prompt = await first_instructions(KiberniktoAgent(name='p4', history_storage=None))
+        prompt = await first_instructions(build_kibernikto_agent(name='p4', history_storage=None))
         self.assertTrue(prompt.startswith('Plain persona, no templates.\n\nCurrent date: '), prompt)
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'WHO_AM_I', 'Env persona {{name}}.'):
-            agent = KiberniktoAgent(name='absent', history_storage=None, persona_source=StaticPersona(name='E'))
+            agent = build_kibernikto_agent(name='absent', history_storage=None, persona_source=StaticPersona(name='E'))
         self.assertIn('Env persona E.', await first_instructions(agent))
 
     def test_unknown_template_field_fails_at_construction(self) -> None:
         self.write_persona('p5', 'You are {{nmae}}.')
         with self.assertRaisesRegex(Exception, 'nmae'):
-            KiberniktoAgent(name='p5', history_storage=None)
+            build_kibernikto_agent(name='p5', history_storage=None)
 
     async def test_escaped_braces_stay_literal(self) -> None:
         self.write_persona('p7', r'Answer as \{{answer}}, you are {{name}}.')
-        agent = KiberniktoAgent(name='p7', history_storage=None, persona_source=StaticPersona(name='K'))
+        agent = build_kibernikto_agent(name='p7', history_storage=None, persona_source=StaticPersona(name='K'))
         self.assertIn('Answer as {{answer}}, you are K.', await first_instructions(agent))
 
     async def test_template_switch_off_keeps_braces_literal_and_never_fails(self) -> None:
         self.write_persona('p8', 'Format: {{answer}} {{nmae}}')
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'PERSONA_TEMPLATE', False):
-            prompt = await first_instructions(KiberniktoAgent(name='p8', history_storage=None))
+            prompt = await first_instructions(build_kibernikto_agent(name='p8', history_storage=None))
         self.assertTrue(prompt.startswith('Format: {{answer}} {{nmae}}\n\nCurrent date: '), prompt)
 
     async def test_identity_prompt_uses_telegram_display_name(self) -> None:

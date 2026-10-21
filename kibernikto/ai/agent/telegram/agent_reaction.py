@@ -73,6 +73,8 @@ class AgentReaction(AbstractCapability[KiberniktoDeps]):
 
     async def _set(self, agent: object, deps: TelegramDeps) -> None:
         emoji = getattr(agent, "reaction", None)
+        if not emoji and isinstance(meta := getattr(agent, "metadata", None), dict):
+            emoji = meta.get("reaction")
         if not emoji or deps.message is None or not deps.billable:
             return  # Peer envelopes (billable=False) answer a bot: no reactions on the wire request.
         key = (deps.message.message_id, emoji)

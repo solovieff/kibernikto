@@ -20,7 +20,7 @@ from pydantic_ai_harness.subagents import SubAgents
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.harness.credit_tier import CreditTier
 from kibernikto.ai.agent.harness.delegation import DELEGATION_GUIDE
 from kibernikto.ai.agent.harness.web import WEB_EXPERT_DESCRIPTION, WEB_EXPERT_INSTRUCTIONS, WEB_EXPERT_NAME, WEB_SEARCH_GUIDANCE
@@ -176,7 +176,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('(Asia/Tokyo)', instructions)
 
     async def test_works_on_a_plain_kibernikto_agent_without_telegram(self) -> None:
-        agent = KiberniktoAgent(model=named_model('fallback'), name='credit-core', history_storage=None,
+        agent = build_kibernikto_agent(model=named_model('fallback'), name='credit-core', history_storage=None,
                                 deps_type=KiberniktoDeps, capabilities=[self.tier])
         await self.set_credits('7', 900)
         result = await agent.run('hi', conversation_id='7', deps=KiberniktoDeps())

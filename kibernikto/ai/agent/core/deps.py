@@ -1,7 +1,7 @@
 """Run-scoped dependency containers for Kibernikto agents.
 
 A ``deps`` object is created by the caller, passed into
-:meth:`KiberniktoAgent.run` and mutated in place by tools during the run. It
+``agent.run`` and mutated in place by tools during the run. It
 is the side-channel that lets a tool deliver binary results (images, files,
 audio, ...) to the user even though a tool's *return value* only ever flows
 back to the model, never to the end user.

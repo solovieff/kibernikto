@@ -1,6 +1,6 @@
 # Telegram peer sub-agents
 
-`TelegramPeerAgent` is a `KiberniktoAgent`. Use the opt-in public builder;
+`TelegramPeerAgent` is a plain `pydantic_ai.Agent`. Use the opt-in public builder;
 the original `build_multi_agent()` is unchanged:
 
 ```python

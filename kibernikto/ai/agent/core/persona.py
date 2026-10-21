@@ -10,15 +10,21 @@ from pathlib import Path
 from typing import Protocol
 
 from pydantic_ai import RunContext, TemplateStr
-from pydantic_ai.capabilities import AbstractCapability
-from pydantic_ai.messages import AgentInstructionSource, InstructionId
+from pydantic_ai._instructions import SourcedInstruction
+from pydantic_ai.capabilities import AbstractCapability, CapabilityOrdering
+from pydantic_ai.messages import AgentInstructionSource, CapabilityInstructionSource, InstructionId
 from pydantic_ai.models import ModelRequestContext
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.storage.config import STORAGE_SETTINGS
+from kibernikto.utils.time_utils import DEFAULT_TIMEZONE, get_user_date
 
 PERSONA_INSTRUCTION = "persona"
 PERSONA_ID = InstructionId(AgentInstructionSource(), name=PERSONA_INSTRUCTION)
+PERSONA_CAP_ID = "persona"
+PERSONA_CAP_PART_ID = InstructionId(CapabilityInstructionSource(PERSONA_CAP_ID), name=PERSONA_INSTRUCTION)
+DATE_CAP_PART_ID = InstructionId(CapabilityInstructionSource(PERSONA_CAP_ID), name="date")
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,9 +91,77 @@ class PersonaFirst(AbstractCapability[object]):
     async def before_model_request(self, ctx: RunContext[object], request_context: ModelRequestContext) -> ModelRequestContext:
         params = request_context.model_request_parameters
         parts = params.instruction_parts or []
-        persona = next((part for part in parts if part.id == PERSONA_ID), None)
+        persona = next((part for part in parts if part.id in (PERSONA_ID, PERSONA_CAP_PART_ID)), None)
         if persona is None or parts[0] is persona:
             return request_context
         # Leading the prompt makes it the cache prefix either way, so it is marked static.
+        ordered = [replace(persona, dynamic=False), *(part for part in parts if part is not persona)]
+        return replace(request_context, model_request_parameters=replace(params, instruction_parts=ordered))
+
+
+class PersonaCapability(AbstractCapability[object]):
+    """Native capability providing the agent's persona (first) and current date instruction (after capability guidance)."""
+
+    id: str | None = PERSONA_CAP_ID
+
+    def __init__(
+            self,
+            name: str,
+            *,
+            source: PersonaSource | None = None,
+            include_persona: bool = True,
+    ) -> None:
+        self.name = name
+        self.source = source
+        self.include_persona = include_persona
+        self._compiled = (
+            compile_persona(persona_source_text(name), source or StaticPersona())
+            if include_persona
+            else None
+        )
+
+    @classmethod
+    def get_serialization_name(cls) -> str | None:
+        return None
+
+    def get_ordering(self) -> CapabilityOrdering | None:
+        return CapabilityOrdering(position="innermost")
+
+    def _collect_instructions(self) -> list[SourcedInstruction[object]]:
+        items: list[SourcedInstruction[object]] = []
+        if self._compiled is not None:
+            items.append(
+                SourcedInstruction(
+                    self._compiled,
+                    name=PERSONA_INSTRUCTION,
+                    id=PERSONA_CAP_PART_ID,
+                    dynamic=not isinstance(self._compiled, str),
+                )
+            )
+        items.append(
+            SourcedInstruction(
+                self._current_date_prompt,
+                name="date",
+                id=DATE_CAP_PART_ID,
+                dynamic=True,
+            )
+        )
+        return items
+
+    @staticmethod
+    def _current_date_prompt(ctx: RunContext[object]) -> str:
+        timezone = ctx.deps.timezone if isinstance(ctx.deps, KiberniktoDeps) else None
+        return f"Current date: {get_user_date(timezone or DEFAULT_TIMEZONE)}."
+
+    async def before_model_request(
+            self, ctx: RunContext[object], request_context: ModelRequestContext
+    ) -> ModelRequestContext:
+        if self._compiled is None:
+            return request_context
+        params = request_context.model_request_parameters
+        parts = params.instruction_parts or []
+        persona = next((part for part in parts if part.id in (PERSONA_ID, PERSONA_CAP_PART_ID)), None)
+        if persona is None or parts[0] is persona:
+            return request_context
         ordered = [replace(persona, dynamic=False), *(part for part in parts if part is not persona)]
         return replace(request_context, model_request_parameters=replace(params, instruction_parts=ordered))

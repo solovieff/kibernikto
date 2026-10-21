@@ -9,7 +9,7 @@ from typing import Sequence
 
 from pydantic_ai import RunContext
 from pydantic_ai.agent import AgentRunResult
-from pydantic_ai.capabilities import AbstractCapability, CombinedCapability, ProcessHistory
+from pydantic_ai.capabilities import AbstractCapability, CapabilityOrdering, CombinedCapability, ProcessHistory
 from pydantic_ai.capabilities.abstract import WrapRunHandler
 from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart, UserContent
 
@@ -17,11 +17,43 @@ from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.media_check import check_history_images, fetch_bytes, head_alive
 from kibernikto.storage.base import HistoryStorage, _sanitize, _window
-from kibernikto.storage.factory import get_history_storage, get_media_store
+from kibernikto.storage.factory import get_media_store
 from kibernikto.storage.singletons import history_storage, media_store
 from kibernikto.utils.image_hosting import image_hosting
 
 logger = logging.getLogger(__name__)
+
+
+def steer_active_run(
+        active_runs: dict[str, RunContext[KiberniktoDeps]],
+        conversation_id: str,
+        user_prompt: str | Sequence[UserContent],
+        new_deps: object,
+) -> bool:
+    """Enqueue ``user_prompt`` into the live run for ``conversation_id``; True if it was absorbed."""
+    active_ctx = active_runs.get(conversation_id)
+    if active_ctx is None:
+        return False
+    items: list[UserContent] = [user_prompt] if isinstance(user_prompt, str) else list(user_prompt)
+    try:
+        if active_ctx.enqueue(*items, priority="asap") is None:
+            return False
+    except Exception:
+        return False  # Run is finishing: let the caller start a fresh one.
+    if not isinstance(active_deps := active_ctx.deps, KiberniktoDeps) or new_deps is active_deps:
+        return True
+    parts = new_deps.user_message_parts if isinstance(new_deps, KiberniktoDeps) and new_deps.user_message_parts else items
+    active_deps.user_message_parts.extend(parts)
+    if hasattr(active_deps, "message") and (new_msg := getattr(new_deps, "message", None)) is not None:
+        if (prev_msg := active_deps.message) is not None and prev_msg is not new_msg:
+            active_deps.extra.setdefault("steered_messages", []).append(prev_msg)
+        active_deps.message = new_msg  # Transport replies once, to the latest message of the burst.
+    return True
+
+
+def is_steered(result: AgentRunResult | None) -> bool:
+    """True for the empty result of a run absorbed into another live run (it has no messages of its own)."""
+    return result is not None and not result.all_messages()
 
 
 @dataclasses.dataclass
@@ -34,8 +66,16 @@ class _ActiveConversationTracker(AbstractCapability[KiberniktoDeps]):
     def get_serialization_name(cls) -> str | None:
         return None
 
+    def _default_conversation_id(self, run_id: str) -> str | None:
+        return ""  # Anonymous runs stay anonymous: no random UUID for storage/billing to latch onto.
+
+    def get_ordering(self) -> CapabilityOrdering | None:
+        return CapabilityOrdering(position="outermost")  # Steered runs skip every inner hook (billing, history).
+
     async def wrap_run(self, ctx: RunContext[KiberniktoDeps], *, handler: WrapRunHandler) -> AgentRunResult:
         cid = ctx.conversation_id or None
+        if cid is not None and ctx.prompt is not None and steer_active_run(self.active_runs, cid, ctx.prompt, ctx.deps):
+            return AgentRunResult(output=None)  # Absorbed into the live run, which answers once.
         if cid is not None and self.active_runs.get(cid) is None:
             self.active_runs[cid] = ctx
             try:
@@ -57,7 +97,7 @@ async def _store_save(store_name: str, media_ref: str, data: bytes) -> None:
 
 
 class _StorageIO(AbstractCapability[KiberniktoDeps]):
-    def __init__(self, storage: HistoryStorage):
+    def __init__(self, storage: HistoryStorage | None):
         self.storage = storage
 
     async def before_run(self, ctx: RunContext[KiberniktoDeps]) -> None:
@@ -114,10 +154,11 @@ class _StorageIO(AbstractCapability[KiberniktoDeps]):
                 logger.warning("Failed to save generated image for conversation %s: %s", conversation_id, exc)
             try:
                 url = await image_hosting.publish(image.data, f"kibernikto-{uuid.uuid4().hex[:8]}.{ext}")
-                if url:
-                    urls.append(url)
             except Exception as exc:
                 logger.warning("Failed to publish generated image for conversation %s: %s", conversation_id, exc)
+            else:
+                if url:
+                    urls.append(url)
         return urls
 
     @staticmethod
@@ -175,26 +216,5 @@ class ConversationHistory(CombinedCapability[KiberniktoDeps]):
             user_prompt: str | Sequence[UserContent],
             new_deps: object,
     ) -> bool:
-        """Inject ``user_prompt`` into active run for ``conversation_id``; returns True if steered."""
-        active_ctx = self.active_runs.get(conversation_id)
-        if active_ctx is None:
-            return False
-        items: Sequence[UserContent] = [user_prompt] if isinstance(user_prompt, str) else list(user_prompt)
-        try:
-            enqueued = active_ctx.enqueue(*items, priority="asap")
-        except Exception:
-            return False
-        if enqueued is None:
-            return False
-        if isinstance(active_deps := active_ctx.deps, KiberniktoDeps):
-            if isinstance(new_deps, KiberniktoDeps) and new_deps.user_message_parts:
-                active_deps.user_message_parts.extend(new_deps.user_message_parts)
-            else:
-                active_deps.user_message_parts.extend(items)
-            if hasattr(active_deps, "message") and (new_msg := getattr(new_deps, "message", None)) is not None:
-                prev_msg = getattr(active_deps, "message", None)
-                if prev_msg is not None and prev_msg is not new_msg:
-                    active_deps.extra.setdefault("steered_messages", []).append(prev_msg)
-                setattr(active_deps, "message", new_msg)
-        return True
-
+        """Inject ``user_prompt`` into the active run for ``conversation_id``; True if steered."""
+        return steer_active_run(self.active_runs, conversation_id, user_prompt, new_deps)

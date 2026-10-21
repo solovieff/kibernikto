@@ -16,11 +16,10 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.methods import SetMessageReaction
 from aiogram.types import Chat, Message, ReactionTypeEmoji, User
-from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
+from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai_harness.subagents import SubAgent
 
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
 from kibernikto.ai.agent.harness.image_agent import image_agent
 from kibernikto.ai.agent.telegram.agent_reaction import AgentReaction
@@ -49,8 +48,8 @@ def scripted_model(*calls: ToolCallPart) -> FunctionModel:
 
 def build(*, parent: str | None, child: str | None, calls: tuple[ToolCallPart, ...] = (DELEGATE,),
           child_calls: tuple[ToolCallPart, ...] = ()) -> TelegramAgent:
-    expert = KiberniktoAgent(model=scripted_model(*child_calls), name='child', description='child expert',
-                             history_storage=None, persona=False, reaction=child)
+    expert = Agent(model=scripted_model(*child_calls), name='child', description='child expert')
+    expert.reaction = child
     expert.tool_plain(lookup)
     sub_agents = KiberniktoSubAgents(agents=[SubAgent(expert)], agent_folders=None,
                                      shared_capabilities=[AgentReaction()])

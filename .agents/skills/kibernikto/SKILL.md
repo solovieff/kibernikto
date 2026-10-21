@@ -38,7 +38,7 @@ fields change often — read them in source, don't trust a remembered list.
 | Server deploy (podman + systemd, one folder per bot) | `deploy/README.md`, `deploy/scripts/_common.sh` |
 
 Request path: `TelegramApp` → middlewares → handler → active `TelegramAgent.process_message`
-→ `KiberniktoAgent.run` → storage → `reply_to`.
+→ `Agent.run` (`ConversationHistory` loads, steers, saves) → `reply_to`.
 
 ## Contracts and traps
 
@@ -59,14 +59,14 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
 - Importing core, harness or Telegram agent modules does not construct provider models or default agent
   instances. Report (needs `VSEGPT_API_KEY`) and scheduler (no execution daemon) stay opt-in and out of
   `harness/__init__.py` and default wiring.
-- `KiberniktoAgent(reaction=emoji)`: `telegram/agent_reaction.py` `AgentReaction` sets it on `deps.message`.
+- Agent `.reaction` emoji: `telegram/agent_reaction.py` `AgentReaction` sets it on `deps.message`.
   Delegates react at run start; the root (first starter, `deps.extra["reaction_root"]`) only on its own tool
   calls except `skip_tools` (`delegate_task`) — plain chatter gets none. Delegates react only via
   `SubAgents(shared_capabilities=[AgentReaction()])` (wired in `multi_agent.py`). Last emoji stays; peer
   envelopes and Telegram errors never react/fail.
 - Bot menu = `handlers/commands.py` `COMMANDS`, published on startup by `set_bot_commands`; `/help` renders
   the same tuple. New command → add it there.
-- Experts are plain `KiberniktoAgent`s delegated via the real `SubAgents(agents=[SubAgent(a)])`;
+- Experts are plain `pydantic_ai.Agent`s delegated via the real `SubAgents(agents=[SubAgent(a)])`;
   only a parent with the `CreditTier` capability (`harness/credit_tier.py`, wired in
   `multi_agent.py`) selects tier models and spends credits. Peer envelopes set
   `KiberniktoDeps.billable=False`; explicit `run(model=...)`/`override(model=...)` beat the tier.
@@ -140,13 +140,13 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
 ```python
 import asyncio
 from pydantic_ai.models.test import TestModel
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.storage.base import MemoryHistoryStorage
 
 async def smoke():
     history = MemoryHistoryStorage(history_size=6)
-    agent = KiberniktoAgent(model=TestModel(custom_output_text="ok"), name="smoke",
-                            history_storage=history)
+    agent = build_kibernikto_agent(model=TestModel(custom_output_text="ok"), name="smoke",
+                                   history_storage=history)
     result = await agent.run("Hello", conversation_id="42")
     assert result.output == "ok" and await history.get_conversation("42")
 

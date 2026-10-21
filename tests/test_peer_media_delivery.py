@@ -6,7 +6,7 @@ from aiogram import Bot
 from aiogram.methods import SendDocument, SendAudio, SendMessage
 from pydantic_ai.messages import BinaryContent
 from pydantic_ai.models.test import TestModel
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.telegram.utils.conversation import reply
 
@@ -18,7 +18,7 @@ class MediaDeliveryTests(unittest.IsolatedAsyncioTestCase):
         bot.session.make_request = AsyncMock(return_value=message(10))
         incoming = message(1, sender=300, chat_id=300).model_copy(update={
             'from_user': message(1).from_user.model_copy(update={'id': 300, 'is_bot': False})}).as_(bot)
-        agent = KiberniktoAgent(model=TestModel(custom_output_text='done'), history_storage=None)
+        agent = build_kibernikto_agent(model=TestModel(custom_output_text='done'), history_storage=None)
         result = await agent.run('task', deps=TelegramDeps(attachments=[BinaryContent(
             data=b'RIFF', media_type='audio/wav', vendor_metadata={'filename': 'tone.wav'})]))
         await reply(incoming, result)
@@ -38,7 +38,7 @@ class MediaDeliveryTests(unittest.IsolatedAsyncioTestCase):
                 attachments = [BinaryContent(data=b'report', media_type='text/plain', vendor_metadata={'filename': 'résumé.txt'})]
                 if mixed:
                     attachments.append(BinaryContent(data=b'audio', media_type='audio/mpeg', vendor_metadata={'filename': 'tone.mp3'}))
-                agent = KiberniktoAgent(model=TestModel(custom_output_text='full answer'), history_storage=None)
+                agent = build_kibernikto_agent(model=TestModel(custom_output_text='full answer'), history_storage=None)
                 result = await agent.run('task', deps=TelegramDeps(attachments=attachments))
                 await reply(incoming, result)
                 methods = [c.args[1] for c in bot.session.make_request.await_args_list]

@@ -18,7 +18,7 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 
 from kibernikto.ai.agent import utils
 from kibernikto.ai.agent.core import image
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.config import APP_SETTINGS
 from kibernikto.ai.agent.utils import (
     OPENAI_COMPATIBLE_PROVIDERS, KiberniktoOpenAIProvider, MissingProviderKeyError,
@@ -95,7 +95,7 @@ class AttributionHeadersTest(unittest.IsolatedAsyncioTestCase):
             seen.update((info.model_settings or {}).get('extra_headers', {}))
             return ModelResponse(parts=[TextPart('ok')])
 
-        agent = KiberniktoAgent(model=FunctionModel(reply), persona=False, history_storage=None, **kwargs)
+        agent = build_kibernikto_agent(model=FunctionModel(reply), persona=False, history_storage=None, **kwargs)
         await agent.run('hi')
         return seen
 
@@ -148,7 +148,7 @@ class FallbackModelTest(unittest.IsolatedAsyncioTestCase):
             return ModelResponse(parts=[TextPart('recovered by fallback')])
 
         fallback_model = FallbackModel(FunctionModel(fail_call), FunctionModel(ok_call))
-        agent = KiberniktoAgent(model=fallback_model, history_storage=None, persona=False)
+        agent = build_kibernikto_agent(model=fallback_model, history_storage=None, persona=False)
         result = await agent.run('ping')
         self.assertEqual(result.output, 'recovered by fallback')
 
@@ -163,7 +163,7 @@ class FallbackModelTest(unittest.IsolatedAsyncioTestCase):
             from kibernikto.ai.agent.core import kibernikto_agent as ka_mod
             settings = AgentKiberniktoSettings()
             with patch.object(ka_mod, 'AGENT_KIBERNIKTO_SETTINGS', settings):
-                agent = ka_mod.KiberniktoAgent(history_storage=None)
+                agent = ka_mod.build_kibernikto_agent(history_storage=None)
                 self.assertIsInstance(agent.model, FallbackModel)
 
 

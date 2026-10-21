@@ -66,7 +66,7 @@ async def reply(
     ``content`` may be a plain ``str`` (e.g. used by access-denied messages) or
     an :class:`pydantic_ai.AgentRunResult`. In the latter case the model's text
     is sent together with every image and file present in the response — including
-    binaries that tools produced, which ``KiberniktoAgent`` folds into the
+    binaries that tools produced, which ``ConversationHistory`` folds into the
     response as ``FilePart``s.
 
     Returns the text portion that was sent (empty string when only media was delivered).

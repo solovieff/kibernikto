@@ -88,7 +88,7 @@ class CheckHistoryImagesTests(unittest.IsolatedAsyncioTestCase):
 class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
     async def test_dead_history_link_reaches_model_as_text_and_history_is_rewritten(self) -> None:
         from pydantic_ai.models.function import AgentInfo, FunctionModel
-        from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+        from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
         from kibernikto.storage.base import MemoryHistoryStorage
 
         seen: list = []
@@ -100,7 +100,7 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
         storage = MemoryHistoryStorage(history_size=10)
         dead = ImageUrl(url='https://i.ibb.co/dead.jpg')
         await storage.add_messages('4', _image_turn(dead))
-        agent = KiberniktoAgent(model=FunctionModel(model), history_storage=storage)
+        agent = build_kibernikto_agent(model=FunctionModel(model), history_storage=storage)
 
         # Offline: the probes in conversation_history are replaced, so aiohttp is never reached.
         with patch('kibernikto.ai.agent.harness.conversation_history.head_alive', AsyncMock(return_value=False)), \
@@ -122,7 +122,7 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_repairing_dead_link_in_window_preserves_older_history(self) -> None:
         from pydantic_ai.models.function import AgentInfo, FunctionModel
-        from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+        from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
         from kibernikto.storage.base import MemoryHistoryStorage
 
         def model(messages, info: AgentInfo) -> ModelResponse:
@@ -136,7 +136,7 @@ class AgentRepairTests(unittest.IsolatedAsyncioTestCase):
         dead = ImageUrl(url='https://i.ibb.co/dead.jpg')
         await storage.add_messages('4', _image_turn(dead))
 
-        agent = KiberniktoAgent(model=FunctionModel(model), history_storage=storage)
+        agent = build_kibernikto_agent(model=FunctionModel(model), history_storage=storage)
         with patch('kibernikto.ai.agent.harness.conversation_history.head_alive', AsyncMock(return_value=False)), \
              patch('kibernikto.ai.agent.harness.conversation_history.fetch_bytes', AsyncMock(return_value=b'')):
             await agent.run('next', conversation_id='4')

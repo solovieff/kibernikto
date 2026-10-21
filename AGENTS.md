@@ -3,7 +3,7 @@
 ## Project Context
 Kibernikto is a multi-agent AI framework with Telegram bot integration, built on pydantic-ai + aiogram v3.
 - Package: `kibernikto` (PyPI, v2.0.0b1)
-- Core: `KiberniktoAgent` — a `pydantic_ai.Agent` subclass with injectable per-chat history; file-backed by default, PostgreSQL/SQLite via `APP_STORAGE_DATA_BACKEND`
+- Core: `build_kibernikto_agent()` — a plain `pydantic_ai.Agent` with `ConversationHistory` + `PersonaCapability`; file-backed by default, PostgreSQL/SQLite via `APP_STORAGE_DATA_BACKEND`
 - Telegram: aiogram dispatcher with conversation handlers, middlewares, multimodal preprocessor
 - Dependencies: `pydantic-ai`, `aiogram`, `logfire`, `pydantic-ai-harness`
 - Config: global settings via `pydantic_settings.BaseSettings` (env vars: `APP_*`, `APP_STORAGE_*`, `AGENT_KIBERNIKTO_*`, `TG_*`, `TRANSCRIBE_*`); agent constructors retain dependency-injection arguments
@@ -12,7 +12,7 @@ Kibernikto is a multi-agent AI framework with Telegram bot integration, built on
 
 ### Imports
 - In __init__ files maximum same packes relative imports. No __all__ etc.
-- `chat_id` is Telegram-only; `conversation_id` (`str`) on `KiberniktoAgent.run` enables per-conversation history (when `history_storage` is not `None`), capability scoping (`CreditTier`, `chat_memory`) and mid-run steering; omit it and automatic history is skipped
+- `chat_id` is Telegram-only; `conversation_id` (`str`) on `agent.run` enables per-conversation history (via `ConversationHistory`) (when `history_storage` is not `None`), capability scoping (`CreditTier`, `chat_memory`) and mid-run steering; omit it and automatic history is skipped
 
 ### Model Providers
 - `openrouter:foo/bar` and OpenAI-compatible gateways (`vsegpt:`, `routerai:`, `beget:`) — routed by `infer_kibernikto_model`
@@ -33,7 +33,7 @@ CLI (kibernikto command / main.py)
   │     ├── payment/ (Telegram Stars)
   │     └── agent/telegram_app.py (TelegramApp: Bot + Dispatcher + polling)
   ├── kibernikto.ai.agent
-  │     ├── core/kibernikto_agent.py (KiberniktoAgent)
+  │     ├── core/kibernikto_agent.py (build_kibernikto_agent)
   │     ├── telegram/telegram_agent.py (TelegramAgent: process_message + reply_to)
   │     └── utils.py (infer_kibernikto_model)
   └── kibernikto.storage
@@ -43,7 +43,7 @@ CLI (kibernikto command / main.py)
 ```
 
 ### Agent Patterns
-- Subclass `KiberniktoAgent` to add tools, change system prompt, swap model
+- No agent superclass: compose `Agent(capabilities=[...])` or call `build_kibernikto_agent(...)`, then add tools
 - Subclass `TelegramAgent` in `kibernikto/ai/agent/telegram/telegram_agent.py` + call that module's `set_telegram_agent(...)` before the dispatcher starts; `agent.to_telegram()` builds the app but does not register the agent
 - `agent.run` returns `AgentRunResult` — use `result.output` for text or structured output, not `result.data`
 

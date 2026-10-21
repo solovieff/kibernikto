@@ -10,7 +10,7 @@ from aiogram.types import Document, File, Update
 from pydantic_ai.messages import BinaryContent, ModelResponse, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai_harness.subagents import SubAgent, SubAgents
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
 from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
@@ -63,7 +63,8 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 deps.add_attachment(BinaryContent(data=result.output.encode(), media_type='text/plain',
                                                   vendor_metadata={'filename': 'vision.txt'}))
                 # A normal tool queues these before run returns; emulate at delivery boundary.
-                remote._materialize_attachments(result, deps)
+                remote_history = next(c for c in remote.root_capability.capabilities if hasattr(c, '_materialize_attachments'))
+                remote_history._materialize_attachments(result, deps)
             await remote.reply_to(event, result)
         app.dispatcher.message.register(handler)
         with patch.object(TELEGRAM_SETTINGS, 'PEER_IDS', [100]):
@@ -402,7 +403,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(returns[-1].content, 'saw shapes')
                 return ModelResponse(parts=[TextPart('done')])
             return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'remote', 'task': 'describe only this'})])
-        parent = KiberniktoAgent(model=FunctionModel(parent_model), history_storage=None,
+        parent = build_kibernikto_agent(model=FunctionModel(parent_model), history_storage=None,
                                 capabilities=[SubAgents(agents=[SubAgent(peer)])])
         photo = BinaryContent(data=b'photo', media_type='image/png')
         unrelated = BinaryContent(data=b'private output', media_type='text/plain')

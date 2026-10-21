@@ -1,4 +1,4 @@
-"""Offline regressions for mid-run steering via KiberniktoAgent.run(..., conversation_id=...)."""
+"""Offline regressions for mid-run steering via agent.run(..., conversation_id=...)."""
 
 import asyncio
 import os
@@ -22,7 +22,8 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai_harness.subagents import SubAgent
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
+from kibernikto.ai.agent.harness.conversation_history import is_steered
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
 from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
 from kibernikto.storage.base import MemoryHistoryStorage
@@ -53,7 +54,7 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
                 return ModelResponse(parts=[ToolCallPart(tool_name='slow_tool', args={})])
             return ModelResponse(parts=[TextPart(content=' | '.join(seen_steps[-1]))])
 
-        agent = KiberniktoAgent(model=FunctionModel(model_fn), name='steer-tool',
+        agent = build_kibernikto_agent(model=FunctionModel(model_fn), name='steer-tool',
                                 history_storage=history, persona=False)
 
         @agent.tool_plain
@@ -66,7 +67,7 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
         await tool_started.wait()
 
         second_result = await agent.run('second message mid-tool', conversation_id='chat-42')
-        self.assertIsNone(second_result)
+        self.assertTrue(is_steered(second_result))
 
         release_tool.set()
         first_result = await first_task
@@ -92,14 +93,14 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
                 return ModelResponse(parts=[TextPart(content='draft')])
             return ModelResponse(parts=[TextPart(content=' + '.join(_user_texts(messages)))])
 
-        agent = KiberniktoAgent(model=FunctionModel(model_fn), name='steer-direct',
+        agent = build_kibernikto_agent(model=FunctionModel(model_fn), name='steer-direct',
                                 history_storage=history, persona=False)
 
         first_task = asyncio.create_task(agent.run('part 1', conversation_id='chat-7'))
         await model_started.wait()
 
         second_result = await agent.run('part 2', conversation_id='chat-7')
-        self.assertIsNone(second_result)
+        self.assertTrue(is_steered(second_result))
 
         release_model.set()
         first_result = await first_task
@@ -115,7 +116,7 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
             await both_started.wait()
             return ModelResponse(parts=[TextPart(content=_user_texts(messages)[-1])])
 
-        agent = KiberniktoAgent(model=FunctionModel(model_fn), name='steer-isolated',
+        agent = build_kibernikto_agent(model=FunctionModel(model_fn), name='steer-isolated',
                                 history_storage=history, persona=False)
 
         res_a, res_b = await asyncio.gather(
@@ -139,7 +140,7 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
                 return ModelResponse(parts=[ToolCallPart(tool_name='wait_for_photo', args={})])
             return ModelResponse(parts=[TextPart(content='done')])
 
-        agent = KiberniktoAgent(model=FunctionModel(model_fn), name='steer-deps',
+        agent = build_kibernikto_agent(model=FunctionModel(model_fn), name='steer-deps',
                                 history_storage=None, persona=False, deps_type=KiberniktoDeps)
 
         @agent.tool_plain
@@ -155,14 +156,14 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
         img = ImageUrl(url='https://example.com/cat.jpg')
         deps2 = KiberniktoDeps(user_message_parts=['second with photo', img])
         steered = await agent.run(['second with photo', img], conversation_id='chat-9', deps=deps2)
-        self.assertIsNone(steered)
+        self.assertTrue(is_steered(steered))
 
         release_tool.set()
         await first_task
         self.assertIn(img, deps1.user_message_parts)
 
     async def test_delegated_subagent_is_not_swallowed_by_parent_active_run(self) -> None:
-        child = KiberniktoAgent(
+        child = build_kibernikto_agent(
             model=FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('child_answer')])),
             name='child-expert',
             description='helper',
@@ -178,7 +179,7 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
                 return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'child-expert', 'task': 'help'})])
             return ModelResponse(parts=[TextPart('parent_done')])
 
-        parent = KiberniktoAgent(
+        parent = build_kibernikto_agent(
             model=FunctionModel(parent_fn),
             name='parent',
             history_storage=MemoryHistoryStorage(),

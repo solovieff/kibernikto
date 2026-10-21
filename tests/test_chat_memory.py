@@ -19,7 +19,7 @@ from pydantic_ai_harness.memory import FileStore, InMemoryStore, Memory, SqliteM
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
-from kibernikto.ai.agent.core.kibernikto_agent import KiberniktoAgent
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.harness.chat_memory import chat_memory
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
@@ -114,7 +114,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('The user did not write it', self.model.requests[-1].instructions)
 
     async def test_works_on_a_plain_kibernikto_agent_without_telegram(self) -> None:
-        agent = KiberniktoAgent(model=FunctionModel(self.model), name='mem-core', history_storage=self.history,
+        agent = build_kibernikto_agent(model=FunctionModel(self.model), name='mem-core', history_storage=self.history,
                                 deps_type=KiberniktoDeps,
                                 capabilities=chat_memory('mem-core', store=self.store, history=self.history))
         await agent.run('tool:write_memory:- likes cats', conversation_id='5', deps=KiberniktoDeps())
