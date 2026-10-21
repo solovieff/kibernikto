@@ -82,7 +82,6 @@ class TelegramAgent(Agent[TelegramDeps]):
             kwargs["model_settings"] = default_model_settings()
 
         self._active_runs: dict[str, RunContext[TelegramDeps]] = {}
-        self._history_storage = history_storage
 
         self._conv_history = ConversationHistory(
             history_storage,
@@ -116,10 +115,6 @@ class TelegramAgent(Agent[TelegramDeps]):
 
         if AGENT_KIBERNIKTO_SETTINGS.IMAGE_MODEL_NAME:
             self.tool(generate_image)
-
-    @property
-    def history_storage(self) -> HistoryStorage | None:
-        return self._history_storage
 
     @staticmethod
     def default_persona_source() -> PersonaSource:

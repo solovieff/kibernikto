@@ -7,7 +7,7 @@ import logging
 import uuid
 from typing import Sequence
 
-from pydantic_ai import RunContext
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.capabilities import AbstractCapability, CapabilityOrdering, CombinedCapability, ProcessHistory
 from pydantic_ai.capabilities.abstract import WrapRunHandler
@@ -174,6 +174,13 @@ class _StorageIO(AbstractCapability[KiberniktoDeps]):
         response = result[last_response]
         result[last_response] = dataclasses.replace(response, parts=[*response.parts, TextPart(content=text)])
         return result
+
+
+def history_storage_of(agent: Agent) -> HistoryStorage | None:
+    """History backend of the agent's ``ConversationHistory``; ``None`` when it has none."""
+    found: list[HistoryStorage | None] = []
+    agent.root_capability.apply(lambda cap: found.append(cap.storage) if isinstance(cap, _StorageIO) else None)
+    return found[0] if found else None
 
 
 class ConversationHistory(CombinedCapability[KiberniktoDeps]):

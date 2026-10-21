@@ -85,6 +85,14 @@ class ConversationHistoryTests(unittest.IsolatedAsyncioTestCase):
             if isinstance(msg, ModelResponse):
                 self.assertFalse(any(isinstance(p, ThinkingPart) for p in msg.parts))
 
+    def test_history_storage_of_finds_storage_or_none(self) -> None:
+        from kibernikto.ai.agent.harness.conversation_history import ConversationHistory, history_storage_of
+        with_history = Agent(FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('x')])),
+                             capabilities=[ConversationHistory(storage=self.storage)])
+        bare = Agent(FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('x')])))
+        self.assertIs(history_storage_of(with_history), self.storage)
+        self.assertIsNone(history_storage_of(bare))
+
 
 if __name__ == '__main__':
     unittest.main()
