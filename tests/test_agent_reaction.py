@@ -24,7 +24,7 @@ from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
 from kibernikto.ai.agent.harness.image_agent import image_agent
 from kibernikto.ai.agent.telegram.agent_reaction import AgentReaction
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
-from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 
 
 def user_message() -> Message:
@@ -47,13 +47,13 @@ def scripted_model(*calls: ToolCallPart) -> FunctionModel:
 
 
 def build(*, parent: str | None, child: str | None, calls: tuple[ToolCallPart, ...] = (DELEGATE,),
-          child_calls: tuple[ToolCallPart, ...] = ()) -> TelegramAgent:
+          child_calls: tuple[ToolCallPart, ...] = ()) -> Agent:
     expert = Agent(model=scripted_model(*child_calls), name='child', description='child expert', metadata={'reaction': child})
     expert.tool_plain(lookup)
     sub_agents = KiberniktoSubAgents(agents=[SubAgent(expert)], agent_folders=None,
                                      shared_capabilities=[AgentReaction()])
-    agent = TelegramAgent(model=scripted_model(*calls), name='parent', history_storage=None,
-                          persona=False, reaction=parent, capabilities=[sub_agents])
+    agent = build_telegram_agent(model=scripted_model(*calls), name='parent', history_storage=None,
+                                 persona=False, reaction=parent, capabilities=[sub_agents])
     agent.tool_plain(lookup)
     return agent
 
@@ -63,7 +63,7 @@ def lookup() -> str:
     return 'found'
 
 
-async def run(agent: TelegramAgent, message: Message | None = None, **deps: bool) -> str:
+async def run(agent: Agent, message: Message | None = None, **deps: bool) -> str:
     result = await agent.run('hi', deps=TelegramDeps(message=message, **deps))
     return result.output
 

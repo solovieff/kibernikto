@@ -1,4 +1,4 @@
-"""Runnable Telegram bot application — built via TelegramApp.from_agent()."""
+"""Runnable Telegram bot application — built via TelegramApp.from_bridge()."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from kibernikto.telegram.peer_hub import PeerHub
 from kibernikto.telegram.middleware.middleware_peer import PeerMiddleware
 
 if TYPE_CHECKING:
-    from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+    from kibernikto.telegram.bridge import TelegramBridge
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +38,11 @@ class TelegramApp:
         await self.dispatcher.start_polling(self.bot)
 
     @classmethod
-    def from_agent(cls, agent: TelegramAgent) -> TelegramApp:
-        """Build a full Telegram bot wired to *agent*.
+    def from_bridge(cls, bridge: TelegramBridge) -> TelegramApp:
+        """Build a full Telegram bot serving *bridge* and register it as the active bridge."""
+        from kibernikto.telegram.bridge import set_telegram_bridge
+        set_telegram_bridge(bridge)
 
-        Creates Bot + Dispatcher, registers middlewares / routers, hooks startup.
-        Does NOT call set_telegram_agent() — caller is responsible for that.
-        """
         from kibernikto.config import APP_SETTINGS
         from kibernikto.telegram.config import TELEGRAM_SETTINGS
         from kibernikto.telegram.handlers import commands_router, conversation_router, payments_router, reset_router

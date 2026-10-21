@@ -107,14 +107,15 @@ class PeerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_app_installs_peer_middleware_before_access_checks(self):
         from kibernikto.telegram.agent.telegram_app import TelegramApp
-        from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+        from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
+        from kibernikto.telegram.bridge import TelegramBridge
         from kibernikto.telegram.middleware.middleware_peer import PeerMiddleware
         from pydantic_ai.models.test import TestModel
         from kibernikto.telegram.config import TELEGRAM_SETTINGS
         from unittest.mock import patch
 
         with patch.object(TELEGRAM_SETTINGS, 'BOT_KEY', '100:offline-test-token'):
-            app = TelegramApp.from_agent(TelegramAgent(model=TestModel()))
+            app = TelegramApp.from_bridge(TelegramBridge(build_telegram_agent(model=TestModel(), history_storage=None)))
         self.assertIsInstance(app.dispatcher.message.outer_middleware[0], PeerMiddleware)
         self.assertIs(app.peer_hub, app.dispatcher.message.outer_middleware[0].hub)
         await app.bot.session.close()

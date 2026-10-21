@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from pydantic_ai import ModelSettings
+from pydantic_ai import Agent, ModelSettings
 from pydantic_ai_harness.subagents import SubAgent
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
@@ -18,7 +18,8 @@ from kibernikto.ai.agent.utils import build_kibernikto_model, infer_kibernikto_m
 from kibernikto.storage.factory import get_history_storage
 
 from .agent_reaction import AgentReaction
-from .telegram_agent import TelegramAgent
+from .deps import TelegramDeps
+from .telegram_agent import build_telegram_agent
 
 if TYPE_CHECKING:
     from .peer_agent import TelegramPeerAgent
@@ -30,25 +31,25 @@ logger = logging.getLogger(__name__)
 _EXPERT_AGENTS = [image_agent]
 
 
-def build_multi_agent() -> TelegramAgent:
+def build_multi_agent() -> Agent[TelegramDeps]:
     """Build the credit-tiered parent with all experts wired via SubAgents delegation."""
     return _build_parent([])
 
 
 def build_multi_agent_with_tg_peers(
         peers: list[TelegramPeerAgent],
-) -> TelegramAgent:
+) -> Agent[TelegramDeps]:
     """Build local experts plus explicitly supplied Telegram peers.
 
     No remote tokens, polling or network requests are needed at construction.
-    Register the result with ``set_telegram_agent`` before running ``to_telegram``.
+    Wrap the result in TelegramBridge and pass it to TelegramApp.from_bridge.
     Correlated answers are admitted automatically; no duplicate env allowlist.
     """
     # No timeout_seconds: the peer owns its deadline; an equal outer one races it and cancels mid-reply.
     return _build_parent([SubAgent(peer) for peer in peers])
 
 
-def _build_parent(delegates: list[SubAgent]) -> TelegramAgent:
+def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
     """Credit-tiered parent; the constructor model serves non-billable (peer envelope) runs."""
     name = AGENT_KIBERNIKTO_SETTINGS.NAME
     if image_agent.model is None:
@@ -60,7 +61,7 @@ def _build_parent(delegates: list[SubAgent]) -> TelegramAgent:
         contain_errors=True,
         shared_capabilities=[AgentReaction()],  # Each delegate marks the user's message with its own emoji.
     )
-    return TelegramAgent(
+    return build_telegram_agent(
         model=build_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME, AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS),
         model_settings=_common_model_settings(),
         name=name,

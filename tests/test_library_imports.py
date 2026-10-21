@@ -66,13 +66,16 @@ class LibraryImportsTests(unittest.TestCase):
 
     def test_telegram_agent_and_multi_agent_import_without_provider_credentials(self) -> None:
         proc = self._run_isolated("""\
-            from kibernikto.ai.agent.telegram import TelegramAgent, TelegramDeps, get_telegram_agent, set_telegram_agent
+            from kibernikto.ai.agent.telegram import build_telegram_agent, TelegramCapability, TelegramDeps
             from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent, build_multi_agent_with_tg_peers
+            from kibernikto.telegram.bridge import TelegramBridge, get_telegram_bridge, set_telegram_bridge
 
-            assert TelegramAgent is not None
+            assert TelegramCapability is not None
             assert TelegramDeps is not None
-            assert callable(get_telegram_agent)
-            assert callable(set_telegram_agent)
+            assert callable(build_telegram_agent)
+            assert TelegramBridge is not None
+            assert callable(get_telegram_bridge)
+            assert callable(set_telegram_bridge)
             assert callable(build_multi_agent)
             assert callable(build_multi_agent_with_tg_peers)
         """)
@@ -116,27 +119,28 @@ class LibraryImportsTests(unittest.TestCase):
         build_m.assert_not_called()
         self.assertIsNone(agent.model)
 
-    def test_get_and_set_telegram_agent_lazy_default_and_swap(self) -> None:
+    def test_get_and_set_telegram_bridge_lazy_default_and_swap(self) -> None:
         from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
-        from kibernikto.ai.agent.telegram import telegram_agent as tg_mod
+        from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
+        from kibernikto.telegram import bridge as br_mod
 
         sentinel_model = TestModel()
-        previous = tg_mod._telegram_agent
+        previous = br_mod._bridge
         try:
-            tg_mod._telegram_agent = None
-            with patch.object(tg_mod, "build_kibernikto_model", return_value=sentinel_model) as build_m:
-                default_agent = tg_mod.get_telegram_agent()
-                second_call = tg_mod.get_telegram_agent()
+            br_mod._bridge = None
+            with patch('kibernikto.ai.agent.core.kibernikto_agent.build_kibernikto_model', return_value=sentinel_model) as build_m:
+                default = br_mod.get_telegram_bridge()
+                second_call = br_mod.get_telegram_bridge()
             build_m.assert_called_once_with(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME, AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS)
-            self.assertIs(default_agent, second_call)
-            self.assertEqual(default_agent._metadata['reaction'], AGENT_KIBERNIKTO_SETTINGS.REACTION)
+            self.assertIs(default, second_call)
+            self.assertEqual(default.agent._metadata['reaction'], AGENT_KIBERNIKTO_SETTINGS.REACTION)
 
-            custom = tg_mod.TelegramAgent(model=TestModel(), name="custom_tg", history_storage=None)
-            returned_prev = tg_mod.set_telegram_agent(custom)
-            self.assertIs(returned_prev, default_agent)
-            self.assertIs(tg_mod.get_telegram_agent(), custom)
+            custom = br_mod.TelegramBridge(build_telegram_agent(model=TestModel(), name='custom_tg', history_storage=None))
+            returned_prev = br_mod.set_telegram_bridge(custom)
+            self.assertIs(returned_prev, default)
+            self.assertIs(br_mod.get_telegram_bridge(), custom)
         finally:
-            tg_mod._telegram_agent = previous
+            br_mod._bridge = previous
 
 
 if __name__ == "__main__":

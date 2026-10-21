@@ -25,8 +25,10 @@ from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.harness.conversation_history import is_steered
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
-from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+from kibernikto.ai.agent.telegram.deps import TelegramDeps
+from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 from kibernikto.storage.base import MemoryHistoryStorage
+from kibernikto.telegram.bridge import TelegramBridge
 
 
 def _user_texts(messages: list[ModelMessage]) -> list[str]:
@@ -207,31 +209,32 @@ class SteeringTests(unittest.IsolatedAsyncioTestCase):
                 return ModelResponse(parts=[TextPart(content='first draft')])
             return ModelResponse(parts=[TextPart(content='combined answer')])
 
-        tg_agent = TelegramAgent(
+        tg_agent = build_telegram_agent(
             model=FunctionModel(model_fn),
             name='tg-steer',
             history_storage=MemoryHistoryStorage(),
             persona=False,
             reaction='👀',
         )
-        tg_agent.build_deps = AsyncMock(side_effect=lambda msg: tg_agent._deps_type(message=msg, is_personal=True))
+        bridge = TelegramBridge(tg_agent)
+        bridge.build_deps = AsyncMock(side_effect=lambda msg: TelegramDeps(message=msg, is_personal=True))
 
         chat = Chat(id=500, type='private')
         user = User(id=500, is_bot=False, first_name='Alice')
         msg1 = Message(message_id=10, date=datetime.now(timezone.utc), chat=chat, from_user=user, text='hello').as_(bot)
         msg2 = Message(message_id=11, date=datetime.now(timezone.utc), chat=chat, from_user=user, text='wait also this').as_(bot)
 
-        task1 = asyncio.create_task(tg_agent.process_message(msg1))
+        task1 = asyncio.create_task(bridge.process_message(msg1))
         await model_started.wait()
 
-        res2 = await tg_agent.process_message(msg2)
+        res2 = await bridge.process_message(msg2)
         self.assertIsNone(res2)
-        await tg_agent.reply_to(msg2, res2)
+        await bridge.reply_to(msg2, res2)
 
         release_model.set()
         res1 = await task1
         self.assertIsNotNone(res1)
-        await tg_agent.reply_to(msg1, res1)
+        await bridge.reply_to(msg1, res1)
 
         reactions = [c.args[1] for c in bot.session.make_request.await_args_list if isinstance(c.args[1], SetMessageReaction)]
         self.assertEqual(len(reactions), 1)

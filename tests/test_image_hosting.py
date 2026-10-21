@@ -155,7 +155,8 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def test_app_shutdown_closes_image_hosting(self) -> None:
         from kibernikto.telegram.agent.telegram_app import TelegramApp
         from kibernikto.telegram.config import TELEGRAM_SETTINGS
-        from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+        from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
+        from kibernikto.telegram.bridge import TelegramBridge
         from pydantic_ai.models.test import TestModel
 
         from aiogram import Dispatcher
@@ -163,7 +164,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         # Module-level routers attach to one Dispatcher per process; this test only needs the hooks.
         with patch.object(TELEGRAM_SETTINGS, 'BOT_KEY', '100:offline-test-token'), \
                 patch.object(Dispatcher, 'include_router'):
-            app = TelegramApp.from_agent(TelegramAgent(model=TestModel()))
+            app = TelegramApp.from_bridge(TelegramBridge(build_telegram_agent(model=TestModel(), history_storage=None)))
         self.addAsyncCleanup(app.bot.session.close)
         with patch.object(hosting.image_hosting, 'aclose', AsyncMock()) as aclose, \
                 patch('kibernikto.storage.factory.shutdown_storage', AsyncMock()):

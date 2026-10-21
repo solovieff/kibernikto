@@ -13,8 +13,9 @@ from pydantic_ai_harness.subagents import SubAgent, SubAgents
 from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
-from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 from kibernikto.telegram.agent.telegram_app import TelegramApp
+from kibernikto.telegram.bridge import TelegramBridge
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.peer_protocol import PeerEnvelope, FILENAME
 
@@ -54,7 +55,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             prompt = next(p.content for m in messages for p in m.parts if isinstance(p, UserPromptPart))
             observed.extend(prompt)
             return ModelResponse(parts=[TextPart('red circle')])
-        remote = TelegramAgent(model=FunctionModel(model), history_storage=None)
+        remote = TelegramBridge(build_telegram_agent(model=FunctionModel(model), history_storage=None))
         deps = TelegramDeps(is_personal=True)
         remote.build_deps = AsyncMock(return_value=deps)
         async def handler(event):
@@ -63,7 +64,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 deps.add_attachment(BinaryContent(data=result.output.encode(), media_type='text/plain',
                                                   vendor_metadata={'filename': 'vision.txt'}))
                 # A normal tool queues these before run returns; emulate at delivery boundary.
-                remote_history = next(c for c in remote.root_capability.capabilities if hasattr(c, '_materialize_attachments'))
+                remote_history = next(c for c in remote.agent.root_capability.capabilities if hasattr(c, '_materialize_attachments'))
                 remote_history._materialize_attachments(result, deps)
             await remote.reply_to(event, result)
         app.dispatcher.message.register(handler)
@@ -90,13 +91,14 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             'text': None, 'caption': 'describe',
             'photo': [PhotoSize(file_id='photo', file_unique_id='u', width=1, height=1, file_size=5)]}).as_(bot)
         photo = BinaryContent(data=b'photo', media_type='image/jpeg')
-        agent = TelegramAgent(model=FunctionModel(lambda messages, info: ModelResponse(parts=[TextPart('done')])),
-                              history_storage=None, capture_peer_media=True)
+        agent = build_telegram_agent(model=FunctionModel(lambda messages, info: ModelResponse(parts=[TextPart('done')])),
+                                     history_storage=None)
+        bridge = TelegramBridge(agent, capture_peer_media=True)
         deps = TelegramDeps()
-        agent.build_deps = AsyncMock(return_value=deps)
-        agent.pre_processor.process_tg_message = AsyncMock(side_effect=AssertionError('legacy processing'))
+        bridge.build_deps = AsyncMock(return_value=deps)
+        bridge.pre_processor.process_tg_message = AsyncMock(side_effect=AssertionError('legacy processing'))
         with patch('kibernikto.telegram.peer_inputs.capture_peer_inputs', new=AsyncMock(return_value=[photo])) as capture:
-            result = await agent.process_message(human)
+            result = await bridge.process_message(human)
         self.assertEqual(result.output, 'done')
         self.assertEqual(deps.peer_inputs, [photo])
         self.assertEqual(deps.user_message_parts, ['describe', photo])
@@ -112,15 +114,16 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         def model(messages, info):
             calls.append(messages)
             return ModelResponse(parts=[TextPart('done')])
-        agent = TelegramAgent(model=FunctionModel(model), history_storage=None)
-        agent.build_deps = AsyncMock(return_value=TelegramDeps())
+        agent = build_telegram_agent(model=FunctionModel(model), history_storage=None)
+        bridge = TelegramBridge(agent)
+        bridge.build_deps = AsyncMock(return_value=TelegramDeps())
         with patch.object(TELEGRAM_SETTINGS, 'PEER_IDS', [100]), patch(
-                'kibernikto.ai.agent.telegram.telegram_agent.download_envelope', new=AsyncMock(return_value=envelope)) as download:
-            self.assertIsNotNone(await agent.process_message(inbound))
-            self.assertIsNone(await agent.process_message(inbound))
-            self.assertIsNone(await agent.process_message(inbound.model_copy(update={'message_id': 99})))
+                'kibernikto.telegram.bridge.download_envelope', new=AsyncMock(return_value=envelope)) as download:
+            self.assertIsNotNone(await bridge.process_message(inbound))
+            self.assertIsNone(await bridge.process_message(inbound))
+            self.assertIsNone(await bridge.process_message(inbound.model_copy(update={'message_id': 99})))
             edited = inbound.model_copy(update={'edit_date': inbound.date, 'caption': envelope.caption.replace(envelope.request_id, 'f' * 32)})
-            self.assertIsNone(await agent.process_message(edited))
+            self.assertIsNone(await bridge.process_message(edited))
             download.assert_awaited_once()
         self.assertEqual(len(calls), 1)
 
@@ -131,15 +134,16 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         request = PeerEnvelope.create('request', 'task', [])
         inbound = wire_message(request, sender=100, reply_id=None).model_copy(update={
             'chat': message(1, chat_id=100).chat}).as_(bot)
-        agent = TelegramAgent(model=FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('done')])), history_storage=None)
-        agent.build_deps = AsyncMock()
+        agent = build_telegram_agent(model=FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('done')])), history_storage=None)
+        bridge = TelegramBridge(agent)
+        bridge.build_deps = AsyncMock()
         with patch.object(TELEGRAM_SETTINGS, 'PEER_IDS', [100]), patch(
-                'kibernikto.ai.agent.telegram.telegram_agent.download_envelope', new=AsyncMock(side_effect=PeerProtocolError('invalid'))):
-            result = await agent.process_message(inbound)
+                'kibernikto.telegram.bridge.download_envelope', new=AsyncMock(side_effect=PeerProtocolError('invalid'))):
+            result = await bridge.process_message(inbound)
         self.assertIsInstance(result, PeerEnvelope)
         self.assertEqual(result.kind, 'error')
         self.assertEqual(result.request_id, request.request_id)
-        agent.build_deps.assert_not_awaited()
+        bridge.build_deps.assert_not_awaited()
 
     async def test_unsolicited_wire_request_still_passes_firewall_before_download(self):
         from kibernikto.telegram.middleware.middleware_firewall import FirewallMiddleware
@@ -151,13 +155,14 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         envelope = PeerEnvelope.create('request', 'task', [])
         inbound = wire_message(envelope, sender=100, reply_id=None).model_copy(update={
             'chat': message(1, chat_id=100).chat})
-        agent = TelegramAgent(model=FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('done')])), history_storage=None)
+        agent = build_telegram_agent(model=FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('done')])), history_storage=None)
+        bridge = TelegramBridge(agent)
         async def handler(event):
-            await agent.process_message(event)
+            await bridge.process_message(event)
         app.dispatcher.message.register(handler)
         bot.session.make_request = AsyncMock(return_value=message(12))
         with patch.multiple(TELEGRAM_SETTINGS, PEER_IDS=[100], PUBLIC=False, MASTER_ID=999, MASTER_IDS=[]), patch(
-                'kibernikto.ai.agent.telegram.telegram_agent.download_envelope', new=AsyncMock()) as download, self.assertLogs(
+                'kibernikto.telegram.bridge.download_envelope', new=AsyncMock()) as download, self.assertLogs(
                     'kibernikto.telegram.middleware.middleware_firewall', level='WARNING'):
             await app.dispatcher.feed_update(bot, Update(update_id=1, message=inbound))
             download.assert_not_awaited()
@@ -170,14 +175,15 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             'chat': message(1, chat_id=100).chat}).as_(bot)
         def fail(messages, info):
             raise RuntimeError('private internal details')
-        agent = TelegramAgent(model=FunctionModel(fail), history_storage=None)
-        agent.build_deps = AsyncMock(return_value=TelegramDeps())
+        agent = build_telegram_agent(model=FunctionModel(fail), history_storage=None)
+        bridge = TelegramBridge(agent)
+        bridge.build_deps = AsyncMock(return_value=TelegramDeps())
         bot.session.make_request = AsyncMock(return_value=message(12, sender=200))
         with patch.object(TELEGRAM_SETTINGS, 'PEER_IDS', [100]), patch(
-                'kibernikto.ai.agent.telegram.telegram_agent.download_envelope', new=AsyncMock(return_value=envelope)), self.assertLogs(
-                    'kibernikto.ai.agent.telegram.telegram_agent', level='ERROR'):
-            result = await agent.process_message(inbound)
-            await agent.reply_to(inbound, result)
+                'kibernikto.telegram.bridge.download_envelope', new=AsyncMock(return_value=envelope)), self.assertLogs(
+                    'kibernikto.telegram.bridge', level='ERROR'):
+            result = await bridge.process_message(inbound)
+            await bridge.reply_to(inbound, result)
         sent = bot.session.make_request.await_args.args[1]
         self.assertIsInstance(sent, SendDocument)
         response = PeerEnvelope.decode(sent.document.data)
@@ -265,9 +271,9 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         request = PeerEnvelope.create('request', 'task', [])
         incoming = wire_message(request, sender=100, reply_id=None).model_copy(update={
             'chat': message(1, chat_id=100).chat}).as_(bot)
-        remote = TelegramAgent(model=TestModel(custom_output_text='done'), history_storage=None)
+        remote = TelegramBridge(build_telegram_agent(model=TestModel(custom_output_text='done'), history_storage=None))
         deps = TelegramDeps(attachments=[BinaryContent(data=b'x' * (MAX_BINARY_BYTES + 1), media_type='text/plain')])
-        result = await remote.run('task', deps=deps)
+        result = await remote.agent.run('task', deps=deps)
         result._peer_request_id = request.request_id
         bot.session.make_request = AsyncMock(return_value=message(12))
         with patch.object(TELEGRAM_SETTINGS, 'PEER_IDS', [100]):

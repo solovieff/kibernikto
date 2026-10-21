@@ -26,9 +26,10 @@ from kibernikto.ai.agent.harness.delegation import DELEGATION_GUIDE
 from kibernikto.ai.agent.harness.web import WEB_EXPERT_DESCRIPTION, WEB_EXPERT_INSTRUCTIONS, WEB_EXPERT_NAME, WEB_SEARCH_GUIDANCE
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
-from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 from kibernikto.storage.base import MemoryHistoryStorage
 from kibernikto.storage.models import ConversationInfo
+from kibernikto.telegram.bridge import TelegramBridge
 from kibernikto.utils.time_utils import get_user_date
 
 POOR, MEDIUM, RICH = 'test:poor', 'test:medium', 'test:rich'
@@ -71,7 +72,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(settings.stop)
         self.tier = CreditTier(models={name: named_model(name, tool_step=True) for name in (POOR, POOR_PREFIXED, MEDIUM, RICH)})
         self.history = MemoryHistoryStorage()
-        self.agent = TelegramAgent(model=named_model('fallback'), name='credit-test',
+        self.agent = build_telegram_agent(model=named_model('fallback'), name='credit-test',
                                    history_storage=self.history, capabilities=[self.tier])
 
         @self.agent.tool_plain
@@ -157,10 +158,10 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
                                           'from': {'id': 7, 'is_bot': False, 'first_name': 'A'}})
         await self.set_credits('7', 100)
         saved = dict(self.chat_data.rows)
-        with patch('kibernikto.ai.agent.telegram.telegram_agent.chat_data', self.chat_data), \
-                patch('kibernikto.ai.agent.telegram.telegram_agent.get_chat_context',
+        with patch('kibernikto.telegram.bridge.chat_data', self.chat_data), \
+                patch('kibernikto.telegram.bridge.get_chat_context',
                       AsyncMock(return_value='chat_type: private | full_name: A')):
-            deps = await self.agent.build_deps(message)
+            deps = await TelegramBridge(self.agent).build_deps(message)
         self.assertEqual(self.chat_data.loads, 1)
         self.assertEqual(self.chat_data.rows, saved)
         self.assertEqual(deps.chat_info.credits, 100)

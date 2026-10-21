@@ -104,10 +104,10 @@ class CliStartupTests(unittest.TestCase):
         events: list[tuple[str, str | None]] = []
         env_key = "CLI_STARTUP_TEST_VALUE"
         default_app, multi_app = Mock(), Mock()
-        default_agent = Mock(to_telegram=Mock(return_value=default_app))
-        multi_agent = Mock(to_telegram=Mock(return_value=multi_app))
-        state: dict[str, object] = {"active": default_agent}
-        telegram = SimpleNamespace(get_telegram_agent=lambda: state["active"])
+        default_bridge, multi_bridge = Mock(), Mock()
+        multi_agent = Mock()
+        app_cls = Mock()
+        app_cls.from_bridge.side_effect = lambda bridge: default_app if bridge is default_bridge else multi_app
 
         def record(name: str) -> None:
             events.append((name, os.environ.get(env_key)))
@@ -117,12 +117,15 @@ class CliStartupTests(unittest.TestCase):
             os.environ.setdefault(env_key, "selected-file")
             return True
 
-        def set_agent(agent: object) -> None:
-            record("set_agent")
-            self.assertIs(agent, multi_agent)
-            state["active"] = agent
+        def get_bridge() -> Mock:
+            record("bridge")
+            return default_bridge
 
-        telegram.set_telegram_agent = set_agent
+        def bridge_factory(agent: object) -> Mock:
+            record("bridge")
+            self.assertIs(agent, multi_agent)
+            return multi_bridge
+
         default_app.run_polling.side_effect = lambda: record("poll_default")
         multi_app.run_polling.side_effect = lambda: record("poll_multi")
         config = SimpleNamespace(
@@ -135,14 +138,17 @@ class CliStartupTests(unittest.TestCase):
                 AGENT_KIBERNIKTO_SETTINGS=object(),
                 print_agent_summary=lambda name: record("summary:" + name),
             ),
-            "kibernikto.ai.agent.telegram.telegram_agent": telegram,
             "kibernikto.storage.config": SimpleNamespace(validate_storage=lambda: record("storage")),
+            "kibernikto.telegram.agent.telegram_app": SimpleNamespace(TelegramApp=app_cls),
+            "kibernikto.telegram.bridge": SimpleNamespace(
+                TelegramBridge=bridge_factory, get_telegram_bridge=get_bridge,
+            ),
             "kibernikto.ai.agent.telegram.multi_agent": SimpleNamespace(
                 build_multi_agent=lambda: multi_agent,
             ),
         }
         root = SimpleNamespace(ai=SimpleNamespace(agent=SimpleNamespace(
-            telegram=SimpleNamespace(telegram_agent=telegram),
+            telegram=SimpleNamespace(telegram_agent=SimpleNamespace()),
         )))
         real_import = builtins.__import__
 
@@ -176,7 +182,7 @@ class CliStartupTests(unittest.TestCase):
         self.assertEqual(events[0], ("dotenv:custom.env", None))
         self.assertTrue(all(value == "selected-file" for _, value in events[1:]))
         self.assertEqual([name for name, _ in events if not name.startswith("import:")], [
-            "dotenv:custom.env", "logger", "banner", "storage", "summary:default", "poll_default",
+            "dotenv:custom.env", "logger", "banner", "storage", "bridge", "summary:default", "poll_default",
         ])
         default_app.run_polling.assert_called_once_with()
         multi_app.run_polling.assert_not_called()
@@ -198,7 +204,7 @@ class CliStartupTests(unittest.TestCase):
         loader.assert_called_once_with(dotenv_path=".env")
         self.assertIn(("import:kibernikto.ai.agent.telegram.multi_agent", "selected-file"), events)
         self.assertEqual([name for name, _ in events if not name.startswith("import:")], [
-            "dotenv:.env", "logger", "banner", "storage", "set_agent", "summary:multi-agent", "poll_multi",
+            "dotenv:.env", "logger", "banner", "storage", "bridge", "summary:multi-agent", "poll_multi",
         ])
         default_app.run_polling.assert_not_called()
         multi_app.run_polling.assert_called_once_with()

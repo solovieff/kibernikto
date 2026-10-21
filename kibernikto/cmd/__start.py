@@ -17,7 +17,6 @@ def start(outer_env=False):
 
     # Runtime imports construct settings and providers from the selected environment.
     from kibernikto.config import configure_logger, print_banner
-    import kibernikto.ai.agent.telegram.telegram_agent as _tg_agent
 
     configure_logger()
     print_banner()
@@ -26,17 +25,19 @@ def start(outer_env=False):
     validate_storage()
 
     from kibernikto.ai.agent.core.config import print_agent_summary
+    from kibernikto.telegram.agent.telegram_app import TelegramApp
+    from kibernikto.telegram.bridge import TelegramBridge, get_telegram_bridge
 
     if args.multi_agent:
-        from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
         from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
 
-        set_telegram_agent(build_multi_agent())
+        bridge = TelegramBridge(build_multi_agent())
         print_agent_summary('multi-agent')
     else:
+        bridge = get_telegram_bridge()
         print_agent_summary('default')
 
-    _tg_agent.get_telegram_agent().to_telegram().run_polling()
+    TelegramApp.from_bridge(bridge).run_polling()
 
 
 if __name__ == '__main__':

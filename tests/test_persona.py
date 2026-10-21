@@ -23,7 +23,7 @@ from kibernikto.ai.agent.core.persona import Persona, StaticPersona
 from kibernikto.ai.agent.telegram import identity
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.identity import BotIdentity, fetch_bot_identity, set_bot_identity
-from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 from kibernikto.storage.config import STORAGE_SETTINGS
 
 TEMPLATE = "You are {{name}} & co.\n{{#each traits}}{{@key}}: {{this}}\n{{/each}}sarcasm={{traits.sarcasm}}"
@@ -69,7 +69,7 @@ class PersonaTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_telegram_name_comes_from_bot_identity_and_env_override_wins(self) -> None:
         self.write_persona('p2', 'You are {{name}}.')
-        agent = TelegramAgent(name='p2', history_storage=None)
+        agent = build_telegram_agent(name='p2', history_storage=None)
         self.assertIn('You are Kibernikto.', await first_instructions(agent, TelegramDeps()))
         set_bot_identity(BotIdentity(username='cyber_bot', full_name='Кибер Никто'))
         self.assertIn('You are Кибер Никто.', await first_instructions(agent, TelegramDeps()))
@@ -108,7 +108,7 @@ class PersonaTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_identity_prompt_uses_telegram_display_name(self) -> None:
         set_bot_identity(BotIdentity(username='cyber_bot', full_name='Кибер Никто', short_description='тень'))
-        prompt = await first_instructions(TelegramAgent(name='p6', history_storage=None), TelegramDeps())
+        prompt = await first_instructions(build_telegram_agent(name='p6', history_storage=None), TelegramDeps())
         self.assertIn('[Your Telegram bot parameters] username: @cyber_bot | display_name: Кибер Никто | '
                       'short_description: тень', prompt)
         self.assertEqual(BotIdentity().as_prompt(), '')

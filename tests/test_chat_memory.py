@@ -23,7 +23,7 @@ from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.harness.chat_memory import chat_memory
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
-from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 from kibernikto.storage import factory
 from kibernikto.storage.base import MemoryHistoryStorage
 from kibernikto.storage.sql.memory import asyncpg_dsn
@@ -56,7 +56,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.store = InMemoryStore()
         self.history = MemoryHistoryStorage(history_size=2)
         self.model = ScriptedModel()
-        self.agent = TelegramAgent(model=FunctionModel(self.model), name='mem-test', history_storage=self.history,
+        self.agent = build_telegram_agent(model=FunctionModel(self.model), name='mem-test', history_storage=self.history,
                                    capabilities=chat_memory('mem-test', store=self.store, history=self.history))
 
     async def say(self, conversation_id: int | str, text: str) -> None:
@@ -73,7 +73,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
     async def test_persona_precedes_memory_guidance(self) -> None:
         # Plain persona is a static string, the case where stock capability guidance used to jump ahead of it.
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'WHO_AM_I', 'PERSONA-MARK'):
-            agent = TelegramAgent(model=FunctionModel(self.model), name='mem-order', history_storage=self.history,
+            agent = build_telegram_agent(model=FunctionModel(self.model), name='mem-order', history_storage=self.history,
                                   capabilities=chat_memory('mem-order', store=self.store, history=self.history))
         await agent.run('hello', conversation_id='5', deps=TelegramDeps())
         instructions = self.model.requests[-1].instructions or ''
@@ -125,7 +125,7 @@ class ChatMemoryTests(unittest.IsolatedAsyncioTestCase):
     async def test_conversation_memory_class_capability(self) -> None:
         from kibernikto.ai.agent.harness.conversation_memory import ConversationMemory
         mem = ConversationMemory('mem-cls', store=self.store, history=self.history)
-        agent = TelegramAgent(model=FunctionModel(self.model), name='mem-cls', history_storage=self.history,
+        agent = build_telegram_agent(model=FunctionModel(self.model), name='mem-cls', history_storage=self.history,
                               capabilities=[mem])
         await agent.run('tool:write_memory:- likes dogs', conversation_id='10', deps=TelegramDeps())
         self.assertEqual(dict(self.store.files), {'10/mem-cls/MEMORY.md': '- likes dogs\n'})
@@ -168,7 +168,7 @@ class PostgresMemoryTests(unittest.IsolatedAsyncioTestCase):
         self.pool = LazyAsyncpgPool(os.environ['KIBERNIKTO_TEST_PG_DSN'])
         self.model = ScriptedModel()
         history = MemoryHistoryStorage()
-        self.agent = TelegramAgent(model=FunctionModel(self.model), name='pg-test', history_storage=history,
+        self.agent = build_telegram_agent(model=FunctionModel(self.model), name='pg-test', history_storage=history,
                                    capabilities=chat_memory('pg-test', history=history,
                                                             store=PostgresMemoryStore(self.pool, table=self.TABLE)))
 

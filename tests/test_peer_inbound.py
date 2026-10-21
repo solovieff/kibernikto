@@ -16,8 +16,9 @@ from aiogram.types import Chat, Message, User
 from pydantic_ai.models.test import TestModel
 
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
-from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 from kibernikto.telegram.config import TELEGRAM_SETTINGS, TelegramSettings
+from kibernikto.telegram.bridge import TelegramBridge
 from kibernikto.telegram.utils.conversation import reply
 
 
@@ -51,9 +52,9 @@ class PeerInboundTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.bot = Bot('100:offline-test-token')
         self.bot.session.make_request = AsyncMock(return_value=make_message())
-        self.agent = TelegramAgent(model=TestModel(custom_output_text='answer'),
-                                   pre_processor=TextPreprocessor(), history_storage=None)
-        self.agent.build_deps = AsyncMock(return_value=TelegramDeps(is_personal=True))
+        agent = build_telegram_agent(model=TestModel(custom_output_text='answer'), history_storage=None)
+        self.bridge = TelegramBridge(agent, pre_processor=TextPreprocessor())
+        self.bridge.build_deps = AsyncMock(return_value=TelegramDeps(is_personal=True))
         self.settings_patch = patch.multiple(TELEGRAM_SETTINGS, PEER_IDS=[200], BOT_MESSAGE_DELAY=0)
         self.settings_patch.start()
         self.addCleanup(self.settings_patch.stop)
@@ -63,10 +64,10 @@ class PeerInboundTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_allowlisted_private_request_runs_model_and_sends_correlated_reply(self) -> None:
         message = make_message().as_(self.bot)
-        result = await self.agent.process_message(message)
+        result = await self.bridge.process_message(message)
         self.assertIsNotNone(result)
         self.assertEqual(result.output, 'answer')
-        await self.agent.reply_to(message, result)
+        await self.bridge.reply_to(message, result)
         self.bot.session.make_request.assert_awaited_once()
         sent = self.bot.session.make_request.await_args.args[1]
         self.assertEqual(sent.chat_id, message.chat.id)
@@ -77,11 +78,11 @@ class PeerInboundTests(unittest.IsolatedAsyncioTestCase):
         for peer_ids in ([], [300]):
             with self.subTest(peer_ids=peer_ids), patch.object(TELEGRAM_SETTINGS, 'PEER_IDS', peer_ids):
                 message = make_message().as_(self.bot)
-                with patch.object(self.agent.pre_processor, 'process_tg_message', new_callable=AsyncMock) as process:
-                    self.assertIsNone(await self.agent.process_message(message))
+                with patch.object(self.bridge.pre_processor, 'process_tg_message', new_callable=AsyncMock) as process:
+                    self.assertIsNone(await self.bridge.process_message(message))
                     process.assert_not_awaited()
                 self.assertEqual(await reply(message, 'answer'), '')
-        self.agent.build_deps.assert_not_awaited()
+        self.bridge.build_deps.assert_not_awaited()
         self.bot.session.make_request.assert_not_awaited()
 
     async def test_private_bot_replies_never_become_new_requests(self) -> None:
@@ -89,41 +90,41 @@ class PeerInboundTests(unittest.IsolatedAsyncioTestCase):
         for reply_id in (1, 999):
             with self.subTest(reply_id=reply_id):
                 message = make_message(reply_id=reply_id).as_(self.bot)
-                with patch.object(self.agent.pre_processor, 'process_tg_message', new_callable=AsyncMock) as process:
-                    self.assertIsNone(await self.agent.process_message(message))
+                with patch.object(self.bridge.pre_processor, 'process_tg_message', new_callable=AsyncMock) as process:
+                    self.assertIsNone(await self.bridge.process_message(message))
                     process.assert_not_awaited()
                 self.assertEqual(await reply(message, 'answer'), '')
-        self.agent.build_deps.assert_not_awaited()
+        self.bridge.build_deps.assert_not_awaited()
         self.bot.session.make_request.assert_not_awaited()
 
     async def test_private_human_replies_still_run_and_reply(self) -> None:
         message = make_message(sender=300, is_bot=False, reply_id=1).as_(self.bot)
-        result = await self.agent.process_message(message)
+        result = await self.bridge.process_message(message)
         self.assertEqual(result.output, 'answer')
-        await self.agent.reply_to(message, result)
+        await self.bridge.reply_to(message, result)
         sent = self.bot.session.make_request.await_args.args[1]
         self.assertEqual(sent.reply_parameters.message_id, message.message_id)
 
     async def test_group_bots_keep_flat_replies_and_configured_delay(self) -> None:
         message = make_message(sender=300, chat_type='supergroup', reply_id=1).as_(self.bot)
-        self.agent.build_deps.return_value = TelegramDeps(is_personal=False, username='peer')
+        self.bridge.build_deps.return_value = TelegramDeps(is_personal=False, username='peer')
         with patch.object(TELEGRAM_SETTINGS, 'BOT_MESSAGE_DELAY', 1), patch(
-            'kibernikto.ai.agent.telegram.telegram_agent.asyncio.sleep', new_callable=AsyncMock
-        ) as sleep, patch('kibernikto.ai.agent.telegram.telegram_agent.random.uniform', return_value=2):
-            result = await self.agent.process_message(message)
+            'kibernikto.telegram.bridge.asyncio.sleep', new_callable=AsyncMock
+        ) as sleep, patch('kibernikto.telegram.bridge.random.uniform', return_value=2):
+            result = await self.bridge.process_message(message)
         sleep.assert_awaited_once_with(2)
         self.assertEqual(result.output, 'answer')
-        await self.agent.reply_to(message, result)
+        await self.bridge.reply_to(message, result)
         sent = self.bot.session.make_request.await_args.args[1]
         self.assertIsNone(sent.reply_parameters)
         self.assertEqual(sent.chat_id, message.chat.id)
 
     async def test_group_humans_keep_anchored_replies(self) -> None:
         message = make_message(sender=300, is_bot=False, chat_type='group').as_(self.bot)
-        self.agent.build_deps.return_value = TelegramDeps(is_personal=False, user_full_name='sender')
-        result = await self.agent.process_message(message)
+        self.bridge.build_deps.return_value = TelegramDeps(is_personal=False, user_full_name='sender')
+        result = await self.bridge.process_message(message)
         self.assertEqual(result.output, 'answer')
-        await self.agent.reply_to(message, result)
+        await self.bridge.reply_to(message, result)
         sent = self.bot.session.make_request.await_args.args[1]
         self.assertEqual(sent.reply_parameters.message_id, message.message_id)
 

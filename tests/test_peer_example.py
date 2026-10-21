@@ -27,23 +27,27 @@ class PeerExampleTests(unittest.TestCase):
         stack.enter_context(patch.dict(os.environ, {'PEER_EXAMPLE_SENTINEL': 'inherited'}))
         settings = SimpleNamespace(DATA_BACKEND=backend, SQLITE_PATH=sqlite_path)
         events = Mock()
-        agent = Mock(capture_peer_media=False)
-        events.attach_mock(agent.to_telegram.return_value.run_polling, 'poll')
+        agent = Mock()
+        app_cls = Mock()
+        events.attach_mock(app_cls.from_bridge.return_value.run_polling, 'poll')
         peer_factory = Mock(return_value=object())
         builder = Mock(return_value=agent)
         worker_factory = Mock(return_value=agent)
+        bridge_factory = Mock(side_effect=lambda agent, **kw: SimpleNamespace(agent=agent, **kw))
         exports = {
             'kibernikto.config': {'configure_logger': events.configure_logger},
             'kibernikto.storage.config': {
                 'STORAGE_SETTINGS': settings, 'validate_storage': events.validate,
             },
             'kibernikto.ai.agent.telegram.telegram_agent': {
-                'TelegramAgent': worker_factory, 'set_telegram_agent': events.register,
+                'build_telegram_agent': worker_factory,
             },
             'kibernikto.ai.agent.telegram.peer_agent': {'TelegramPeerAgent': peer_factory},
             'kibernikto.ai.agent.telegram.multi_agent': {
                 'build_multi_agent_with_tg_peers': builder,
             },
+            'kibernikto.telegram.bridge': {'TelegramBridge': bridge_factory},
+            'kibernikto.telegram.agent.telegram_app': {'TelegramApp': app_cls},
         }
         modules: dict[str, ModuleType] = {}
         for name, attributes in exports.items():
@@ -70,6 +74,7 @@ class PeerExampleTests(unittest.TestCase):
             example=example, directory=directory, env_file=env_file,
             settings=settings, events=events, agent=agent, peer_factory=peer_factory,
             builder=builder, worker_factory=worker_factory, imported=imported,
+            bridge_factory=bridge_factory, app_cls=app_cls,
         )
 
     def test_worker_registers_configured_agent_then_polls_without_delegation(self) -> None:
@@ -79,23 +84,23 @@ class PeerExampleTests(unittest.TestCase):
         fixture.builder.assert_not_called()
         fixture.peer_factory.assert_not_called()
         self.assertNotIn('kibernikto.ai.agent.telegram.multi_agent', fixture.imported)
-        self.assertEqual(fixture.events.mock_calls, [call.configure_logger(), call.validate(), call.register(fixture.agent), call.poll()])
-        fixture.agent.to_telegram.assert_called_once_with()
+        self.assertEqual(fixture.events.mock_calls, [call.configure_logger(), call.validate(), call.poll()])
+        fixture.app_cls.from_bridge.assert_called_once()
         fixture.agent.run.assert_not_called()
-        self.assertIs(fixture.agent.capture_peer_media, False)
+        self.assertIs(fixture.bridge_factory.call_args.kwargs['capture_peer_media'], False)
 
     def test_caller_builds_poetry_peer_with_public_builder(self) -> None:
         fixture = self.startup_fixture()
         fixture.example.main(['--env-file', str(fixture.env_file), '--peer', '@ExamplePoetBot'])
         fixture.peer_factory.assert_called_once_with(
             peer='@ExamplePoetBot', name='poet',
-            description='Пишет стихи по заданной теме, размеру и настроению.',
+            description='Пишет стихи по заданной теме, размеру и настроению.', multimodal=False,
         )
         fixture.builder.assert_called_once_with([fixture.peer_factory.return_value])
         fixture.worker_factory.assert_not_called()
-        self.assertEqual(fixture.events.mock_calls, [call.configure_logger(), call.validate(), call.register(fixture.agent), call.poll()])
+        self.assertEqual(fixture.events.mock_calls, [call.configure_logger(), call.validate(), call.poll()])
         fixture.agent.run.assert_not_called()
-        self.assertIs(fixture.agent.capture_peer_media, False)
+        self.assertIs(fixture.bridge_factory.call_args.kwargs['capture_peer_media'], False)
 
     def test_multimodal_caller_opts_peer_into_binary_transport(self) -> None:
         fixture = self.startup_fixture()
@@ -112,13 +117,12 @@ class PeerExampleTests(unittest.TestCase):
 
     def test_multimodal_caller_captures_current_media_before_registration(self) -> None:
         fixture = self.startup_fixture()
-        fixture.events.register.side_effect = lambda agent: self.assertIs(agent.capture_peer_media, True)
         fixture.example.main([
             '--env-file', str(fixture.env_file), '--peer', '@ExamplePoetBot', '--multimodal',
         ])
-        self.assertIs(fixture.agent.capture_peer_media, True)
-        fixture.events.register.assert_called_once_with(fixture.agent)
-        fixture.agent.to_telegram.return_value.run_polling.assert_called_once_with()
+        self.assertIs(fixture.bridge_factory.call_args.kwargs['capture_peer_media'], True)
+        fixture.app_cls.from_bridge.assert_called_once()
+        fixture.app_cls.from_bridge.return_value.run_polling.assert_called_once_with()
 
     def test_multimodal_without_peer_is_rejected_before_loading_environment(self) -> None:
         fixture = self.startup_fixture()
@@ -128,7 +132,7 @@ class PeerExampleTests(unittest.TestCase):
         self.assertEqual(fixture.imported, [])
         self.assertEqual(os.environ['PEER_EXAMPLE_SENTINEL'], 'inherited')
         fixture.worker_factory.assert_not_called()
-        fixture.events.register.assert_not_called()
+        fixture.app_cls.from_bridge.assert_not_called()
 
     def test_worker_instructions_configure_the_actual_agent(self) -> None:
         fixture = self.startup_fixture()
@@ -150,7 +154,8 @@ class PeerExampleTests(unittest.TestCase):
             '--env-file', str(fixture.env_file), '--peer', '123456',
             '--peer-name', 'sonnet_poet', '--peer-description', 'Writes sonnets',
         ])
-        fixture.peer_factory.assert_called_once_with(peer=123456, name='sonnet_poet', description='Writes sonnets')
+        fixture.peer_factory.assert_called_once_with(peer=123456, name='sonnet_poet', description='Writes sonnets',
+                                                     multimodal=False)
 
     def test_invalid_peer_is_rejected_before_loading_environment(self) -> None:
         fixture = self.startup_fixture()
@@ -168,7 +173,7 @@ class PeerExampleTests(unittest.TestCase):
             fixture.example.main(['--env-file', str(fixture.directory / 'missing.env')])
         self.assertEqual(error.exception.code, 2)
         self.assertEqual(fixture.imported, [])
-        fixture.agent.to_telegram.assert_not_called()
+        fixture.app_cls.from_bridge.assert_not_called()
 
     def test_in_memory_sqlite_does_not_create_directories(self) -> None:
         fixture = self.startup_fixture(backend='sqlite')
@@ -181,8 +186,7 @@ class PeerExampleTests(unittest.TestCase):
         fixture.events.validate.side_effect = OSError('offline storage failure')
         with self.assertRaisesRegex(OSError, 'offline storage failure'):
             fixture.example.main(['--env-file', str(fixture.env_file)])
-        fixture.events.register.assert_not_called()
-        fixture.agent.to_telegram.assert_not_called()
+        fixture.app_cls.from_bridge.assert_not_called()
 
     def test_env_file_is_required_without_importing_framework(self) -> None:
         result = subprocess.run(

@@ -7,8 +7,7 @@ from aiogram.enums import ChatType
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-import kibernikto.ai.agent.telegram.telegram_agent as _agent_module
-from kibernikto.ai.agent.harness.conversation_history import history_storage_of
+import kibernikto.telegram.bridge as _bridge_module
 from kibernikto.storage.chat_wipe import wipe_chat
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.utils.permissions import is_admin_id
@@ -54,8 +53,8 @@ async def handle_reset_choice(query: CallbackQuery) -> None:
         await prompt.edit_text('Cancelled.')
         await query.answer()
         return
-    agent = _agent_module.get_telegram_agent()
-    notes = await wipe_chat(str(prompt.chat.id), history=history_storage_of(agent), agent_name=agent.name)
+    bridge = _bridge_module.get_telegram_bridge()
+    notes = await wipe_chat(str(prompt.chat.id), history=bridge.history_storage, agent_name=bridge.agent.name)
     logger.info('User %s reset chat %s (%d note files)', query.from_user.id, prompt.chat.id, notes)
     await prompt.edit_text('✅ History and notes erased.')
     await query.answer()

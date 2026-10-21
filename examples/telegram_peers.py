@@ -83,27 +83,22 @@ def main(argv: Sequence[str] | None = None) -> None:
         Path(STORAGE_SETTINGS.SQLITE_PATH).parent.mkdir(parents=True, exist_ok=True)
     validate_storage()
 
-    from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent, set_telegram_agent
+    from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
+    from kibernikto.telegram.agent.telegram_app import TelegramApp
+    from kibernikto.telegram.bridge import TelegramBridge
 
     if args.peer is not None:
         from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent_with_tg_peers
         from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
 
-        if args.multimodal:
-            peer = TelegramPeerAgent(
-                peer=args.peer, name=args.peer_name, description=args.peer_description, multimodal=True,
-            )
-        else:
-            peer = TelegramPeerAgent(peer=args.peer, name=args.peer_name, description=args.peer_description)
+        peer = TelegramPeerAgent(peer=args.peer, name=args.peer_name, description=args.peer_description,
+                                 multimodal=args.multimodal)
         agent = build_multi_agent_with_tg_peers([peer])
-        if args.multimodal:
-            agent.capture_peer_media = True
     else:
-        agent = TelegramAgent()
+        agent = build_telegram_agent()
     if args.instructions is not None:
         agent.instructions(args.instructions)
-    set_telegram_agent(agent)
-    agent.to_telegram().run_polling()
+    TelegramApp.from_bridge(TelegramBridge(agent, capture_peer_media=args.multimodal)).run_polling()
 
 
 if __name__ == '__main__':

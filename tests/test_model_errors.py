@@ -16,7 +16,7 @@ from pydantic_ai import ModelHTTPError
 
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError, RULES, map_model_error
-from kibernikto.ai.agent.telegram.telegram_agent import user_facing_model_error
+from kibernikto.telegram.bridge import user_facing_model_error
 
 IMAGE_BODY = {'message': 'No endpoints found that support image input', 'code': 404,
               'metadata': {'routing_funnel': [{'step': 'Initial Endpoints', 'endpoint_count': 6}],
@@ -78,28 +78,32 @@ def _private_message() -> Message:
 
 class ProcessMessageTests(unittest.IsolatedAsyncioTestCase):
     async def test_exhausted_credits_return_top_up_hint_without_error(self) -> None:
-        from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+        from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
+        from kibernikto.telegram.bridge import TelegramBridge
 
-        agent = TelegramAgent(model=None, history_storage=None)
+        agent = build_telegram_agent(model=None, history_storage=None)
+        bridge = TelegramBridge(agent)
         message = _private_message()
-        with patch.object(agent, '_pre_processor', AsyncMock(process_tg_message=AsyncMock(return_value=['hi']))), \
-                patch.object(agent, 'build_deps', AsyncMock(return_value=TelegramDeps(message=message))), \
-                patch.object(agent, 'run', AsyncMock(side_effect=InsufficientCreditsError())):
-            result = await agent.process_message(message)
+        with patch.object(bridge, 'pre_processor', AsyncMock(process_tg_message=AsyncMock(return_value=['hi']))), \
+                patch.object(bridge, 'build_deps', AsyncMock(return_value=TelegramDeps(message=message))), \
+                patch.object(bridge.agent, 'run', AsyncMock(side_effect=InsufficientCreditsError())):
+            result = await bridge.process_message(message)
         self.assertIn('/pay', result)
         self.assertIn('/balance', result)
 
     async def test_model_error_propagates_to_dispatcher(self) -> None:
-        from kibernikto.ai.agent.telegram.telegram_agent import TelegramAgent
+        from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
+        from kibernikto.telegram.bridge import TelegramBridge
 
-        agent = TelegramAgent(model=None, history_storage=None)
+        agent = build_telegram_agent(model=None, history_storage=None)
+        bridge = TelegramBridge(agent)
         message = _private_message()
         error = ModelHTTPError(404, 'm', IMAGE_BODY)
-        with patch.object(agent, '_pre_processor', AsyncMock(process_tg_message=AsyncMock(return_value=['draw']))), \
-                patch.object(agent, 'build_deps', AsyncMock(return_value=TelegramDeps(message=message))), \
-                patch.object(agent, 'run', AsyncMock(side_effect=error)):
+        with patch.object(bridge, 'pre_processor', AsyncMock(process_tg_message=AsyncMock(return_value=['draw']))), \
+                patch.object(bridge, 'build_deps', AsyncMock(return_value=TelegramDeps(message=message))), \
+                patch.object(bridge.agent, 'run', AsyncMock(side_effect=error)):
             with self.assertRaises(ModelHTTPError):
-                await agent.process_message(message)
+                await bridge.process_message(message)
 
 
 class ConversationHandlerTests(unittest.IsolatedAsyncioTestCase):
@@ -111,7 +115,7 @@ class ConversationHandlerTests(unittest.IsolatedAsyncioTestCase):
         agent.process_message = AsyncMock(side_effect=ModelHTTPError(404, 'm', IMAGE_BODY))
         with patch.object(Message, 'answer', new_callable=AsyncMock) as answer, \
                 patch.object(Message, 'bot', new_callable=lambda: AsyncMock(), create=True), \
-                patch.object(conversation._agent_module, 'get_telegram_agent', return_value=agent):
+                patch.object(conversation._bridge_module, 'get_telegram_bridge', return_value=agent):
             with self.assertRaises(ModelHTTPError):
                 await conversation._process_and_reply(message)
         hint = answer.await_args.args[0]
@@ -127,7 +131,7 @@ class ConversationHandlerTests(unittest.IsolatedAsyncioTestCase):
         agent.process_message = AsyncMock(side_effect=RuntimeError('boom'))
         with patch.object(Message, 'answer', new_callable=AsyncMock) as answer, \
                 patch.object(Message, 'bot', new_callable=lambda: AsyncMock(), create=True), \
-                patch.object(conversation._agent_module, 'get_telegram_agent', return_value=agent):
+                patch.object(conversation._bridge_module, 'get_telegram_bridge', return_value=agent):
             with self.assertRaises(RuntimeError):
                 await conversation._process_and_reply(message)
         self.assertIn('администратор', answer.await_args.args[0])

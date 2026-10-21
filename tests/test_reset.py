@@ -137,7 +137,7 @@ class WiringTests(unittest.TestCase):
     def test_router_is_registered_before_conversation(self) -> None:
         import inspect
         from kibernikto.telegram.agent import telegram_app
-        source = inspect.getsource(telegram_app.TelegramApp.from_agent)
+        source = inspect.getsource(telegram_app.TelegramApp.from_bridge)
         self.assertLess(source.index('include_router(reset_router)'), source.index('include_router(conversation_router)'))
         self.assertEqual(reset.reset_router.name, 'reset_router')
 

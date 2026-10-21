@@ -5,9 +5,9 @@ from aiogram.filters import or_f
 from aiogram.types import Message
 from pydantic_ai import ModelHTTPError
 
-import kibernikto.ai.agent.telegram.telegram_agent as _agent_module
+import kibernikto.telegram.bridge as _bridge_module
 from kibernikto.ai.agent.telegram.chat_context import forget_chat_context
-from kibernikto.ai.agent.telegram.telegram_agent import user_facing_model_error
+from kibernikto.telegram.bridge import user_facing_model_error
 from kibernikto.telegram.utils.permissions import should_react
 
 logger = logging.getLogger(__name__)
@@ -16,25 +16,25 @@ conversation_router = Router(name="conversation_router")
 
 
 async def _process_and_reply(message: Message) -> None:
-    """Run the active agent on ``message`` and send its reply.
+    """Run the active bridge on ``message`` and send its reply.
 
-    The agent is resolved via ``_agent_module`` (not the imported name) so
-    that :func:`set_telegram_agent` is honoured at runtime without a restart.
+    The bridge is resolved via ``_bridge_module`` (not the imported name) so
+    that :func:`set_telegram_bridge` is honoured at runtime without a restart.
     A single "typing…" action is shown; Telegram keeps it up until the answer
     arrives, so there is no need to refresh it on a loop.
     """
-    agent = _agent_module.get_telegram_agent()
+    bridge = _bridge_module.get_telegram_bridge()
 
     await message.bot.send_chat_action(message.chat.id, "typing")
     try:
-        result = await agent.process_message(message)
+        result = await bridge.process_message(message)
     except Exception as error:
         # Re-raised so ErrorsMiddleware reports it; user gets a short hint instead of silence.
         hint = user_facing_model_error(error) if isinstance(error, ModelHTTPError) else (
             "Не получилось ответить, сообщение передано администратору.")
         await message.answer(hint)
         raise
-    await agent.reply_to(message, result)
+    await bridge.reply_to(message, result)
 
 
 @conversation_router.message(F.pinned_message | F.new_chat_title | F.new_chat_photo)

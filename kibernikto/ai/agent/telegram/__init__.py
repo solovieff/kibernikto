@@ -1,2 +1,3 @@
 from .deps import TelegramDeps
-from .telegram_agent import TelegramAgent, get_telegram_agent, set_telegram_agent
+from .telegram_agent import build_telegram_agent
+from .telegram_capability import TelegramCapability
