@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+- `KiberniktoAgent` is gone: `build_kibernikto_agent()` returns a plain `pydantic_ai.Agent`
+  with `ConversationHistory` (history + mid-run steering) and `PersonaCapability`.
+  A steered run returns an empty result; check it with `is_steered(result)`.
+- `TelegramAgent` is gone: `build_telegram_agent()` returns a plain `Agent[TelegramDeps]` with
+  `TelegramCapability`; Telegram I/O lives in `TelegramBridge(agent)`; run with
+  `TelegramApp.from_bridge(bridge)`. `get/set_telegram_agent` → `get/set_telegram_bridge`.
+- Agent reaction emoji is `Agent(metadata={"reaction": "👀"})`, not an attribute.
+
 ## 2.0.0b1 — first 2.x beta
 
 Complete rewrite on [pydantic-ai](https://ai.pydantic.dev) + aiogram 3. Not API-compatible with 1.x:

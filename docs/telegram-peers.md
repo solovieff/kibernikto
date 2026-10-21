@@ -9,13 +9,13 @@ load_dotenv('caller.env')  # Before importing configuration-dependent agents.
 
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent_with_tg_peers
 from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
-from kibernikto.ai.agent.telegram.telegram_agent import set_telegram_agent
+from kibernikto.telegram.agent.telegram_app import TelegramApp
+from kibernikto.telegram.bridge import TelegramBridge
 
 poet = TelegramPeerAgent(peer='@YourPoetBot', name='poet',
                          description='Пишет стихи по заданной теме, размеру и настроению.')
 agent = build_multi_agent_with_tg_peers([poet])
-set_telegram_agent(agent)
-agent.to_telegram().run_polling()
+TelegramApp.from_bridge(TelegramBridge(agent)).run_polling()
 ```
 
 For startup validation and SQLite parent-directory creation, prefer the runnable
@@ -135,9 +135,9 @@ previous output attachments, or files from disk. Only the delegated task string
 and selected bytes cross the transport. Selection is run-scoped; applications
 delegating different inputs concurrently should use separate dependency copies.
 
-For normal Telegram updates, `TelegramAgent(..., capture_peer_media=True)` opts
-into **current-message** capture. The public builder's returned agent also exposes
-the `capture_peer_media` attribute, as above. Capture downloads the largest photo
+For normal Telegram updates, `TelegramBridge(agent, capture_peer_media=True)` opts
+into **current-message** capture. The bridge also exposes the `capture_peer_media`
+attribute, as above. Capture downloads the largest photo
 variant, voice, audio, or document from the current update and places the bytes in
 `deps.peer_inputs`. It does not walk `reply_to_message`, history, or local storage,
 and does not assemble albums. The lower-level helper is

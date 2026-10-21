@@ -24,7 +24,7 @@ fields change often — read them in source, don't trust a remembered list.
 | CLI, dotenv, startup | `kibernikto/cmd/__start.py`, `main.py` |
 | Base agent, history, attachments | `kibernikto/ai/agent/core/kibernikto_agent.py` |
 | Model string → model | `kibernikto/ai/agent/utils.py` (`infer_kibernikto_model`) |
-| Telegram agent + active-agent setter | `kibernikto/ai/agent/telegram/telegram_agent.py` |
+| Telegram agent + active bridge | `kibernikto/ai/agent/telegram/telegram_agent.py`, `kibernikto/telegram/bridge.py` |
 | Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/telegram/multi_agent.py` |
 | Harness capabilities (transport-free, keyed on `RunContext.conversation_id`): `CreditTier`, `chat_memory`, delegation roster, web layout, experts | `kibernikto/ai/agent/harness/` |
 | Bot, Dispatcher, middleware order, lifecycle | `kibernikto/telegram/agent/telegram_app.py` |
@@ -37,7 +37,7 @@ fields change often — read them in source, don't trust a remembered list.
 | Settings | grep `env_prefix` — one `BaseSettings` per module |
 | Server deploy (podman + systemd, one folder per bot) | `deploy/README.md`, `deploy/scripts/_common.sh` |
 
-Request path: `TelegramApp` → middlewares → handler → active `TelegramAgent.process_message`
+Request path: `TelegramApp` → middlewares → handler → active `TelegramBridge.process_message`
 → `Agent.run` (`ConversationHistory` loads, steers, saves) → `reply_to`.
 
 ## Contracts and traps
@@ -48,8 +48,7 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
 - Some fields are declared but unused. Grep for the consumer before relying on one.
 
 **Agents**
-- Register a custom agent with `set_telegram_agent(agent)` before polling. `to_telegram()` builds
-  the app only; handlers resolve the active agent per update.
+- `TelegramApp.from_bridge(bridge)` registers the bridge; handlers resolve it per update via `get_telegram_bridge()`.
 - Use `result.output` (text or structured), never `result.data`.
 - Per-conversation history and mid-run steering exist in the overridden async `run` with `conversation_id=` and non-None
   `history_storage`. Concurrent `run(..., conversation_id=X)` calls while a run for `X` is active enqueue the new prompt
@@ -84,7 +83,7 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
   rendered against `Persona(name, traits)` — never against deps (aiogram `Message` inside). No `{{` → plain static
   string. Compiled at construction: an unknown field (`{{nmae}}`) raises then; no HTML escaping. Values come from
   `persona_source=` (a `PersonaSource` Protocol, per run); default `StaticPersona` = `PERSONA_NAME` or "Kibernikto",
-  traits from `AGENT_KIBERNIKTO_PERSONA_TRAITS` JSON. `TelegramAgent` defaults to `TelegramPersona`:
+  traits from `AGENT_KIBERNIKTO_PERSONA_TRAITS` JSON. `build_telegram_agent` defaults to `TelegramPersona`:
   `PERSONA_NAME` → bot `full_name` from getMe → "Kibernikto".
 - Bot identity (`telegram/identity.py`): `fetch_bot_identity` runs once in `_on_startup` (getMe + descriptions,
   descriptions best-effort) into a `BotIdentity`; the prompt line, `{{name}}` and `should_react` all read it from
@@ -105,7 +104,7 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramAgen
 
 **Telegram**
 - Module-level routers attach to one Dispatcher per process; tests patch `include_router`.
-- Middleware is per observer (message, edited, error), not one chain. See `TelegramApp.from_agent`.
+- Middleware is per observer (message, edited, error), not one chain. See `TelegramApp.from_bridge`.
 - Preprocessor settings are module-level shared state; treat as read-only.
 - Voice is enabled by the presence of `TRANSCRIBE_OPENAI_API_KEY`. PDF extraction is a stub.
 - Media store (private archive, `media/`) ≠ image hosting (public URLs for the model, `public/`).
