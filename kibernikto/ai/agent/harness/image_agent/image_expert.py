@@ -48,8 +48,8 @@ image_agent = Agent(
     description="Describes, generates and edits images.",
     system_prompt=IMAGE_SYSTEM_PROMPT,
     deps_type=KiberniktoDeps,
+    metadata={"reaction": "✍"},
 )
-image_agent.reaction = "✍"
 
 
 @image_agent.tool

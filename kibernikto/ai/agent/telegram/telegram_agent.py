@@ -83,7 +83,6 @@ class TelegramAgent(Agent[TelegramDeps]):
 
         self._active_runs: dict[str, RunContext[TelegramDeps]] = {}
         self._history_storage = history_storage
-        self._reaction = reaction_val
 
         self._conv_history = ConversationHistory(
             history_storage,
@@ -105,6 +104,7 @@ class TelegramAgent(Agent[TelegramDeps]):
         if not callable(settings := kwargs.get("model_settings")):
             kwargs["model_settings"] = with_attribution(settings, name)
 
+        kwargs["metadata"] = {**(kwargs.get("metadata") or {}), "reaction": reaction_val}
         super().__init__(**kwargs)
 
         self._pre_processor = pre_processor or TelegramMessagePreprocessor()
@@ -120,10 +120,6 @@ class TelegramAgent(Agent[TelegramDeps]):
     @property
     def history_storage(self) -> HistoryStorage | None:
         return self._history_storage
-
-    @property
-    def reaction(self) -> str | None:
-        return self._reaction
 
     @staticmethod
     def default_persona_source() -> PersonaSource:

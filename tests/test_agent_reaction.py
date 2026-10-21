@@ -48,8 +48,7 @@ def scripted_model(*calls: ToolCallPart) -> FunctionModel:
 
 def build(*, parent: str | None, child: str | None, calls: tuple[ToolCallPart, ...] = (DELEGATE,),
           child_calls: tuple[ToolCallPart, ...] = ()) -> TelegramAgent:
-    expert = Agent(model=scripted_model(*child_calls), name='child', description='child expert')
-    expert.reaction = child
+    expert = Agent(model=scripted_model(*child_calls), name='child', description='child expert', metadata={'reaction': child})
     expert.tool_plain(lookup)
     sub_agents = KiberniktoSubAgents(agents=[SubAgent(expert)], agent_folders=None,
                                      shared_capabilities=[AgentReaction()])
@@ -124,5 +123,7 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
         agent = build(parent='👀', child='✍', calls=(LOOKUP, DELEGATE))
         self.assertEqual((await agent.run('hi')).output, 'final')
 
-    def test_default_experts_carry_their_reactions(self) -> None:
-        self.assertEqual((image_agent.name, image_agent.reaction), ('image-agent', '✍'))
+    async def test_default_experts_carry_their_reactions(self) -> None:
+        from pydantic_ai.models.test import TestModel
+        result = await image_agent.run('hi', model=TestModel(call_tools=[]))
+        self.assertEqual((image_agent.name, result.metadata['reaction']), ('image-agent', '✍'))

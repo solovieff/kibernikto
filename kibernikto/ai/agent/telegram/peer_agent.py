@@ -125,17 +125,13 @@ class TelegramPeerAgent(Agent[TelegramDeps]):
             raise ValueError('peer must be a positive private chat ID or @username')
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError('timeout must be finite and positive')
-        super().__init__(model=_TelegramModel(), name=name, description=description, deps_type=TelegramDeps)
+        super().__init__(model=_TelegramModel(), name=name, description=description, deps_type=TelegramDeps,
+                         metadata={"reaction": reaction})
         self.peer = peer
         self.timeout = timeout
         self._peer_bot = bot
         self._peer_hub = hub
         self.multimodal = multimodal
-        self._reaction = reaction
-
-    @property
-    def reaction(self) -> str | None:
-        return self._reaction
 
     async def run(self, user_prompt: str | None = None, *, deps: TelegramDeps | None = None,
                   **kwargs: object) -> AgentRunResult[str]:

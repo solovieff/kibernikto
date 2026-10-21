@@ -50,13 +50,13 @@ def _web_expert(model_name: str) -> Agent:
         name=WEB_EXPERT_NAME,
         description=WEB_EXPERT_DESCRIPTION,
         instructions=WEB_EXPERT_INSTRUCTIONS,
+        metadata={"reaction": "👨‍💻"},
     )
     def current_date_prompt(ctx) -> str:
         timezone = ctx.deps.timezone if isinstance(ctx.deps, KiberniktoDeps) else None
         return f"Current date: {get_user_date(timezone or DEFAULT_TIMEZONE)}."
 
     agent.instructions(current_date_prompt)
-    agent.reaction = "👨‍💻"
     return agent
 
 

@@ -27,7 +27,7 @@ _STEERED = "steered_messages"
 
 @dataclass
 class AgentReaction(AbstractCapability[KiberniktoDeps]):
-    """Mark ``deps.message`` with ``ctx.agent.reaction``; the last emoji stays.
+    """Mark ``deps.message`` with the agent's ``metadata["reaction"]``; the last emoji stays.
 
     Delegates react at run start. The root agent reacts on its own tool calls and on earlier
     messages absorbed by mid-run steering, so plain single-message chatter stays clean while
@@ -48,7 +48,7 @@ class AgentReaction(AbstractCapability[KiberniktoDeps]):
         if not isinstance(deps := ctx.deps, TelegramDeps):
             return  # Deps-less runs (tests, scripts) have no message to mark.
         if deps.extra.setdefault(_ROOT, ctx.agent) is not ctx.agent:
-            await self._set(ctx.agent, deps)  # First starter is the root; everyone after is a delegate.
+            await self._set(ctx, deps)  # First starter is the root; everyone after is a delegate.
 
     async def before_model_request(
             self, ctx: RunContext[KiberniktoDeps], request_context: ModelRequestContext,
@@ -68,13 +68,11 @@ class AgentReaction(AbstractCapability[KiberniktoDeps]):
     ) -> ValidatedToolArgs:
         deps = ctx.deps
         if isinstance(deps, TelegramDeps) and deps.extra.get(_ROOT) is ctx.agent and tool_def.name not in self.skip_tools:
-            await self._set(ctx.agent, deps)
+            await self._set(ctx, deps)
         return args
 
-    async def _set(self, agent: object, deps: TelegramDeps) -> None:
-        emoji = getattr(agent, "reaction", None)
-        if not emoji and isinstance(meta := getattr(agent, "metadata", None), dict):
-            emoji = meta.get("reaction")
+    async def _set(self, ctx: RunContext[KiberniktoDeps], deps: TelegramDeps) -> None:
+        emoji = (ctx.metadata or {}).get("reaction")
         if not emoji or deps.message is None or not deps.billable:
             return  # Peer envelopes (billable=False) answer a bot: no reactions on the wire request.
         key = (deps.message.message_id, emoji)

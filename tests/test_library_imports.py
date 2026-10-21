@@ -129,7 +129,7 @@ class LibraryImportsTests(unittest.TestCase):
                 second_call = tg_mod.get_telegram_agent()
             build_m.assert_called_once_with(AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME, AGENT_KIBERNIKTO_SETTINGS.FALLBACK_MODELS)
             self.assertIs(default_agent, second_call)
-            self.assertEqual(default_agent.reaction, AGENT_KIBERNIKTO_SETTINGS.REACTION)
+            self.assertEqual(default_agent._metadata['reaction'], AGENT_KIBERNIKTO_SETTINGS.REACTION)
 
             custom = tg_mod.TelegramAgent(model=TestModel(), name="custom_tg", history_storage=None)
             returned_prev = tg_mod.set_telegram_agent(custom)
