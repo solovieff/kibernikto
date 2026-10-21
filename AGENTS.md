@@ -34,7 +34,8 @@ CLI (kibernikto command / main.py)
   │     └── agent/telegram_app.py (TelegramApp: Bot + Dispatcher + polling)
   ├── kibernikto.ai.agent
   │     ├── core/kibernikto_agent.py (build_kibernikto_agent)
-  │     ├── telegram/telegram_agent.py (TelegramAgent: process_message + reply_to)
+  │     ├── telegram/telegram_agent.py (build_telegram_agent)
+  │     ├── telegram/telegram_capability.py (TelegramCapability)
   │     └── utils.py (infer_kibernikto_model)
   └── kibernikto.storage
         ├── base.py (HistoryStorage contract; opt-in MemoryHistoryStorage)
@@ -44,7 +45,7 @@ CLI (kibernikto command / main.py)
 
 ### Agent Patterns
 - No agent superclass: compose `Agent(capabilities=[...])` or call `build_kibernikto_agent(...)`, then add tools
-- Subclass `TelegramAgent` in `kibernikto/ai/agent/telegram/telegram_agent.py` + call that module's `set_telegram_agent(...)` before the dispatcher starts; `agent.to_telegram()` builds the app but does not register the agent
+- Telegram: build the agent with `build_telegram_agent(...)` (or add `TelegramCapability` to any `Agent`), wrap it in `TelegramBridge(agent, pre_processor=..., capture_peer_media=...)` (`kibernikto/telegram/bridge.py`: process_message + reply_to) and run `TelegramApp.from_bridge(bridge)`; there is no agent subclass
 - `agent.run` returns `AgentRunResult` — use `result.output` for text or structured output, not `result.data`
 
 ### Logging
@@ -53,7 +54,7 @@ CLI (kibernikto command / main.py)
 
 ## Known Gotchas
 
-- **Preprocessing**: `TelegramAgent` accepts a `pre_processor=` instance; its settings are module-level state, so don't mutate runtime settings
+- **Preprocessing**: `TelegramBridge` accepts a `pre_processor=` instance; its settings are module-level state, so don't mutate runtime settings
 - **History window alignment**: `get_conversation` walks back from last N messages to find a `request` — it's intentional, don't "fix" it
 - **Subscription period**: hard-coded 30 days in `payment_utils.py` (`DEFAULT_SUBSCRIPTION_PERIOD = 2592000`)
 - **ServiceMiddleware debug policy**: the historical `or 1 == 1` forwarding shortcut was deliberate, not an invitation to harden it. Current source skips admin messages and no longer contains that expression; do not change or reintroduce forwarding behavior merely to reconcile old documentation.
