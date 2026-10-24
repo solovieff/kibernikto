@@ -16,13 +16,13 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
     "pydantic-ai>=2.55.0,<3",
-    "logfire>=5.1.1,<6",
+    "logfire>=5.3.0,<6",
     "aiogram>=3.31.0,<4",
     "aiohttp>=3.14.5,<4",
     "aiofiles>=25.1.0,<26",
     "certifi>=2026.7.22",
     "python-dotenv>=1.2.4",
-    "pydantic-ai-harness[researcher,exa]>=0.55.0,<0.56",
+    "pydantic-ai-harness[exa,researcher]>=0.55.0,<0.56",
     "sqlalchemy[asyncio]>=2.1.4,<3",
     "asyncpg>=0.32.0,<0.33",
     "aiosqlite>=0.22.1,<0.23",

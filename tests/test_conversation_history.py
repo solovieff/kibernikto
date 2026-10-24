@@ -2,7 +2,6 @@
 
 import os
 import unittest
-from unittest.mock import AsyncMock, patch
 
 os.environ['OPENROUTER_API_KEY'] = 'test-not-a-real-key'
 os.environ['AGENT_KIBERNIKTO_MODEL_NAME'] = 'openrouter:test/offline'
@@ -10,8 +9,11 @@ os.environ['APP_STORAGE_DATA_BACKEND'] = 'file'
 os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
 from pydantic_ai import Agent, ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.messages import BinaryContent, BinaryImage, FilePart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.test import TestModel
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.harness.conversation_history import ConversationHistory
 from kibernikto.storage.base import MemoryHistoryStorage
 
 
@@ -92,6 +94,46 @@ class ConversationHistoryTests(unittest.IsolatedAsyncioTestCase):
         bare = Agent(FunctionModel(lambda m, i: ModelResponse(parts=[TextPart('x')])))
         self.assertIs(history_storage_of(with_history), self.storage)
         self.assertIsNone(history_storage_of(bare))
+
+
+class MaterializeAttachmentsTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        self.result = await Agent(TestModel(custom_output_text='done')).run('hello')
+
+    async def test_image_is_narrowed_and_metadata_is_preserved(self) -> None:
+        image = BinaryContent(data=b'image', media_type='image/png', identifier='generated-image',
+                              vendor_metadata={'filename': 'image.png'})
+        deps = KiberniktoDeps(attachments=[image])
+
+        ConversationHistory._materialize_attachments(self.result, deps)
+
+        content = self.result.response.files[0]
+        self.assertIsInstance(content, BinaryImage)
+        self.assertEqual(content.data, image.data)
+        self.assertEqual(content.identifier, image.identifier)
+        self.assertEqual(content.vendor_metadata, image.vendor_metadata)
+
+    async def test_audio_and_document_remain_non_image_files(self) -> None:
+        attachments = [
+            BinaryContent(data=b'audio', media_type='audio/mpeg'),
+            BinaryContent(data=b'pdf', media_type='application/pdf'),
+        ]
+
+        ConversationHistory._materialize_attachments(self.result, KiberniktoDeps(attachments=attachments))
+
+        self.assertEqual(self.result.response.files, attachments)
+        self.assertTrue(all(not isinstance(content, BinaryImage) for content in self.result.response.files))
+
+    async def test_existing_files_and_repeated_attachments_are_not_duplicated(self) -> None:
+        existing = BinaryImage(data=b'existing', media_type='image/png')
+        added = BinaryImage(data=b'added', media_type='image/jpeg')
+        self.result.response.parts.append(FilePart(content=existing))
+        deps = KiberniktoDeps(attachments=[existing, added, added])
+
+        ConversationHistory._materialize_attachments(self.result, deps)
+        ConversationHistory._materialize_attachments(self.result, deps)
+
+        self.assertEqual([content.data for content in self.result.response.files], [b'existing', b'added'])
 
 
 if __name__ == '__main__':

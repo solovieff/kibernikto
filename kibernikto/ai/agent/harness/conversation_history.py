@@ -11,7 +11,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.capabilities import AbstractCapability, CapabilityOrdering, CombinedCapability, ProcessHistory
 from pydantic_ai.capabilities.abstract import WrapRunHandler
-from pydantic_ai.messages import BinaryImage, FilePart, ModelMessage, ModelResponse, TextPart, UserContent
+from pydantic_ai.messages import BinaryContent, FilePart, ModelMessage, ModelResponse, TextPart, UserContent
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
@@ -135,11 +135,11 @@ class _StorageIO(AbstractCapability[KiberniktoDeps]):
         if not isinstance(deps, KiberniktoDeps) or not deps.attachments:
             return
         response = run_result.response
-        existing_data = {p.content.data for p in response.parts if isinstance(p, FilePart) and hasattr(p.content, 'data')}
+        existing_data: set[bytes] = {part.content.data for part in response.parts if isinstance(part, FilePart)}
         for binary in deps.attachments:
             if binary.data in existing_data:
                 continue
-            content = BinaryImage.narrow_type(binary) if not isinstance(binary, BinaryImage) else binary
+            content = BinaryContent.narrow_type(binary)
             response.parts.append(FilePart(content=content))
             existing_data.add(binary.data)
 
