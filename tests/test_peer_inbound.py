@@ -55,7 +55,9 @@ class PeerInboundTests(unittest.IsolatedAsyncioTestCase):
         agent = build_telegram_agent(model=TestModel(custom_output_text='answer'), history_storage=None)
         self.bridge = TelegramBridge(agent, pre_processor=TextPreprocessor())
         self.bridge.build_deps = AsyncMock(return_value=TelegramDeps(is_personal=True))
-        self.settings_patch = patch.multiple(TELEGRAM_SETTINGS, PEER_IDS=[200], BOT_MESSAGE_DELAY=0)
+        self.settings_patch = patch.multiple(
+            TELEGRAM_SETTINGS, PEER_IDS=[200], BOT_MESSAGE_DELAY=0, STICKER_IDS=[],
+        )
         self.settings_patch.start()
         self.addCleanup(self.settings_patch.stop)
 

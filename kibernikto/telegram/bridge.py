@@ -20,7 +20,7 @@ from kibernikto.storage.singletons import chat_data
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.peer_protocol import FILENAME, PeerEnvelope, PeerProtocolError, download_envelope
 from kibernikto.telegram.pre_processors import TelegramMessagePreprocessor
-from kibernikto.telegram.utils.conversation import is_private_peer_request, reply
+from kibernikto.telegram.utils.conversation import is_private_peer_request, reply, send_random_sticker
 from kibernikto.utils.time_utils import DEFAULT_TIMEZONE
 
 logger = logging.getLogger(__name__)
@@ -169,6 +169,15 @@ class TelegramBridge:
             return
         if result is not None:
             await reply(target, result)
+            if TELEGRAM_SETTINGS.STICKER_IDS and random.random() < TELEGRAM_SETTINGS.STICKER_PROBABILITY:
+                try:
+                    await send_random_sticker(
+                        chat_id=target.chat.id,
+                        sticker_list=TELEGRAM_SETTINGS.STICKER_IDS,
+                        bot=target.bot,
+                    )
+                except Exception:
+                    logger.exception("Failed to send random response sticker")
 
 
 _bridge: TelegramBridge | None = None
