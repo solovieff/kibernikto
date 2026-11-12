@@ -122,8 +122,8 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.agent.name, 'vkusvill')
         self.assertIsInstance(self.agent.toolsets[-1], FunctionToolset)
 
-    def test_tool_calls_are_serial(self) -> None:
-        self.assertFalse(self.agent.model_settings['parallel_tool_calls'])
+    def test_tool_calls_follow_the_setting(self) -> None:
+        self.assertEqual(self.agent.model_settings['parallel_tool_calls'], VKUSVILL_SETTINGS.PARALLEL_TOOL_CALLS)
 
     async def test_instructions_carry_the_shopping_contract(self) -> None:
         await self.agent.run('привет', deps=TelegramDeps())
@@ -134,7 +134,7 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('не понимает «сок в маленькой таре»', instructions)
         self.assertIn('sort="price_asc"', instructions)
         self.assertIn('category_id', instructions)
-        self.assertIn('Больше 10 вызовов инструментов', instructions)
+        self.assertIn('Больше 40 вызовов инструментов', instructions)
         self.assertIn('mode="custom"', instructions)
         self.assertIn('vkusvill_product_details', instructions)
         self.assertIn('vkusvill_cart_link_create', instructions)

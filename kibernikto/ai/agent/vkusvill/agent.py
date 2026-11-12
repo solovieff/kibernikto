@@ -37,8 +37,10 @@ def build_vkusvill_agent(
     logging.getLogger('kibernikto').info(
         'VkusVill agent model: %s', settings.MODEL_NAME or AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME,
     )
-    # Serial tool calls: the model otherwise fires a burst of identical searches per shopping list.
-    kwargs.setdefault('model_settings', {**default_model_settings(), 'parallel_tool_calls': False})
+    # Batched tool calls keep long shopping lists from crawling one search per step.
+    kwargs.setdefault('model_settings', {
+        **default_model_settings(), 'parallel_tool_calls': settings.PARALLEL_TOOL_CALLS,
+    })
     return build_telegram_agent(
         history_storage=history_storage,
         name=settings.NAME,

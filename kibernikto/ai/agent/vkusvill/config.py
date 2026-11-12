@@ -29,6 +29,9 @@ class VkusvillSettings(BaseSettings):
     MIN_CREDITS: int = Field(
         default=2000, description='Personal chats above this balance may delegate to the shop; 0 = no floor',
     )
+    PARALLEL_TOOL_CALLS: bool = Field(
+        default=True, description='Let the model batch tool calls; long shopping lists finish faster',
+    )
     AUTH_MODE: Literal['anonymous', 'oauth'] = Field(
         default='anonymous', description='anonymous: public catalog tools only; oauth: personalized tools',
     )

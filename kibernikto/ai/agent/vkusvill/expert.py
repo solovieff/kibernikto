@@ -43,7 +43,7 @@ def build_vkusvill_expert_agent(settings: VkusvillSettings = VKUSVILL_SETTINGS):
         name=settings.NAME,
         persona=False,
         instructions=_delegated_instructions,
-        model_settings={**default_model_settings(), 'parallel_tool_calls': False},
+        model_settings={**default_model_settings(), 'parallel_tool_calls': settings.PARALLEL_TOOL_CALLS},
         toolsets=[build_vkusvill_toolset(settings, process_tool_call=remember_basket)],
         model=model,
     )
