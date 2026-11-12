@@ -1,9 +1,11 @@
 """Offline coverage for the VkusVill MCP agent: settings, toolset wiring, behaviour prompt."""
 
+import json
 import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 # Keep import-time model/storage singletons independent of live credentials.
@@ -203,3 +205,49 @@ class CreditGatedRosterTests(unittest.IsolatedAsyncioTestCase):
         roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], min_credits=2000)
         run = await roster.for_run(self.make_ctx(credits=2001, is_personal=True))
         self.assertEqual([a.name for a in run.agents], [VKUSVILL_EXPERT_NAME])
+
+
+class BasketMemoTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def make_ctx(chat_id: int = 777):
+        return SimpleNamespace(deps=SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id))))
+
+    async def test_products_and_cart_land_in_the_conversation_memo(self) -> None:
+        from kibernikto.ai.agent.vkusvill.memory import basket_note, clear_basket, remember_basket
+
+        ctx = self.make_ctx()
+        clear_basket(ctx.deps)
+
+        async def call_tool(name, args, *, metadata=None):
+            if name == 'vkusvill_products_search':
+                return json.dumps({'ok': True, 'data': {'items': [{'id': 5, 'name': 'Круассан&nbsp;на масле'}]}})
+            return json.dumps({'ok': True, 'data': {'link': 'https://vkusvill.ru/mobile?basket&share=1'}})
+
+        await remember_basket(ctx, call_tool, 'vkusvill_products_search', {'q': 'круассан'})
+        await remember_basket(ctx, call_tool, 'vkusvill_cart_link_create', {'products': [{'id': 5, 'q': 2}]})
+
+        note = basket_note(ctx.deps)
+        self.assertIn('Круассан на масле × 2', note)
+        self.assertIn('share=1', note)
+        self.assertIn('предыдущую корзину не открывай', note)
+
+    async def test_conversations_do_not_leak_baskets(self) -> None:
+        from kibernikto.ai.agent.vkusvill.memory import basket_note, clear_basket, remember_basket
+
+        owner = self.make_ctx(chat_id=888)
+        stranger = self.make_ctx(chat_id=999)
+        clear_basket(owner.deps)
+
+        async def call_tool(name, args, *, metadata=None):
+            return json.dumps({'ok': True, 'data': {'link': 'https://vkusvill.ru/mobile?basket&share=7'}})
+
+        await remember_basket(owner, call_tool, 'vkusvill_cart_link_create', {'products': [{'id': 1, 'q': 1}]})
+
+        self.assertIn('share=7', basket_note(owner.deps))
+        self.assertEqual(basket_note(stranger.deps), '')
+
+    def test_conversation_key_falls_back_to_user_id(self) -> None:
+        from kibernikto.ai.agent.vkusvill.memory import conversation_key
+
+        self.assertEqual(conversation_key(SimpleNamespace(message=None, user_id=42)), '42')
+        self.assertIsNone(conversation_key(SimpleNamespace(message=None, user_id=None)))

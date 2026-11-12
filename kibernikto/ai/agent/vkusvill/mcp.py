@@ -2,15 +2,18 @@
 
 from fastmcp.client.auth import OAuth
 from key_value.aio.stores.filetree import FileTreeStore
-from pydantic_ai.mcp import MCPToolset
+from pydantic_ai.mcp import MCPToolset, ProcessToolCallback
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
 
 
-def build_vkusvill_toolset(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> MCPToolset[object]:
+def build_vkusvill_toolset(
+        settings: VkusvillSettings = VKUSVILL_SETTINGS,
+        process_tool_call: ProcessToolCallback | None = None,
+) -> MCPToolset[object]:
     """Tools from mcp.vkusvill.ru; the token store survives restarts in oauth mode."""
     if settings.AUTH_MODE == 'anonymous':
-        return MCPToolset(settings.MCP_URL)
+        return MCPToolset(settings.MCP_URL, process_tool_call=process_tool_call)
 
     token_dir = resolve_token_dir(settings)
     token_dir.mkdir(parents=True, exist_ok=True)
@@ -24,4 +27,4 @@ def build_vkusvill_toolset(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> MC
         callback_host=settings.OAUTH_CALLBACK_HOST,
         token_storage=FileTreeStore(data_directory=token_dir),
     )
-    return MCPToolset(settings.MCP_URL, auth=oauth)
+    return MCPToolset(settings.MCP_URL, auth=oauth, process_tool_call=process_tool_call)

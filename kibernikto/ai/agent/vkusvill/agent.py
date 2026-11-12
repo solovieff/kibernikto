@@ -2,7 +2,7 @@
 
 import logging
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.toolsets import AbstractToolset
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
@@ -15,7 +15,13 @@ from kibernikto.storage.singletons import history_storage
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
+from .memory import basket_note, remember_basket
 from .prompts import VKUSVILL_INSTRUCTIONS
+
+
+def _instructions(ctx: RunContext[TelegramDeps]) -> str:
+    """Static contract plus the cart this chat built last time, when there is one."""
+    return VKUSVILL_INSTRUCTIONS + basket_note(ctx.deps)
 
 
 def build_vkusvill_agent(
@@ -37,7 +43,7 @@ def build_vkusvill_agent(
         history_storage=history_storage,
         name=settings.NAME,
         persona=False,
-        instructions=VKUSVILL_INSTRUCTIONS,
-        toolsets=[toolset or build_vkusvill_toolset(settings)],
+        instructions=_instructions,
+        toolsets=[toolset or build_vkusvill_toolset(settings, process_tool_call=remember_basket)],
         **kwargs,
     )

@@ -15,6 +15,7 @@ from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
+from .memory import basket_note, remember_basket
 from .prompts import VKUSVILL_DELEGATED_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,11 @@ VKUSVILL_EXPERT_DESCRIPTION = (
     'Покупки во ВкусВилле: найти продукты по каталогу, собрать корзину и вернуть ссылку на неё, '
     'персональные скидки и история заказов. Только личные покупки, не для общих вопросов.'
 )
+
+
+def _delegated_instructions(ctx: RunContext[TelegramDeps]) -> str:
+    """Delegation contract plus the cart this chat built last time, when there is one."""
+    return VKUSVILL_DELEGATED_INSTRUCTIONS + basket_note(ctx.deps)
 
 
 def build_vkusvill_expert_agent(settings: VkusvillSettings = VKUSVILL_SETTINGS):
@@ -36,9 +42,9 @@ def build_vkusvill_expert_agent(settings: VkusvillSettings = VKUSVILL_SETTINGS):
         deps_type=TelegramDeps,
         name=settings.NAME,
         persona=False,
-        instructions=VKUSVILL_DELEGATED_INSTRUCTIONS,
+        instructions=_delegated_instructions,
         model_settings={**default_model_settings(), 'parallel_tool_calls': False},
-        toolsets=[build_vkusvill_toolset(settings)],
+        toolsets=[build_vkusvill_toolset(settings, process_tool_call=remember_basket)],
         model=model,
     )
 
