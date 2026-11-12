@@ -138,3 +138,36 @@ class MaterializeAttachmentsTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CurrentTurnWindowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_long_tool_loop_keeps_the_user_prompt(self) -> None:
+        from pydantic_ai import ToolCallPart
+
+        from kibernikto.ai.agent.harness.conversation_history import ConversationHistory
+
+        prompt_seen: list[bool] = []
+
+        def model_fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            prompt_seen.append(any(isinstance(p, UserPromptPart) for m in messages for p in m.parts))
+            rounds = sum(1 for m in messages for p in m.parts if p.part_kind == 'tool-return')
+            if rounds < 4:
+                return ModelResponse(parts=[ToolCallPart('ping', {'n': rounds})])
+            return ModelResponse(parts=[TextPart(content='done')])
+
+        agent = Agent(
+            FunctionModel(model_fn),
+            deps_type=KiberniktoDeps,
+            capabilities=[
+                ConversationHistory(storage=MemoryHistoryStorage(history_size=2), history_size=2),
+            ],
+        )
+
+        @agent.tool_plain
+        def ping(n: int) -> str:
+            return f'pong {n}'
+
+        await agent.run('КУПИ ХЛЕБ', conversation_id='chat-loop', deps=KiberniktoDeps())
+
+        self.assertGreaterEqual(len(prompt_seen), 5)
+        self.assertTrue(all(prompt_seen), 'the user prompt vanished from a long tool turn')

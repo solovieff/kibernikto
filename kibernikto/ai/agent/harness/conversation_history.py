@@ -11,7 +11,9 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.capabilities import AbstractCapability, CapabilityOrdering, CombinedCapability, ProcessHistory
 from pydantic_ai.capabilities.abstract import WrapRunHandler
-from pydantic_ai.messages import BinaryContent, FilePart, ModelMessage, ModelResponse, TextPart, UserContent
+from pydantic_ai.messages import (
+    BinaryContent, FilePart, ModelMessage, ModelRequest, ModelResponse, TextPart, UserContent, UserPromptPart,
+)
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
@@ -202,13 +204,15 @@ class ConversationHistory(CombinedCapability[KiberniktoDeps]):
         self.active_runs = active_runs if active_runs is not None else {}
 
         def process_messages(ctx: RunContext[KiberniktoDeps], messages: list[ModelMessage]) -> list[ModelMessage]:
-            # Keep instructions on the current (latest) request so the model sees system prompts,
-            # but window history turns according to history_size.
-            if not messages:
+            # Window only the history that precedes this turn: a long tool loop must keep the user's prompt,
+            # otherwise the model sees bare tool returns and answers an empty question.
+            if not messages or not self.history_size or len(messages) <= self.history_size:
                 return messages
-            if self.history_size and len(messages) > self.history_size:
-                return _window(messages, self.history_size)
-            return messages
+            turn_start = _current_turn_start(messages)
+            current_turn = messages[turn_start:]
+            budget = max(self.history_size - len(current_turn), 0)
+            head = _window(messages[:turn_start], budget) if budget else []
+            return [*head, *current_turn]
 
         capabilities: list[AbstractCapability[KiberniktoDeps]] = [
             _ActiveConversationTracker(self.active_runs),
@@ -225,3 +229,12 @@ class ConversationHistory(CombinedCapability[KiberniktoDeps]):
     ) -> bool:
         """Inject ``user_prompt`` into the active run for ``conversation_id``; True if steered."""
         return steer_active_run(self.active_runs, conversation_id, user_prompt, new_deps)
+
+
+def _current_turn_start(messages: Sequence[ModelMessage]) -> int:
+    """Index of the request that opened the current turn: the last one carrying a user prompt."""
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        if isinstance(message, ModelRequest) and any(isinstance(part, UserPromptPart) for part in message.parts):
+            return index
+    return 0

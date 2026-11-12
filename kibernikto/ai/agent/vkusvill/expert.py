@@ -15,7 +15,7 @@ from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
-from .prompts import VKUSVILL_INSTRUCTIONS
+from .prompts import VKUSVILL_DELEGATED_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def build_vkusvill_expert_agent(settings: VkusvillSettings = VKUSVILL_SETTINGS):
         deps_type=TelegramDeps,
         name=settings.NAME,
         persona=False,
-        instructions=VKUSVILL_INSTRUCTIONS,
+        instructions=VKUSVILL_DELEGATED_INSTRUCTIONS,
         model_settings={**default_model_settings(), 'parallel_tool_calls': False},
         toolsets=[build_vkusvill_toolset(settings)],
         model=model,
