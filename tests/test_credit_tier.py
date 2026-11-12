@@ -11,7 +11,7 @@ os.environ['AGENT_KIBERNIKTO_IMAGE_MODEL_NAME'] = ''
 os.environ['APP_STORAGE_DATA_BACKEND'] = 'file'
 os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
-from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
+from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai_harness.exa import ExaSearch
@@ -258,6 +258,75 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
         self.assertEqual(self.chat_data.rows['7'].credits, 100)
+
+    async def test_check_credits_tool_returns_balance_tier_and_reuses_run_snapshot(self) -> None:
+        observed_tool_returns: list[str] = []
+
+        def call_check_credits(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            if len(messages) == 1:
+                return ModelResponse(parts=[ToolCallPart('check_credits', {})])
+            for message in messages:
+                for part in getattr(message, 'parts', ()):
+                    if isinstance(part, ToolReturnPart) and part.tool_name == 'check_credits':
+                        observed_tool_returns.append(str(part.content))
+            return ModelResponse(parts=[TextPart('checked')])
+
+        self.tier.models[MEDIUM] = FunctionModel(call_check_credits)
+        await self.set_credits('7', 120)
+        result = await self.agent.run('how many credits do I have?', conversation_id='7', deps=TelegramDeps())
+        self.assertEqual(result.output, 'checked')
+        self.assertEqual(len(observed_tool_returns), 1)
+        self.assertIn('credits: 120', observed_tool_returns[0])
+        self.assertIn('tier: medium', observed_tool_returns[0])
+        self.assertIn('/balance', observed_tool_returns[0])
+        self.assertIn('/pay [stars]', observed_tool_returns[0])
+        self.assertNotIn('admin_commands', observed_tool_returns[0])
+        self.assertEqual(self.chat_data.loads, 2)  # Initial load shared by _select + check_credits, plus after_run charge.
+
+    async def test_check_credits_tool_includes_admin_grant_commands_for_master_user(self) -> None:
+        from kibernikto.telegram.config import TELEGRAM_SETTINGS
+
+        observed_tool_returns: list[str] = []
+
+        def call_check_credits(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            if len(messages) == 1:
+                return ModelResponse(parts=[ToolCallPart('check_credits', {})])
+            for message in messages:
+                for part in getattr(message, 'parts', ()):
+                    if isinstance(part, ToolReturnPart) and part.tool_name == 'check_credits':
+                        observed_tool_returns.append(str(part.content))
+            return ModelResponse(parts=[TextPart('admin-checked')])
+
+        self.tier.models[MEDIUM] = FunctionModel(call_check_credits)
+        await self.set_credits('199740245', 120)
+        with patch.multiple(TELEGRAM_SETTINGS, MASTER_ID=199740245, ADMIN_COMMANDS_ALLOWED=True):
+            deps = TelegramDeps(user_id=199740245)
+        self.assertTrue(deps.is_admin)
+        result = await self.agent.run('how to grant credits?', conversation_id='199740245', deps=deps)
+        self.assertEqual(result.output, 'admin-checked')
+        self.assertEqual(len(observed_tool_returns), 1)
+        self.assertIn('admin_commands (caller is admin)', observed_tool_returns[0])
+        self.assertIn('/pay <±credits> 199740245', observed_tool_returns[0])
+        self.assertIn('/pay <±credits> <tg_id>', observed_tool_returns[0])
+        self.assertIn('/balance <tg_id>', observed_tool_returns[0])
+
+    async def test_check_credits_tool_reports_untracked_on_non_billable_run(self) -> None:
+        observed_tool_returns: list[str] = []
+
+        def call_check_credits(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            if len(messages) == 1:
+                return ModelResponse(parts=[ToolCallPart('check_credits', {})])
+            for message in messages:
+                for part in getattr(message, 'parts', ()):
+                    if isinstance(part, ToolReturnPart) and part.tool_name == 'check_credits':
+                        observed_tool_returns.append(str(part.content))
+            return ModelResponse(parts=[TextPart('untracked')])
+
+        with self.agent.override(model=FunctionModel(call_check_credits)):
+            result = await self.agent.run('credits?', conversation_id='7', deps=TelegramDeps(billable=False))
+        self.assertEqual(result.output, 'untracked')
+        self.assertEqual(observed_tool_returns, ['credits: untracked (non-billable run)'])
+        self.assertEqual(self.chat_data.loads, 0)
 
 
 if __name__ == '__main__':

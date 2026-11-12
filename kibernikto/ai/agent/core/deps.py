@@ -34,6 +34,9 @@ class KiberniktoDeps:
     billable: bool = True
     """``False`` skips credit tiering and charging (e.g. a peer envelope served for another bot)."""
 
+    is_admin: bool = False
+    """``True`` when the caller is an administrator allowed to run admin balance commands."""
+
     chat_info: ConversationInfo | None = None
     """Run-start snapshot of ``chat_data`` (credits); read-only — writers reload before saving."""
 

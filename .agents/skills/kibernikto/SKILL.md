@@ -73,7 +73,8 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
 - `chat_data` (`ConversationInfo`) stores credits only; legacy JSON keys are ignored on load.
   `build_deps` loads it once into `KiberniktoDeps.chat_info` (read-only; tier selection reuses it) and
   writes nothing; `CreditTier.after_run` re-reads before charging so a mid-run top-up survives.
-  Credits are kept out of the prompt. Timezone is `utils.time_utils.DEFAULT_TIMEZONE` (Moscow).
+  Credits stay out of the system prompt and are inspected on demand via the `CreditTier.check_credits` tool.
+  Timezone is `utils.time_utils.DEFAULT_TIMEZONE` (Moscow).
 - Instructions per run, in order: persona (`{FILESTORE}/{NAME}-instructions.txt` **replaces** `WHO_AM_I`;
   read once at agent construction → restart to apply; unknown `{{field}}` fails at startup, escape as `\{{`
   or disable with `AGENT_KIBERNIKTO_PERSONA_TEMPLATE=false`), capability guidance (memory, roster), `Current date: …`

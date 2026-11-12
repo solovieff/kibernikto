@@ -63,7 +63,7 @@ class TelegramBridge:
             message=message,
         )
         deps.chat_info = await chat_data.load(str(message.chat.id))
-        # Credits stay out of the prompt for now; prepend them here when the model needs its balance.
+        # Credits stay out of the prompt; CreditTier exposes them on demand via check_credits.
         deps.conversation_context = f"[Current conversation context] {await get_chat_context(message)}"
         deps.timezone = DEFAULT_TIMEZONE
         return deps
