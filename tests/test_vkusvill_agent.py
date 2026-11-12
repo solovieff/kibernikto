@@ -131,6 +131,7 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('ВкусВилл', instructions)
         self.assertIn('Не занимайся исследованиями', instructions)
         self.assertIn('Не переспрашивай по понятному списку', instructions)
+        self.assertIn('Корзину создавай только когда просят собрать', instructions)
         self.assertIn('не понимает «сок в маленькой таре»', instructions)
         self.assertIn('sort="price_asc"', instructions)
         self.assertIn('category_id', instructions)
