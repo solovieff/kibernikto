@@ -15,13 +15,13 @@ from kibernikto.storage.singletons import history_storage
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
-from .memory import basket_note, remember_basket
+from .memory import basket_note, catalog_note, remember_basket
 from .prompts import VKUSVILL_INSTRUCTIONS
 
 
 def _instructions(ctx: RunContext[TelegramDeps]) -> str:
     """Static contract plus the cart this chat built last time, when there is one."""
-    return VKUSVILL_INSTRUCTIONS + basket_note(ctx.deps)
+    return VKUSVILL_INSTRUCTIONS + catalog_note(ctx.deps) + basket_note(ctx.deps)
 
 
 def build_vkusvill_agent(
@@ -43,6 +43,7 @@ def build_vkusvill_agent(
     })
     return build_telegram_agent(
         history_storage=history_storage,
+        history_size=settings.HISTORY_SIZE,
         name=settings.NAME,
         persona=False,
         instructions=_instructions,

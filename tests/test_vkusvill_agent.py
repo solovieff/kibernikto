@@ -251,3 +251,46 @@ class BasketMemoTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(conversation_key(SimpleNamespace(message=None, user_id=42)), '42')
         self.assertIsNone(conversation_key(SimpleNamespace(message=None, user_id=None)))
+
+
+class CatalogMemoTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def make_ctx(chat_id: int = 404):
+        return SimpleNamespace(deps=SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id))))
+
+    async def test_found_products_are_injected_with_prices(self) -> None:
+        from kibernikto.ai.agent.vkusvill.memory import catalog_note, clear_basket, remember_basket
+
+        ctx = self.make_ctx()
+        clear_basket(ctx.deps)
+
+        async def call_tool(name, args, *, metadata=None):
+            return json.dumps({'ok': True, 'data': {'items': [
+                {'id': 5, 'name': 'Круассан&nbsp;на масле', 'price': {'current': 112}},
+                {'id': 6, 'name': 'Сметана 15%', 'price': {'current': 94}},
+            ]}})
+
+        await remember_basket(ctx, call_tool, 'vkusvill_products_search', {'q': 'завтрак'})
+
+        note = catalog_note(ctx.deps)
+        self.assertIn('id 5: Круассан на масле — 112 ₽', note)
+        self.assertIn('id 6: Сметана 15% — 94 ₽', note)
+
+    async def test_catalog_memo_is_bounded(self) -> None:
+        from kibernikto.ai.agent.vkusvill.memory import MAX_SEEN_PRODUCTS, catalog_note, clear_basket, remember_basket
+
+        ctx = self.make_ctx(chat_id=405)
+        clear_basket(ctx.deps)
+        items = [{'id': index, 'name': f'Товар {index}', 'price': {'current': 10}} for index in range(60)]
+
+        async def call_tool(name, args, *, metadata=None):
+            return json.dumps({'ok': True, 'data': {'items': items}})
+
+        await remember_basket(ctx, call_tool, 'vkusvill_products_search', {'q': 'всё'})
+
+        note = catalog_note(ctx.deps)
+        self.assertEqual(note.count('— 10 ₽'), MAX_SEEN_PRODUCTS)
+        self.assertIn('Товар 59', note)
+
+    def test_shop_history_window_is_wider_than_the_library_default(self) -> None:
+        self.assertEqual(VkusvillSettings().HISTORY_SIZE, 40)

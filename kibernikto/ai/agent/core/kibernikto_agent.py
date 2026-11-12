@@ -28,6 +28,7 @@ def build_kibernikto_agent(
         history_storage: HistoryStorage | None = None,
         persona_source: PersonaSource | None = None,
         persona: bool = True,
+        history_size: int | None = None,
         **kwargs,
 ) -> Agent[KiberniktoDeps]:
     """Build a standard ``pydantic_ai.Agent`` wired with ``ConversationHistory`` and ``PersonaCapability``."""
@@ -48,7 +49,7 @@ def build_kibernikto_agent(
 
     conv_history = ConversationHistory(
         history_storage,
-        history_size=AGENT_KIBERNIKTO_SETTINGS.HISTORY_SIZE,
+        history_size=AGENT_KIBERNIKTO_SETTINGS.HISTORY_SIZE if history_size is None else history_size,
         keep_thinking=AGENT_KIBERNIKTO_SETTINGS.KEEP_THINKING_IN_HISTORY,
     )
     persona_cap = PersonaCapability(name, source=persona_source, include_persona=persona)
