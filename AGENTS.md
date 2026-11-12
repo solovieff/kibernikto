@@ -51,6 +51,8 @@ CLI (kibernikto command / main.py)
 - `agent.run` returns `AgentRunResult` — use `result.output` for text or structured output, not `result.data`
 - VkusVill: `main.py --vkusvill` swaps the agent, the transport stays stock; tools come from `MCPToolset`
   (`kibernikto/ai/agent/vkusvill/mcp.py`). There is no order tool upstream — the flow ends with a cart share link
+- VkusVill as an expert (`VKUSVILL_ENABLED=true`): `build_vkusvill_expert()` joins the delegation roster and
+  `CreditGatedSubAgents` drops it per run unless the chat is private and above `VKUSVILL_MIN_CREDITS`
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)

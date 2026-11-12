@@ -15,19 +15,29 @@ os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
 from fastmcp.client.auth import OAuth
 from pydantic import ValidationError
-from pydantic_ai import FunctionToolset, ModelMessage, ModelRequest, ModelResponse, TextPart
+from pydantic_ai import FunctionToolset, ModelMessage, ModelRequest, ModelResponse, RunContext, RunUsage, TextPart
 from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.test import TestModel
 
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
+from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
 from kibernikto.ai.agent.vkusvill.agent import build_vkusvill_agent
 from kibernikto.ai.agent.vkusvill.config import (
     DEFAULT_MCP_URL,
     DEFAULT_SCOPES,
+    VKUSVILL_SETTINGS,
     VkusvillSettings,
     resolve_token_dir,
 )
+from kibernikto.ai.agent.vkusvill.expert import (
+    VKUSVILL_EXPERT_NAME,
+    CreditGatedSubAgents,
+    build_vkusvill_expert,
+    expert_allowed,
+)
 from kibernikto.ai.agent.vkusvill.mcp import build_vkusvill_toolset
+from kibernikto.storage.models import ConversationInfo
 
 
 class VkusvillSettingsTests(unittest.TestCase):
@@ -133,3 +143,63 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
         await self.agent.run('привет', deps=TelegramDeps())
         instructions = self.model.requests[-1].instructions or ''
         self.assertNotIn('Kibernikto', instructions)
+
+
+class VkusvillExpertGateTests(unittest.TestCase):
+    def test_personal_chat_needs_more_than_the_floor(self) -> None:
+        self.assertTrue(expert_allowed(credits=2500, is_personal=True, min_credits=2000))
+        self.assertFalse(expert_allowed(credits=2000, is_personal=True, min_credits=2000))
+        self.assertFalse(expert_allowed(credits=500, is_personal=True, min_credits=2000))
+
+    def test_group_chat_never_gets_the_shop(self) -> None:
+        self.assertFalse(expert_allowed(credits=999_999, is_personal=False, min_credits=0))
+        self.assertFalse(expert_allowed(credits=999_999, is_personal=False, min_credits=2000))
+
+    def test_no_floor_allows_any_personal_chat(self) -> None:
+        self.assertTrue(expert_allowed(credits=0, is_personal=True, min_credits=0))
+
+    def test_expert_is_a_named_subagent_with_routing_description(self) -> None:
+        expert = build_vkusvill_expert()
+        self.assertEqual(expert.name, VKUSVILL_EXPERT_NAME)
+        self.assertIn('ВкусВилл', expert.description)
+
+    def test_default_settings_keep_the_expert_off(self) -> None:
+        self.assertFalse(VkusvillSettings().ENABLED)
+        self.assertEqual(VkusvillSettings().MIN_CREDITS, 2000)
+
+    def test_default_multi_agent_roster_has_no_shop(self) -> None:
+        with patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
+                patch('kibernikto.ai.agent.telegram.multi_agent.KiberniktoSubAgents') as roster:
+            build_multi_agent()
+        names = [sub.name or sub.agent.name for sub in roster.call_args.kwargs['agents']]
+        self.assertNotIn(VKUSVILL_EXPERT_NAME, names)
+
+    def test_enabled_multi_agent_registers_the_gated_roster(self) -> None:
+        with patch.object(VKUSVILL_SETTINGS, 'ENABLED', True), \
+                patch('kibernikto.ai.agent.vkusvill.expert.CreditGatedSubAgents') as gated, \
+                patch('kibernikto.ai.agent.vkusvill.expert.build_vkusvill_expert') as expert:
+            build_multi_agent()
+        expert.assert_called_once_with()
+        self.assertEqual(gated.call_args.kwargs['min_credits'], VKUSVILL_SETTINGS.MIN_CREDITS)
+        self.assertIn(expert.return_value, gated.call_args.kwargs['agents'])
+
+
+class CreditGatedRosterTests(unittest.IsolatedAsyncioTestCase):
+    def make_ctx(self, *, credits: int, is_personal: bool) -> RunContext[TelegramDeps]:
+        deps = TelegramDeps(is_personal=is_personal, chat_info=ConversationInfo(credits=credits))
+        return RunContext(deps=deps, model=TestModel(), usage=RunUsage(), conversation_id='42')
+
+    async def test_group_chat_run_drops_the_shop(self) -> None:
+        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], min_credits=2000)
+        run = await roster.for_run(self.make_ctx(credits=50_000, is_personal=False))
+        self.assertEqual(run.agents, [])
+
+    async def test_poor_personal_chat_drops_the_shop(self) -> None:
+        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], min_credits=2000)
+        run = await roster.for_run(self.make_ctx(credits=1999, is_personal=True))
+        self.assertEqual(run.agents, [])
+
+    async def test_rich_personal_chat_keeps_the_shop(self) -> None:
+        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], min_credits=2000)
+        run = await roster.for_run(self.make_ctx(credits=2001, is_personal=True))
+        self.assertEqual([a.name for a in run.agents], [VKUSVILL_EXPERT_NAME])

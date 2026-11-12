@@ -23,6 +23,12 @@ class VkusvillSettings(BaseSettings):
     MODEL_NAME: str | None = Field(
         default=None, description='Provider-prefixed model; unset = AGENT_KIBERNIKTO_MODEL_NAME',
     )
+    ENABLED: bool = Field(
+        default=False, description='Wire the shop expert into build_multi_agent() delegation',
+    )
+    MIN_CREDITS: int = Field(
+        default=2000, description='Personal chats above this balance may delegate to the shop; 0 = no floor',
+    )
     AUTH_MODE: Literal['anonymous', 'oauth'] = Field(
         default='anonymous', description='anonymous: public catalog tools only; oauth: personalized tools',
     )
