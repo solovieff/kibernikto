@@ -68,6 +68,7 @@ class CliHelpTests(unittest.TestCase):
                     self.assertIn("Run Kibernikto", result.stdout)
                     self.assertIn("--env_file_path", result.stdout)
                     self.assertIn("--multi-agent", result.stdout)
+                    self.assertIn("--vkusvill", result.stdout)
                     self.assertEqual(result.stderr, "")
 
 
@@ -100,14 +101,17 @@ class CliStartupTests(unittest.TestCase):
     def run_startup(
         self, argv: list[str], *, outer_env: bool = False,
         initial_value: str | None = None,
-    ) -> tuple[list[tuple[str, str | None]], Mock, Mock, Mock]:
+    ) -> SimpleNamespace:
         events: list[tuple[str, str | None]] = []
         env_key = "CLI_STARTUP_TEST_VALUE"
-        default_app, multi_app = Mock(), Mock()
-        default_bridge, multi_bridge = Mock(), Mock()
-        multi_agent = Mock()
+        agents = {"default": Mock(), "multi-agent": Mock(), "vkusvill": Mock()}
+        bridges = {name: Mock() for name in agents}
+        apps = {name: Mock() for name in agents}
+        poll_events = {"default": "poll_default", "multi-agent": "poll_multi", "vkusvill": "poll_vkusvill"}
         app_cls = Mock()
-        app_cls.from_bridge.side_effect = lambda bridge: default_app if bridge is default_bridge else multi_app
+        app_cls.from_bridge.side_effect = lambda bridge: next(
+            app for name, app in apps.items() if bridges[name] is bridge
+        )
 
         def record(name: str) -> None:
             events.append((name, os.environ.get(env_key)))
@@ -119,15 +123,15 @@ class CliStartupTests(unittest.TestCase):
 
         def get_bridge() -> Mock:
             record("bridge")
-            return default_bridge
+            return bridges["default"]
 
         def bridge_factory(agent: object) -> Mock:
             record("bridge")
-            self.assertIs(agent, multi_agent)
-            return multi_bridge
+            return bridges[next(name for name, candidate in agents.items() if candidate is agent)]
 
-        default_app.run_polling.side_effect = lambda: record("poll_default")
-        multi_app.run_polling.side_effect = lambda: record("poll_multi")
+        for name, app in apps.items():
+            app.run_polling.side_effect = (lambda preset=poll_events[name]: record(preset))
+
         config = SimpleNamespace(
             configure_logger=lambda: record("logger"),
             print_banner=lambda: record("banner"),
@@ -144,7 +148,10 @@ class CliStartupTests(unittest.TestCase):
                 TelegramBridge=bridge_factory, get_telegram_bridge=get_bridge,
             ),
             "kibernikto.ai.agent.telegram.multi_agent": SimpleNamespace(
-                build_multi_agent=lambda: multi_agent,
+                build_multi_agent=lambda: agents["multi-agent"],
+            ),
+            "kibernikto.ai.agent.vkusvill": SimpleNamespace(
+                build_vkusvill_agent=lambda: agents["vkusvill"],
             ),
         }
         root = SimpleNamespace(ai=SimpleNamespace(agent=SimpleNamespace(
@@ -174,40 +181,49 @@ class CliStartupTests(unittest.TestCase):
                     spec.loader.exec_module(module)
                     self.assertEqual(events, [], "Importing the CLI must not load env or runtime modules")
                     module.start(outer_env=outer_env)
-        return events, loader, default_app, multi_app
+        return SimpleNamespace(events=events, loader=loader, apps=apps)
 
     def test_custom_env_is_loaded_before_runtime_imports(self) -> None:
-        events, loader, default_app, multi_app = self.run_startup(["--env_file_path", "custom.env"])
-        loader.assert_called_once_with(dotenv_path="custom.env")
-        self.assertEqual(events[0], ("dotenv:custom.env", None))
-        self.assertTrue(all(value == "selected-file" for _, value in events[1:]))
-        self.assertEqual([name for name, _ in events if not name.startswith("import:")], [
+        result = self.run_startup(["--env_file_path", "custom.env"])
+        result.loader.assert_called_once_with(dotenv_path="custom.env")
+        self.assertEqual(result.events[0], ("dotenv:custom.env", None))
+        self.assertTrue(all(value == "selected-file" for _, value in result.events[1:]))
+        self.assertEqual([name for name, _ in result.events if not name.startswith("import:")], [
             "dotenv:custom.env", "logger", "banner", "storage", "bridge", "summary:default", "poll_default",
         ])
-        default_app.run_polling.assert_called_once_with()
-        multi_app.run_polling.assert_not_called()
+        result.apps["default"].run_polling.assert_called_once_with()
+        result.apps["multi-agent"].run_polling.assert_not_called()
 
     def test_default_env_path_is_preserved(self) -> None:
-        _, loader, _, _ = self.run_startup([])
-        loader.assert_called_once_with(dotenv_path=".env")
+        result = self.run_startup([])
+        result.loader.assert_called_once_with(dotenv_path=".env")
 
     def test_outer_env_skips_all_dotenv_loading(self) -> None:
-        events, loader, default_app, _ = self.run_startup(
+        result = self.run_startup(
             ["--env_file_path", "ignored.env"], outer_env=True, initial_value="external",
         )
-        loader.assert_not_called()
-        self.assertTrue(all(value == "external" for _, value in events))
-        default_app.run_polling.assert_called_once_with()
+        result.loader.assert_not_called()
+        self.assertTrue(all(value == "external" for _, value in result.events))
+        result.apps["default"].run_polling.assert_called_once_with()
 
     def test_multi_agent_registers_and_polls_selected_agent(self) -> None:
-        events, loader, default_app, multi_app = self.run_startup(["--multi-agent"])
-        loader.assert_called_once_with(dotenv_path=".env")
-        self.assertIn(("import:kibernikto.ai.agent.telegram.multi_agent", "selected-file"), events)
-        self.assertEqual([name for name, _ in events if not name.startswith("import:")], [
+        result = self.run_startup(["--multi-agent"])
+        result.loader.assert_called_once_with(dotenv_path=".env")
+        self.assertIn(("import:kibernikto.ai.agent.telegram.multi_agent", "selected-file"), result.events)
+        self.assertEqual([name for name, _ in result.events if not name.startswith("import:")], [
             "dotenv:.env", "logger", "banner", "storage", "bridge", "summary:multi-agent", "poll_multi",
         ])
-        default_app.run_polling.assert_not_called()
-        multi_app.run_polling.assert_called_once_with()
+        result.apps["default"].run_polling.assert_not_called()
+        result.apps["multi-agent"].run_polling.assert_called_once_with()
+
+    def test_vkusvill_registers_and_polls_the_shop_agent(self) -> None:
+        result = self.run_startup(["--vkusvill"])
+        self.assertIn(("import:kibernikto.ai.agent.vkusvill", "selected-file"), result.events)
+        self.assertEqual([name for name, _ in result.events if not name.startswith("import:")], [
+            "dotenv:.env", "logger", "banner", "storage", "bridge", "summary:vkusvill", "poll_vkusvill",
+        ])
+        result.apps["multi-agent"].run_polling.assert_not_called()
+        result.apps["vkusvill"].run_polling.assert_called_once_with()
 
 
 if __name__ == "__main__":
