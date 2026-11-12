@@ -165,6 +165,7 @@ class VkusvillExpertGateTests(unittest.TestCase):
         expert = build_vkusvill_expert()
         self.assertEqual(expert.name, VKUSVILL_EXPERT_NAME)
         self.assertIn('ВкусВилл', expert.description)
+        self.assertIn('забыть', expert.description)
 
     def test_default_settings_keep_the_expert_off(self) -> None:
         self.assertFalse(VkusvillSettings().ENABLED)
