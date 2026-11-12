@@ -69,7 +69,7 @@ __init__.py relative re-exports only (no __all__)
 | Field | Default | Meaning |
 |---|---|---|
 | `MCP_URL` | `https://mcp.vkusvill.ru/mcp` | MCP endpoint |
-| `NAME` | `ВкусВилл` | agent name in logs/summary |
+| `NAME` | `vkusvill` | agent name in logs, summaries and attribution headers (ASCII — it rides an HTTP header) |
 | `MODEL_NAME` | unset | provider-prefixed model; unset → `AGENT_KIBERNIKTO_MODEL_NAME` |
 | `AUTH_MODE` | `anonymous` | `anonymous` \| `oauth` |
 | `OAUTH_CLIENT_ID` | unset | from the VkusVill registration email |

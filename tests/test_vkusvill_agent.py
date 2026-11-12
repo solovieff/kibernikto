@@ -35,7 +35,7 @@ class VkusvillSettingsTests(unittest.TestCase):
         settings = VkusvillSettings()
         self.assertEqual(settings.AUTH_MODE, 'anonymous')
         self.assertEqual(settings.MCP_URL, DEFAULT_MCP_URL)
-        self.assertEqual(settings.NAME, 'ВкусВилл')
+        self.assertEqual(settings.NAME, 'vkusvill')
         self.assertEqual(settings.OAUTH_SCOPES, DEFAULT_SCOPES)
         self.assertIsNone(settings.MODEL_NAME)
 
@@ -103,11 +103,11 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
 
     def test_agent_is_named_and_owns_the_default_mcp_toolset(self) -> None:
         agent = build_vkusvill_agent(model=FunctionModel(self.model), history_storage=None)
-        self.assertEqual(agent.name, 'ВкусВилл')
+        self.assertEqual(agent.name, 'vkusvill')
         self.assertIsInstance(agent.toolsets[-1], MCPToolset)
 
     def test_agent_accepts_an_injected_toolset(self) -> None:
-        self.assertEqual(self.agent.name, 'ВкусВилл')
+        self.assertEqual(self.agent.name, 'vkusvill')
         self.assertIsInstance(self.agent.toolsets[-1], FunctionToolset)
 
     async def test_instructions_carry_the_shopping_contract(self) -> None:

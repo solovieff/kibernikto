@@ -18,7 +18,7 @@ class VkusvillSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix='VKUSVILL_')
 
-    NAME: str = Field(default='ВкусВилл', description='Agent name in logs and summaries')
+    NAME: str = Field(default='vkusvill', description='Agent name (ASCII, it rides attribution headers)')
     MCP_URL: str = Field(default=DEFAULT_MCP_URL, description='VkusVill MCP endpoint')
     MODEL_NAME: str | None = Field(
         default=None, description='Provider-prefixed model; unset = AGENT_KIBERNIKTO_MODEL_NAME',

@@ -16,6 +16,7 @@
 - Default `VKUSVILL_AUTH_MODE` is `anonymous`; the agent must be usable without any VkusVill credentials.
 - OAuth scopes: `catalog.search`, `purchase_history.read`, `discounts.view`, `recommendations.personalized`.
 - Env prefix `VKUSVILL_`; settings are env-only and fail fast on incomplete OAuth config.
+- `VKUSVILL_NAME` (default `vkusvill`) ends up in attribution HTTP headers — it must stay ASCII, the Russian identity lives in the prompt.
 - Do not add dependencies (`FileTreeStore` from the already-installed `py-key-value-aio`; `DiskStore` is NOT available — it needs an extra package).
 - No `__all__` in package `__init__.py`; relative imports only there.
 - No `typing.Any`; use `str | None` style unions.
