@@ -1,8 +1,11 @@
 """build_vkusvill_agent — plain Agent[TelegramDeps] wired to the VkusVill MCP toolset."""
 
+import logging
+
 from pydantic_ai import Agent
 from pydantic_ai.toolsets import AbstractToolset
 
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.kibernikto_agent import default_model_settings
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
@@ -25,6 +28,9 @@ def build_vkusvill_agent(
     """Shop assistant for Telegram: stock transport and history, VkusVill identity and tools."""
     if settings.MODEL_NAME is not None:
         kwargs.setdefault('model', infer_kibernikto_model(settings.MODEL_NAME))
+    logging.getLogger('kibernikto').info(
+        'VkusVill agent model: %s', settings.MODEL_NAME or AGENT_KIBERNIKTO_SETTINGS.MODEL_NAME,
+    )
     # Serial tool calls: the model otherwise fires a burst of identical searches per shopping list.
     kwargs.setdefault('model_settings', {**default_model_settings(), 'parallel_tool_calls': False})
     return build_telegram_agent(

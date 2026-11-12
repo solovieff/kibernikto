@@ -117,6 +117,9 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
         await self.agent.run('привет', deps=TelegramDeps())
         instructions = self.model.requests[-1].instructions or ''
         self.assertIn('ВкусВилл', instructions)
+        self.assertIn('Не занимайся исследованиями', instructions)
+        self.assertIn('Не переспрашивай по понятному списку', instructions)
+        self.assertIn('Больше 10 вызовов инструментов', instructions)
         self.assertIn('mode="custom"', instructions)
         self.assertIn('vkusvill_product_details', instructions)
         self.assertIn('vkusvill_cart_link_create', instructions)
