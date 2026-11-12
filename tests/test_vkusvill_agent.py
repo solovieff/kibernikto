@@ -13,7 +13,9 @@ os.environ['AGENT_KIBERNIKTO_IMAGE_MODEL_NAME'] = ''
 os.environ['APP_STORAGE_DATA_BACKEND'] = 'file'
 os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
+from fastmcp.client.auth import OAuth
 from pydantic import ValidationError
+from pydantic_ai.mcp import MCPToolset
 
 from kibernikto.ai.agent.vkusvill.config import (
     DEFAULT_MCP_URL,
@@ -21,6 +23,7 @@ from kibernikto.ai.agent.vkusvill.config import (
     VkusvillSettings,
     resolve_token_dir,
 )
+from kibernikto.ai.agent.vkusvill.mcp import build_vkusvill_toolset
 
 
 class VkusvillSettingsTests(unittest.TestCase):
@@ -50,3 +53,25 @@ class VkusvillSettingsTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             settings = VkusvillSettings(OAUTH_TOKEN_DIR=tmp)
             self.assertEqual(resolve_token_dir(settings), Path(tmp))
+
+
+class VkusvillToolsetTests(unittest.TestCase):
+    def test_anonymous_toolset_points_at_the_public_endpoint(self) -> None:
+        toolset = build_vkusvill_toolset()
+        self.assertIsInstance(toolset, MCPToolset)
+        self.assertEqual(str(toolset.client.transport.url), DEFAULT_MCP_URL)
+
+    def test_oauth_toolset_carries_credentials_and_creates_the_token_dir(self) -> None:
+        with TemporaryDirectory() as tmp:
+            token_dir = Path(tmp) / 'tokens'
+            settings = VkusvillSettings(
+                AUTH_MODE='oauth',
+                OAUTH_CLIENT_ID='cid',
+                OAUTH_CLIENT_SECRET='secret',
+                OAUTH_TOKEN_DIR=str(token_dir),
+            )
+            toolset = build_vkusvill_toolset(settings)
+            auth = toolset.client.transport.auth
+            self.assertIsInstance(auth, OAuth)
+            self.assertEqual(auth._static_client_info.client_id, 'cid')
+            self.assertTrue(token_dir.is_dir())
