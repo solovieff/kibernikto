@@ -110,10 +110,15 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.agent.name, 'vkusvill')
         self.assertIsInstance(self.agent.toolsets[-1], FunctionToolset)
 
+    def test_tool_calls_are_serial(self) -> None:
+        self.assertFalse(self.agent.model_settings['parallel_tool_calls'])
+
     async def test_instructions_carry_the_shopping_contract(self) -> None:
         await self.agent.run('привет', deps=TelegramDeps())
         instructions = self.model.requests[-1].instructions or ''
         self.assertIn('ВкусВилл', instructions)
+        self.assertIn('mode="custom"', instructions)
+        self.assertIn('vkusvill_product_details', instructions)
         self.assertIn('vkusvill_cart_link_create', instructions)
         self.assertIn('vkusvill.ru/mobile?basket&share=', instructions)
         self.assertIn('не оформляешь заказ', instructions)
