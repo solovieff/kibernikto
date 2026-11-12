@@ -36,6 +36,8 @@ CLI (kibernikto command / main.py)
   │     ├── core/kibernikto_agent.py (build_kibernikto_agent)
   │     ├── telegram/telegram_agent.py (build_telegram_agent)
   │     ├── telegram/telegram_capability.py (TelegramCapability)
+  │     ├── vkusvill/ (build_vkusvill_agent: MCPToolset over mcp.vkusvill.ru + shopping prompt;
+  │     │              VKUSVILL_* settings, anonymous or OAuth 2.0 + PKCE)
   │     └── utils.py (infer_kibernikto_model)
   └── kibernikto.storage
         ├── base.py (HistoryStorage contract; opt-in MemoryHistoryStorage)
@@ -47,6 +49,8 @@ CLI (kibernikto command / main.py)
 - No agent superclass: compose `Agent(capabilities=[...])` or call `build_kibernikto_agent(...)`, then add tools
 - Telegram: build the agent with `build_telegram_agent(...)` (or add `TelegramCapability` to any `Agent`), wrap it in `TelegramBridge(agent, pre_processor=..., capture_peer_media=...)` (`kibernikto/telegram/bridge.py`: process_message + reply_to) and run `TelegramApp.from_bridge(bridge)`; there is no agent subclass
 - `agent.run` returns `AgentRunResult` — use `result.output` for text or structured output, not `result.data`
+- VkusVill: `main.py --vkusvill` swaps the agent, the transport stays stock; tools come from `MCPToolset`
+  (`kibernikto/ai/agent/vkusvill/mcp.py`). There is no order tool upstream — the flow ends with a cart share link
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)

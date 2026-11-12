@@ -77,7 +77,7 @@ __init__.py relative re-exports only (no __all__)
 | `OAUTH_SCOPES` | all four advertised scopes | JSON list, like `AGENT_KIBERNIKTO_FALLBACK_MODELS` |
 | `OAUTH_CALLBACK_PORT` | `8765` | local callback port, must match the registered redirect URI |
 | `OAUTH_CALLBACK_HOST` | `localhost` | callback host |
-| `OAUTH_TOKEN_DIR` | `{APP_STORAGE_FILESTORE_LOCATION}/{NAME}-oauth` | persistent token store directory |
+| `OAUTH_TOKEN_DIR` | `{APP_STORAGE_FILESTORE_LOCATION}/vkusvill-oauth` | persistent token store directory |
 
 `@model_validator(mode='after')` raises when `AUTH_MODE='oauth'` and either credential is
 missing — same fail-fast style as `StorageSettings`.

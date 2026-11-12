@@ -26,6 +26,7 @@ fields change often — read them in source, don't trust a remembered list.
 | Model string → model | `kibernikto/ai/agent/utils.py` (`infer_kibernikto_model`) |
 | Telegram agent + active bridge | `kibernikto/ai/agent/telegram/telegram_agent.py`, `kibernikto/telegram/bridge.py` |
 | Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/telegram/multi_agent.py` |
+| VkusVill MCP agent (`main.py --vkusvill`) | `kibernikto/ai/agent/vkusvill/` |
 | Harness capabilities (transport-free, keyed on `RunContext.conversation_id`): `CreditTier`, `chat_memory`, delegation roster, web layout, experts | `kibernikto/ai/agent/harness/` |
 | Bot, Dispatcher, middleware order, lifecycle | `kibernikto/telegram/agent/telegram_app.py` |
 | Handlers / middlewares / preprocessing | `kibernikto/telegram/handlers/`, `kibernikto/telegram/middleware/`, `kibernikto/telegram/pre_processors/` |
