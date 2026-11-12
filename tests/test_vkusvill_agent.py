@@ -116,11 +116,11 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
     def test_agent_is_named_and_owns_the_default_mcp_toolset(self) -> None:
         agent = build_vkusvill_agent(model=FunctionModel(self.model), history_storage=None)
         self.assertEqual(agent.name, 'vkusvill')
-        self.assertIsInstance(agent.toolsets[-1], MCPToolset)
+        self.assertTrue(any(isinstance(toolset, MCPToolset) for toolset in agent.toolsets))
 
     def test_agent_accepts_an_injected_toolset(self) -> None:
         self.assertEqual(self.agent.name, 'vkusvill')
-        self.assertIsInstance(self.agent.toolsets[-1], FunctionToolset)
+        self.assertTrue(any(isinstance(toolset, FunctionToolset) for toolset in self.agent.toolsets))
 
     def test_tool_calls_follow_the_setting(self) -> None:
         self.assertEqual(self.agent.model_settings['parallel_tool_calls'], VKUSVILL_SETTINGS.PARALLEL_TOOL_CALLS)

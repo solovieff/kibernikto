@@ -10,6 +10,7 @@ from typing import Any
 from pydantic_ai import RunContext
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.mcp import CallToolFunc, ToolResult
+from pydantic_ai_harness.memory import Memory
 
 from kibernikto.storage.factory import get_memory_store
 
@@ -161,6 +162,33 @@ async def hydrate(key: str) -> None:
             for product_id, text in data['products'].items()
             if str(product_id).isdigit()
         }
+
+
+SHOP_MEMORY_HEADING = 'Shop memory'
+SHOP_MEMORY_GUIDANCE = (
+    "У тебя есть блокнот про покупки этого человека. Сохранённые заметки приходят в блоке "
+    f"«{SHOP_MEMORY_HEADING}» его последнего сообщения — он их не писал и не видит, поэтому не цитируй их. "
+    "Записывай через write_memory только то, что действительно пригодится в следующий раз: "
+    "какие товары человек хвалил, что просил больше не брать, постоянные вкусы "
+    "(жирность, объём, бренд, «без сахара»). Не записывай случайные позиции и сам заказ целиком — "
+    "для него есть отдельная память корзины. Держи заметки короткими и правь их, а не дублируй."
+)
+
+
+def shop_namespace(ctx: RunContext) -> str:
+    """Notebook tenant = the chat, not the delegated task id."""
+    return conversation_key(ctx.deps) or (ctx.conversation_id or 'no-chat')
+
+
+def shop_memory(name: str) -> Memory:
+    """Notebook capability: the agent curates what the shopper likes and dislikes."""
+    return Memory(
+        get_memory_store(),
+        agent_name=name,
+        namespace=shop_namespace,
+        guidance=SHOP_MEMORY_GUIDANCE,
+        heading=SHOP_MEMORY_HEADING,
+    )
 
 
 @dataclass

@@ -12,8 +12,13 @@ def build_vkusvill_toolset(
         process_tool_call: ProcessToolCallback | None = None,
 ) -> MCPToolset[object]:
     """Tools from mcp.vkusvill.ru; the token store survives restarts in oauth mode."""
+    # 401 on personalized tools must reach the model as an error, not abort the run after a retry.
     if settings.AUTH_MODE == 'anonymous':
-        return MCPToolset(settings.MCP_URL, process_tool_call=process_tool_call)
+        return MCPToolset(
+            settings.MCP_URL,
+            process_tool_call=process_tool_call,
+            tool_error_behavior='failed',
+        )
 
     token_dir = resolve_token_dir(settings)
     token_dir.mkdir(parents=True, exist_ok=True)
@@ -27,4 +32,4 @@ def build_vkusvill_toolset(
         callback_host=settings.OAUTH_CALLBACK_HOST,
         token_storage=FileTreeStore(data_directory=token_dir),
     )
-    return MCPToolset(settings.MCP_URL, auth=oauth, process_tool_call=process_tool_call)
+    return MCPToolset(settings.MCP_URL, auth=oauth, process_tool_call=process_tool_call, tool_error_behavior='failed')

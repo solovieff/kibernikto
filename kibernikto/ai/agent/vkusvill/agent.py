@@ -15,7 +15,7 @@ from kibernikto.storage.singletons import history_storage
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
-from .memory import ShopMemo, basket_note, catalog_note, remember_basket
+from .memory import ShopMemo, basket_note, catalog_note, remember_basket, shop_memory
 from .prompts import VKUSVILL_INSTRUCTIONS
 from .tools import attach_shop_tools
 
@@ -49,6 +49,6 @@ def build_vkusvill_agent(
         persona=False,
         instructions=_instructions,
         toolsets=[toolset or build_vkusvill_toolset(settings, process_tool_call=remember_basket)],
-        capabilities=[*(kwargs.pop('capabilities', ()) or ()), ShopMemo()],
+        capabilities=[*(kwargs.pop('capabilities', ()) or ()), ShopMemo(), shop_memory(settings.NAME)],
         **kwargs,
     ))
