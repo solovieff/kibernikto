@@ -15,8 +15,9 @@ from kibernikto.storage.singletons import history_storage
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
-from .memory import basket_note, catalog_note, remember_basket
+from .memory import ShopMemo, basket_note, catalog_note, remember_basket
 from .prompts import VKUSVILL_INSTRUCTIONS
+from .tools import attach_shop_tools
 
 
 def _instructions(ctx: RunContext[TelegramDeps]) -> str:
@@ -41,12 +42,13 @@ def build_vkusvill_agent(
     kwargs.setdefault('model_settings', {
         **default_model_settings(), 'parallel_tool_calls': settings.PARALLEL_TOOL_CALLS,
     })
-    return build_telegram_agent(
+    return attach_shop_tools(build_telegram_agent(
         history_storage=history_storage,
         history_size=settings.HISTORY_SIZE,
         name=settings.NAME,
         persona=False,
         instructions=_instructions,
         toolsets=[toolset or build_vkusvill_toolset(settings, process_tool_call=remember_basket)],
+        capabilities=[*(kwargs.pop('capabilities', ()) or ()), ShopMemo()],
         **kwargs,
-    )
+    ))

@@ -16,8 +16,9 @@ from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
 from .config import VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
-from .memory import basket_note, catalog_note, remember_basket
+from .memory import ShopMemo, basket_note, catalog_note, remember_basket
 from .prompts import VKUSVILL_DELEGATED_INSTRUCTIONS
+from .tools import attach_shop_tools
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def build_vkusvill_expert_agent(settings: VkusvillSettings = VKUSVILL_SETTINGS):
     from kibernikto.ai.agent.utils import infer_kibernikto_model
 
     model = infer_kibernikto_model(settings.MODEL_NAME) if settings.MODEL_NAME else ...
-    return build_kibernikto_agent(
+    return attach_shop_tools(build_kibernikto_agent(
         history_storage=None,
         history_size=settings.HISTORY_SIZE,
         deps_type=TelegramDeps,
@@ -47,8 +48,9 @@ def build_vkusvill_expert_agent(settings: VkusvillSettings = VKUSVILL_SETTINGS):
         instructions=_delegated_instructions,
         model_settings={**default_model_settings(), 'parallel_tool_calls': settings.PARALLEL_TOOL_CALLS},
         toolsets=[build_vkusvill_toolset(settings, process_tool_call=remember_basket)],
+        capabilities=[ShopMemo()],
         model=model,
-    )
+    ))
 
 
 def build_vkusvill_expert(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> SubAgent:

@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic_ai import RunContext
+from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.mcp import CallToolFunc, ToolResult
 
+from kibernikto.storage.factory import get_memory_store
+
 logger = logging.getLogger(__name__)
+
+STATE_DIR = 'vkusvill'
+MAX_STATE_CHARS = 20_000
 
 CART_TOOL = 'vkusvill_cart_link_create'
 SEARCH_TOOL = 'vkusvill_products_search'
@@ -88,6 +95,84 @@ def _render_basket(key: str, products: object, link: str) -> str:
     return '; '.join(lines) + f'. Ссылка: {link}'
 
 
+def _state_path(key: str) -> str:
+    return f'{key}/{STATE_DIR}/shop.json'
+
+
+async def _read_state(key: str) -> dict[str, Any]:
+    try:
+        file = await get_memory_store().read(_state_path(key), max_chars=MAX_STATE_CHARS)
+    except Exception as exc:  # noqa: BLE001 — the pocket cache must never break a shopping run
+        logger.warning('Shop memo read failed for %s: %s', key, exc)
+        return {}
+    try:
+        data = json.loads(getattr(file, 'content', '') or '')
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+async def _write_state(key: str) -> None:
+    """Replace the conversation's shop state; ``expected_version`` must match the stored file."""
+    store = get_memory_store()
+    path = _state_path(key)
+    payload = json.dumps(
+        {'basket': _LAST_BASKET.get(key), 'products': _SEEN_PRODUCTS.get(key, {})}, ensure_ascii=False,
+    )
+    for _ in range(2):
+        try:
+            current = await store.read(path, max_chars=MAX_STATE_CHARS)
+            version = getattr(current, 'version', None) if current is not None else None
+            await store.write(path, payload, expected_version=version)
+            return
+        except Exception as exc:  # noqa: BLE001 — persistence is best effort, the run continues
+            logger.warning('Shop memo write failed for %s: %s', key, exc)
+
+
+async def _delete_state(key: str) -> None:
+    store = get_memory_store()
+    path = _state_path(key)
+    try:
+        current = await store.read(path, max_chars=MAX_STATE_CHARS)
+        if current is not None:
+            await store.delete(path, expected_version=getattr(current, 'version', None))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning('Shop memo delete failed for %s: %s', key, exc)
+
+
+async def forget_shop_memory(deps: object) -> None:
+    """Drop the cart and the product cache for this chat, in memory and in storage."""
+    key = conversation_key(deps)
+    clear_basket(deps)
+    if key:
+        await _delete_state(key)
+
+
+async def hydrate(key: str) -> None:
+    """Restore the persisted cart and product cache for a conversation into the hot dicts."""
+    if key in _LAST_BASKET or key in _SEEN_PRODUCTS:
+        return
+    data = await _read_state(key)
+    if isinstance(data.get('basket'), str):
+        _LAST_BASKET[key] = data['basket']
+    if isinstance(data.get('products'), dict):
+        _SEEN_PRODUCTS[key] = {
+            int(product_id): str(text)
+            for product_id, text in data['products'].items()
+            if str(product_id).isdigit()
+        }
+
+
+@dataclass
+class ShopMemo(AbstractCapability):
+    """Loads the shop's pocket memory from the shared memory backend before each run."""
+
+    async def before_run(self, ctx: RunContext) -> None:
+        key = conversation_key(ctx.deps) or (ctx.conversation_id or None)
+        if key:
+            await hydrate(key)
+
+
 async def remember_basket(ctx: RunContext, call_tool: CallToolFunc, name: str, args: dict[str, Any]) -> ToolResult:
     """Wrap MCP calls: cache found products and the last finished cart for this conversation."""
     result = await call_tool(name, args)
@@ -100,6 +185,9 @@ async def remember_basket(ctx: RunContext, call_tool: CallToolFunc, name: str, a
     elif name == CART_TOOL and data.get('link'):
         _LAST_BASKET[key] = _render_basket(key, args.get('products'), str(data['link']))
         logger.info('Basket memo updated for conversation %s', key)
+    else:
+        return result
+    await _write_state(key)
     return result
 
 

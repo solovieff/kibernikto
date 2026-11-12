@@ -298,3 +298,68 @@ class CatalogMemoTests(unittest.IsolatedAsyncioTestCase):
     def test_settings_read_the_agent_prefixed_env(self) -> None:
         with patch.dict(os.environ, {'AGENT_VKUSVILL_MIN_CREDITS': '777'}):
             self.assertEqual(VkusvillSettings().MIN_CREDITS, 777)
+
+
+class ShopMemoPersistenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_memo_survives_a_lost_process(self) -> None:
+        from unittest.mock import patch as mock_patch
+        from pydantic_ai_harness.memory import InMemoryStore
+
+        from kibernikto.ai.agent.vkusvill import memory as memo
+
+        store = InMemoryStore()
+        deps = SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=31337)))
+        memo.clear_basket(deps)
+
+        async def call_tool(name, args, *, metadata=None):
+            if name == 'vkusvill_products_search':
+                return json.dumps({'ok': True, 'data': {'items': [{'id': 9, 'name': 'Сырники', 'price': {'current': 306}}]}})
+            return json.dumps({'ok': True, 'data': {'link': 'https://vkusvill.ru/mobile?basket&share=99'}})
+
+        with mock_patch.object(memo, 'get_memory_store', return_value=store):
+            await memo.remember_basket(SimpleNamespace(deps=deps), call_tool, 'vkusvill_products_search', {'q': 'сырники'})
+            await memo.remember_basket(SimpleNamespace(deps=deps), call_tool, 'vkusvill_cart_link_create',
+                                       {'products': [{'id': 9, 'q': 2}]})
+            self.assertIn('share=99', memo.basket_note(deps))
+
+            memo.clear_basket(deps)          # simulate a process restart: hot dicts are gone
+            self.assertEqual(memo.basket_note(deps), '')
+
+            await memo.hydrate('31337')       # what ShopMemo.before_run does
+            restored = memo.basket_note(deps)
+            self.assertIn('Сырники × 2', restored)
+            self.assertIn('share=99', restored)
+            self.assertIn('id 9: Сырники — 306 ₽', memo.catalog_note(deps))
+
+
+class ForgetShopCartTests(unittest.IsolatedAsyncioTestCase):
+    async def test_forget_tool_clears_memory(self) -> None:
+        from unittest.mock import patch as mock_patch
+        from pydantic_ai_harness.memory import InMemoryStore
+
+        from kibernikto.ai.agent.vkusvill import memory as memo
+
+        store = InMemoryStore()
+        deps = SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=5150)))
+        memo.clear_basket(deps)
+
+        async def call_tool(name, args, *, metadata=None):
+            if name == 'vkusvill_products_search':
+                return json.dumps({'ok': True, 'data': {'items': [{'id': 3, 'name': 'Молоко', 'price': {'current': 93}}]}})
+            return json.dumps({'ok': True, 'data': {'link': 'https://vkusvill.ru/mobile?basket&share=5'}})
+
+        with mock_patch.object(memo, 'get_memory_store', return_value=store):
+            await memo.remember_basket(SimpleNamespace(deps=deps), call_tool, 'vkusvill_products_search', {'q': 'молоко'})
+            await memo.remember_basket(SimpleNamespace(deps=deps), call_tool, 'vkusvill_cart_link_create',
+                                       {'products': [{'id': 3, 'q': 1}]})
+            self.assertIn('share=5', memo.basket_note(deps))
+
+            await memo.forget_shop_memory(deps)
+
+            self.assertEqual(memo.basket_note(deps), '')
+            self.assertEqual(memo.catalog_note(deps), '')
+            self.assertIsNone(await store.read('5150/vkusvill/shop.json', max_chars=1000))
+
+    def test_agent_exposes_the_forget_tool(self) -> None:
+        agent = build_vkusvill_agent(history_storage=None)
+        self.assertIn('forget_shop_cart', agent._function_toolset.tools)
