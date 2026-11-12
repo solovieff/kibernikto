@@ -8,7 +8,6 @@ from kibernikto.ai.agent.core.persona import PersonaCapability, PersonaSource
 from kibernikto.ai.agent.harness.conversation_history import ConversationHistory
 from kibernikto.ai.agent.utils import build_kibernikto_model, with_attribution
 from kibernikto.storage.base import HistoryStorage
-from kibernikto.storage.singletons import history_storage
 
 
 def default_model_settings() -> ModelSettings:

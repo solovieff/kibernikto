@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
 
-from pydantic_ai import RunContext
 from pydantic_ai.capabilities import AbstractCapability
-from pydantic_ai.messages import ModelMessage
-from pydantic_ai_harness.conversation_search import ConversationSearch
-from pydantic_ai_harness.memory import Memory, MemoryStore
-from pydantic_ai_harness.step_persistence import RunRecord
+from pydantic_ai_harness.memory import MemoryStore
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.storage.base import HistoryStorage
-from kibernikto.storage.factory import get_history_storage, get_memory_store
 
 FULL_HISTORY_LIMIT = 5000
 NO_CHAT_NAMESPACE = "no-chat"  # Shared notebook for runs without a chat (tests, scripts).
@@ -35,9 +29,6 @@ CHAT_MEMORY_GUIDANCE = (
 
 from kibernikto.ai.agent.harness.conversation_memory import (
     ConversationMemory,
-    conversation_namespace as chat_namespace,
-    ConversationHistorySource as ChatHistorySource,
-    ConversationSearchBound as ChatConversationSearch,
 )
 
 

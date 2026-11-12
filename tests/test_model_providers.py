@@ -138,8 +138,8 @@ class FallbackModelTest(unittest.IsolatedAsyncioTestCase):
     async def test_fallback_model_fails_over_on_model_api_error(self) -> None:
         from pydantic_ai.exceptions import ModelHTTPError
         from pydantic_ai.models.fallback import FallbackModel
-        from pydantic_ai.models.function import AgentInfo, FunctionModel
-        from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+        from pydantic_ai.models.function import FunctionModel
+        from pydantic_ai.messages import ModelResponse, TextPart
 
         def fail_call(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
             raise ModelHTTPError(status_code=429, model_name='primary', body='Provider overloaded')

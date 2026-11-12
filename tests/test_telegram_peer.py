@@ -67,7 +67,6 @@ class PeerTests(unittest.IsolatedAsyncioTestCase):
     async def test_peer_is_a_real_subagent_and_returns_real_history(self):
         from pydantic_ai import Agent
         from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
-        from pydantic_ai import Agent
         from pydantic_ai.models.function import FunctionModel
         from pydantic_ai_harness.subagents import SubAgent, SubAgents
         from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent

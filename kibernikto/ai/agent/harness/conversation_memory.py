@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Sequence
 
 from pydantic_ai import RunContext
-from pydantic_ai.capabilities import AbstractCapability, CombinedCapability
+from pydantic_ai.capabilities import CombinedCapability
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai_harness.conversation_search import ConversationSearch
 from pydantic_ai_harness.memory import Memory, MemoryStore
