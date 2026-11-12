@@ -16,7 +16,7 @@ DEFAULT_TOKEN_DIRNAME = 'vkusvill-oauth'
 class VkusvillSettings(BaseSettings):
     """VkusVill MCP endpoint, credentials and the OAuth callback."""
 
-    model_config = SettingsConfigDict(env_prefix='VKUSVILL_')
+    model_config = SettingsConfigDict(env_prefix='AGENT_VKUSVILL_')
 
     NAME: str = Field(default='vkusvill', description='Agent name (ASCII, it rides attribution headers)')
     MCP_URL: str = Field(default=DEFAULT_MCP_URL, description='VkusVill MCP endpoint')
@@ -30,7 +30,10 @@ class VkusvillSettings(BaseSettings):
         default=2000, description='Personal chats above this balance may delegate to the shop; 0 = no floor',
     )
     HISTORY_SIZE: int = Field(
-        default=40, description='Message window for the shop agent; larger than the library default',
+        default=49, description='Message window for the shop agent; larger than the library default',
+    )
+    MAX_TOOL_CALLS: int = Field(
+        default=60, description='Hard per-run tool-call ceiling enforced by UsageLimits',
     )
     PARALLEL_TOOL_CALLS: bool = Field(
         default=True, description='Let the model batch tool calls; long shopping lists finish faster',

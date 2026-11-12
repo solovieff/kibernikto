@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, replace
 
 from pydantic_ai import RunContext
+from pydantic_ai.usage import UsageLimits
 from pydantic_ai_harness.subagents import SubAgent
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
@@ -56,6 +57,8 @@ def build_vkusvill_expert(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> Sub
         build_vkusvill_expert_agent(settings),
         name=VKUSVILL_EXPERT_NAME,
         description=VKUSVILL_EXPERT_DESCRIPTION,
+        # Hard stop: a runaway search loop fails fast instead of burning the parent's credits.
+        usage_limits=UsageLimits(tool_calls_limit=settings.MAX_TOOL_CALLS),
     )
 
 

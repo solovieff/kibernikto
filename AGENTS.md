@@ -37,7 +37,7 @@ CLI (kibernikto command / main.py)
   │     ├── telegram/telegram_agent.py (build_telegram_agent)
   │     ├── telegram/telegram_capability.py (TelegramCapability)
   │     ├── vkusvill/ (build_vkusvill_agent: MCPToolset over mcp.vkusvill.ru + shopping prompt;
-  │     │              VKUSVILL_* settings, anonymous or OAuth 2.0 + PKCE)
+  │     │              AGENT_VKUSVILL_* settings, anonymous or OAuth 2.0 + PKCE)
   │     └── utils.py (infer_kibernikto_model)
   └── kibernikto.storage
         ├── base.py (HistoryStorage contract; opt-in MemoryHistoryStorage)
@@ -51,8 +51,8 @@ CLI (kibernikto command / main.py)
 - `agent.run` returns `AgentRunResult` — use `result.output` for text or structured output, not `result.data`
 - VkusVill: `main.py --vkusvill` swaps the agent, the transport stays stock; tools come from `MCPToolset`
   (`kibernikto/ai/agent/vkusvill/mcp.py`). There is no order tool upstream — the flow ends with a cart share link
-- VkusVill as an expert (`VKUSVILL_ENABLED=true`): `build_vkusvill_expert()` joins the delegation roster and
-  `CreditGatedSubAgents` drops it per run unless the chat is private and above `VKUSVILL_MIN_CREDITS`
+- VkusVill as an expert (`AGENT_VKUSVILL_ENABLED=true`): `build_vkusvill_expert()` joins the delegation roster and
+  `CreditGatedSubAgents` drops it per run unless the chat is private and above `AGENT_VKUSVILL_MIN_CREDITS`
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)

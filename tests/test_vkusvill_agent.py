@@ -134,7 +134,7 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('не понимает «сок в маленькой таре»', instructions)
         self.assertIn('sort="price_asc"', instructions)
         self.assertIn('category_id', instructions)
-        self.assertIn('Больше 40 вызовов инструментов', instructions)
+        self.assertIn('не трать их на повторы', instructions)
         self.assertIn('mode="custom"', instructions)
         self.assertIn('vkusvill_product_details', instructions)
         self.assertIn('vkusvill_cart_link_create', instructions)
@@ -293,4 +293,8 @@ class CatalogMemoTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Товар 59', note)
 
     def test_shop_history_window_is_wider_than_the_library_default(self) -> None:
-        self.assertEqual(VkusvillSettings().HISTORY_SIZE, 40)
+        self.assertEqual(VkusvillSettings().HISTORY_SIZE, 49)
+
+    def test_settings_read_the_agent_prefixed_env(self) -> None:
+        with patch.dict(os.environ, {'AGENT_VKUSVILL_MIN_CREDITS': '777'}):
+            self.assertEqual(VkusvillSettings().MIN_CREDITS, 777)

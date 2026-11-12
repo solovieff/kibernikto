@@ -13,10 +13,10 @@
 ## Global Constraints
 
 - MCP endpoint: `https://mcp.vkusvill.ru/mcp`; 11 tools; no order-placement tool exists — the flow always ends with a `https://vkusvill.ru/mobile?basket&share=...` link.
-- Default `VKUSVILL_AUTH_MODE` is `anonymous`; the agent must be usable without any VkusVill credentials.
+- Default `AGENT_VKUSVILL_AUTH_MODE` is `anonymous`; the agent must be usable without any VkusVill credentials.
 - OAuth scopes: `catalog.search`, `purchase_history.read`, `discounts.view`, `recommendations.personalized`.
-- Env prefix `VKUSVILL_`; settings are env-only and fail fast on incomplete OAuth config.
-- `VKUSVILL_NAME` (default `vkusvill`) ends up in attribution HTTP headers — it must stay ASCII, the Russian identity lives in the prompt.
+- Env prefix `AGENT_VKUSVILL_`; settings are env-only and fail fast on incomplete OAuth config.
+- `AGENT_VKUSVILL_NAME` (default `vkusvill`) ends up in attribution HTTP headers — it must stay ASCII, the Russian identity lives in the prompt.
 - Do not add dependencies (`FileTreeStore` from the already-installed `py-key-value-aio`; `DiskStore` is NOT available — it needs an extra package).
 - No `__all__` in package `__init__.py`; relative imports only there.
 - No `typing.Any`; use `str | None` style unions.
@@ -36,8 +36,8 @@
 **Interfaces:**
 - Produces:
   - `VkusvillSettings(BaseSettings)` with fields `NAME: str`, `MCP_URL: str`, `MODEL_NAME: str | None`, `AUTH_MODE: Literal['anonymous','oauth']`, `OAUTH_CLIENT_ID: str | None`, `OAUTH_CLIENT_SECRET: str | None`, `OAUTH_SCOPES: list[str]`, `OAUTH_CALLBACK_PORT: int`, `OAUTH_CALLBACK_HOST: str`, `OAUTH_TOKEN_DIR: str | None`.
-  - `VKUSVILL_SETTINGS: VkusvillSettings` module-level singleton.
-  - `resolve_token_dir(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> Path`.
+  - `AGENT_VKUSVILL_SETTINGS: VkusvillSettings` module-level singleton.
+  - `resolve_token_dir(settings: VkusvillSettings = AGENT_VKUSVILL_SETTINGS) -> Path`.
   - `DEFAULT_SCOPES: list[str]`, `DEFAULT_MCP_URL: str`.
 - Consumes: `kibernikto.storage.config.STORAGE_SETTINGS.FILESTORE_LOCATION`.
 
@@ -128,7 +128,7 @@ DEFAULT_TOKEN_DIRNAME = 'vkusvill-oauth'
 class VkusvillSettings(BaseSettings):
     """VkusVill MCP endpoint, credentials and the OAuth callback."""
 
-    model_config = SettingsConfigDict(env_prefix='VKUSVILL_')
+    model_config = SettingsConfigDict(env_prefix='AGENT_VKUSVILL_')
 
     NAME: str = Field(default='ВкусВилл', description='Agent name in logs and summaries')
     MCP_URL: str = Field(default=DEFAULT_MCP_URL, description='VkusVill MCP endpoint')
@@ -151,15 +151,15 @@ class VkusvillSettings(BaseSettings):
     def _validate_oauth_credentials(self) -> 'VkusvillSettings':
         if self.AUTH_MODE == 'oauth' and not (self.OAUTH_CLIENT_ID and self.OAUTH_CLIENT_SECRET):
             raise ValueError(
-                'VKUSVILL_AUTH_MODE=oauth requires VKUSVILL_OAUTH_CLIENT_ID and VKUSVILL_OAUTH_CLIENT_SECRET',
+                'AGENT_VKUSVILL_AUTH_MODE=oauth requires AGENT_VKUSVILL_OAUTH_CLIENT_ID and AGENT_VKUSVILL_OAUTH_CLIENT_SECRET',
             )
         return self
 
 
-VKUSVILL_SETTINGS = VkusvillSettings()
+AGENT_VKUSVILL_SETTINGS = VkusvillSettings()
 
 
-def resolve_token_dir(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> Path:
+def resolve_token_dir(settings: VkusvillSettings = AGENT_VKUSVILL_SETTINGS) -> Path:
     """Persistent OAuth token directory: explicit override or FILESTORE/vkusvill-oauth."""
     if settings.OAUTH_TOKEN_DIR:
         return Path(settings.OAUTH_TOKEN_DIR).expanduser()
@@ -169,7 +169,7 @@ def resolve_token_dir(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> Path:
 Create `kibernikto/ai/agent/vkusvill/__init__.py`:
 
 ```python
-from .config import VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
+from .config import AGENT_VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -194,8 +194,8 @@ git commit -m "feat(vkusvill): settings and oauth token directory"
 - Test: `tests/test_vkusvill_agent.py`
 
 **Interfaces:**
-- Consumes: `VkusvillSettings`, `VKUSVILL_SETTINGS`, `resolve_token_dir`.
-- Produces: `build_vkusvill_toolset(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> MCPToolset[object]`.
+- Consumes: `VkusvillSettings`, `AGENT_VKUSVILL_SETTINGS`, `resolve_token_dir`.
+- Produces: `build_vkusvill_toolset(settings: VkusvillSettings = AGENT_VKUSVILL_SETTINGS) -> MCPToolset[object]`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -249,10 +249,10 @@ from fastmcp.client.auth import OAuth
 from key_value.aio.stores.filetree import FileTreeStore
 from pydantic_ai.mcp import MCPToolset
 
-from .config import VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
+from .config import AGENT_VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
 
 
-def build_vkusvill_toolset(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> MCPToolset[object]:
+def build_vkusvill_toolset(settings: VkusvillSettings = AGENT_VKUSVILL_SETTINGS) -> MCPToolset[object]:
     """Tools from mcp.vkusvill.ru; the token store survives restarts in oauth mode."""
     if settings.AUTH_MODE == 'anonymous':
         return MCPToolset(settings.MCP_URL)
@@ -275,7 +275,7 @@ def build_vkusvill_toolset(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> MC
 Extend `kibernikto/ai/agent/vkusvill/__init__.py`:
 
 ```python
-from .config import VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
+from .config import AGENT_VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
 from .mcp import build_vkusvill_toolset
 ```
 
@@ -302,10 +302,10 @@ git commit -m "feat(vkusvill): mcp toolset factory with anonymous and oauth mode
 - Test: `tests/test_vkusvill_agent.py`
 
 **Interfaces:**
-- Consumes: `build_vkusvill_toolset`, `VKUSVILL_SETTINGS`, `build_telegram_agent`, `infer_kibernikto_model`, `history_storage` singleton.
+- Consumes: `build_vkusvill_toolset`, `AGENT_VKUSVILL_SETTINGS`, `build_telegram_agent`, `infer_kibernikto_model`, `history_storage` singleton.
 - Produces:
-  - `VKUSVILL_INSTRUCTIONS: str`
-  - `build_vkusvill_agent(*, history_storage: HistoryStorage | None = history_storage, toolset: AbstractToolset | None = None, settings: VkusvillSettings = VKUSVILL_SETTINGS, **kwargs) -> Agent[TelegramDeps]`
+  - `AGENT_VKUSVILL_INSTRUCTIONS: str`
+  - `build_vkusvill_agent(*, history_storage: HistoryStorage | None = history_storage, toolset: AbstractToolset | None = None, settings: VkusvillSettings = AGENT_VKUSVILL_SETTINGS, **kwargs) -> Agent[TelegramDeps]`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -373,7 +373,7 @@ Create `kibernikto/ai/agent/vkusvill/prompts.py`:
 ```python
 """Behaviour contract for the VkusVill shopping agent."""
 
-VKUSVILL_INSTRUCTIONS = """
+AGENT_VKUSVILL_INSTRUCTIONS = """
 Ты — помощник интернет-магазина ВкусВилл. Помогаешь выбрать продукты и собрать корзину.
 
 Правила:
@@ -405,16 +405,16 @@ from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.storage.base import HistoryStorage
 from kibernikto.storage.singletons import history_storage
 
-from .config import VKUSVILL_SETTINGS, VkusvillSettings
+from .config import AGENT_VKUSVILL_SETTINGS, VkusvillSettings
 from .mcp import build_vkusvill_toolset
-from .prompts import VKUSVILL_INSTRUCTIONS
+from .prompts import AGENT_VKUSVILL_INSTRUCTIONS
 
 
 def build_vkusvill_agent(
         *,
         history_storage: HistoryStorage | None = history_storage,
         toolset: AbstractToolset | None = None,
-        settings: VkusvillSettings = VKUSVILL_SETTINGS,
+        settings: VkusvillSettings = AGENT_VKUSVILL_SETTINGS,
         **kwargs,
 ) -> Agent[TelegramDeps]:
     """Shop assistant for Telegram: stock transport and history, VkusVill identity and tools."""
@@ -424,7 +424,7 @@ def build_vkusvill_agent(
         history_storage=history_storage,
         name=settings.NAME,
         persona=False,
-        instructions=VKUSVILL_INSTRUCTIONS,
+        instructions=AGENT_VKUSVILL_INSTRUCTIONS,
         toolsets=[toolset or build_vkusvill_toolset(settings)],
         **kwargs,
     )
@@ -434,9 +434,9 @@ Extend `kibernikto/ai/agent/vkusvill/__init__.py`:
 
 ```python
 from .agent import build_vkusvill_agent
-from .config import VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
+from .config import AGENT_VKUSVILL_SETTINGS, VkusvillSettings, resolve_token_dir
 from .mcp import build_vkusvill_toolset
-from .prompts import VKUSVILL_INSTRUCTIONS
+from .prompts import AGENT_VKUSVILL_INSTRUCTIONS
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -630,16 +630,16 @@ Append to `deploy/tg_bots/kibernikto/kibernikto.env`:
 # AUTH_MODE=oauth: register a client at https://vkusvill.ru/oauth/registration/ and paste the
 #                  credentials from the email; the first run opens the browser for the callback.
 ########################
-# VKUSVILL_NAME=ВкусВилл
-# VKUSVILL_MCP_URL=https://mcp.vkusvill.ru/mcp
-# VKUSVILL_AUTH_MODE=anonymous
-# VKUSVILL_MODEL_NAME=
-# VKUSVILL_OAUTH_CLIENT_ID=
-# VKUSVILL_OAUTH_CLIENT_SECRET=
-# VKUSVILL_OAUTH_SCOPES=["catalog.search","purchase_history.read","discounts.view","recommendations.personalized"]
-# VKUSVILL_OAUTH_CALLBACK_PORT=8765
-# VKUSVILL_OAUTH_CALLBACK_HOST=localhost
-# VKUSVILL_OAUTH_TOKEN_DIR=
+# AGENT_VKUSVILL_NAME=ВкусВилл
+# AGENT_VKUSVILL_MCP_URL=https://mcp.vkusvill.ru/mcp
+# AGENT_VKUSVILL_AUTH_MODE=anonymous
+# AGENT_VKUSVILL_MODEL_NAME=
+# AGENT_VKUSVILL_OAUTH_CLIENT_ID=
+# AGENT_VKUSVILL_OAUTH_CLIENT_SECRET=
+# AGENT_VKUSVILL_OAUTH_SCOPES=["catalog.search","purchase_history.read","discounts.view","recommendations.personalized"]
+# AGENT_VKUSVILL_OAUTH_CALLBACK_PORT=8765
+# AGENT_VKUSVILL_OAUTH_CALLBACK_HOST=localhost
+# AGENT_VKUSVILL_OAUTH_TOKEN_DIR=
 ```
 
 - [ ] **Step 3: Update the architecture docs**
@@ -648,7 +648,7 @@ In `AGENTS.md`, under `### Architecture Layers`, add after the `kibernikto.ai.ag
 
 ```
   │     ├── vkusvill/ (build_vkusvill_agent: MCPToolset over mcp.vkusvill.ru + shopping prompt;
-  │     │              VKUSVILL_* settings, anonymous or OAuth 2.0 + PKCE)
+  │     │              AGENT_VKUSVILL_* settings, anonymous or OAuth 2.0 + PKCE)
 ```
 
 and under `### Agent Patterns` add:
@@ -709,7 +709,7 @@ Expected: tool calls to `vkusvill_products_search`, then a `vkusvill_cart_link_c
 - [ ] **Step 3: Record the verdict**
 
 Only after the user confirms the link opens and the basket is correct, the phase «a» is done.
-OAuth (`VKUSVILL_AUTH_MODE=oauth`) is tested separately once credentials arrive by email.
+OAuth (`AGENT_VKUSVILL_AUTH_MODE=oauth`) is tested separately once credentials arrive by email.
 
 ---
 

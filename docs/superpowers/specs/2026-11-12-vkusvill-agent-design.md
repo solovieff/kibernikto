@@ -55,16 +55,16 @@ Rejected:
 New package `kibernikto/ai/agent/vkusvill/`:
 
 ```
-config.py   VkusvillSettings (env prefix VKUSVILL_) + VKUSVILL_SETTINGS singleton
+config.py   VkusvillSettings (env prefix AGENT_VKUSVILL_) + AGENT_VKUSVILL_SETTINGS singleton
 mcp.py      build_vkusvill_toolset() -> MCPToolset, auth chosen by AUTH_MODE
-prompts.py  VKUSVILL_INSTRUCTIONS — identity + shopping contract
+prompts.py  AGENT_VKUSVILL_INSTRUCTIONS — identity + shopping contract
 agent.py    build_vkusvill_agent(...) -> Agent[TelegramDeps]
 __init__.py relative re-exports only (no __all__)
 ```
 
 ### `config.py`
 
-`VkusvillSettings(BaseSettings)`, `env_prefix='VKUSVILL_'`:
+`VkusvillSettings(BaseSettings)`, `env_prefix='AGENT_VKUSVILL_'`:
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -85,7 +85,7 @@ missing — same fail-fast style as `StorageSettings`.
 ### `mcp.py`
 
 ```python
-def build_vkusvill_toolset(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> MCPToolset[object]
+def build_vkusvill_toolset(settings: VkusvillSettings = AGENT_VKUSVILL_SETTINGS) -> MCPToolset[object]
 ```
 
 - `anonymous` → `MCPToolset(settings.MCP_URL)`.
@@ -96,7 +96,7 @@ def build_vkusvill_toolset(settings: VkusvillSettings = VKUSVILL_SETTINGS) -> MC
 
 ### `prompts.py`
 
-`VKUSVILL_INSTRUCTIONS` states, in Russian:
+`AGENT_VKUSVILL_INSTRUCTIONS` states, in Russian:
 
 1. Identity: assistant of the VkusVill online store.
 2. Only report products returned by tools; never invent names, prices or availability.
@@ -115,10 +115,10 @@ def build_vkusvill_agent(*, history_storage: HistoryStorage | None = history_sto
                          **kwargs) -> Agent[TelegramDeps]
 ```
 
-- Model: `infer_kibernikto_model(VKUSVILL_SETTINGS.MODEL_NAME)` when set, otherwise the library
+- Model: `infer_kibernikto_model(AGENT_VKUSVILL_SETTINGS.MODEL_NAME)` when set, otherwise the library
   default; `**kwargs` still overrides.
-- Delegates to `build_telegram_agent(..., name=VKUSVILL_SETTINGS.NAME, persona=False,
-  instructions=VKUSVILL_INSTRUCTIONS, toolsets=[toolset])`, so `TelegramCapability`,
+- Delegates to `build_telegram_agent(..., name=AGENT_VKUSVILL_SETTINGS.NAME, persona=False,
+  instructions=AGENT_VKUSVILL_INSTRUCTIONS, toolsets=[toolset])`, so `TelegramCapability`,
   `ConversationHistory`, reactions and media handling stay identical to the default agent.
 - `persona=False` — the generic kibernikto persona must not leak into the shop assistant;
   `PersonaCapability` still contributes the current-date instruction.
@@ -140,7 +140,7 @@ flag is parsed before any runtime import so `--help` stays offline and credentia
 
 1. User registers a client at `https://vkusvill.ru/oauth/registration/`; the email carries
    `client_id`, `client_secret`, `redirect_uri`, `scope`.
-2. `VKUSVILL_AUTH_MODE=oauth` plus credentials in `.env`.
+2. `AGENT_VKUSVILL_AUTH_MODE=oauth` plus credentials in `.env`.
 3. First run opens the browser at the authorization URL; the local callback collects the code,
    PKCE exchanges it for a 24h JWT, and the token is written to `OAUTH_TOKEN_DIR`.
 4. Later runs reuse the stored token; a 401 triggers the flow again.
@@ -174,7 +174,7 @@ Live gate (manual, by the user): `main.py --vkusvill` against the test bot, prom
 
 - `AGENTS.md` architecture block — new `kibernikto/ai/agent/vkusvill/` layer.
 - `.agents/skills/kibernikto/SKILL.md` source map + `check_docs.py --tests` must stay green.
-- `deploy/tg_bots/kibernikto/kibernikto.env` — commented `VKUSVILL_*` block.
+- `deploy/tg_bots/kibernikto/kibernikto.env` — commented `AGENT_VKUSVILL_*` block.
 - `examples/vkusvill_agent.py` — library usage without Telegram.
 
 ## Risks
