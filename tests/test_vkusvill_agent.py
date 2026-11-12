@@ -15,8 +15,12 @@ os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
 from fastmcp.client.auth import OAuth
 from pydantic import ValidationError
+from pydantic_ai import FunctionToolset, ModelMessage, ModelRequest, ModelResponse, TextPart
 from pydantic_ai.mcp import MCPToolset
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from kibernikto.ai.agent.telegram.deps import TelegramDeps
+from kibernikto.ai.agent.vkusvill.agent import build_vkusvill_agent
 from kibernikto.ai.agent.vkusvill.config import (
     DEFAULT_MCP_URL,
     DEFAULT_SCOPES,
@@ -75,3 +79,46 @@ class VkusvillToolsetTests(unittest.TestCase):
             self.assertIsInstance(auth, OAuth)
             self.assertEqual(auth._static_client_info.client_id, 'cid')
             self.assertTrue(token_dir.is_dir())
+
+
+class ScriptedModel:
+    """Answers `ok` and records every request so instructions can be inspected."""
+
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
+
+    def __call__(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        self.requests.append(messages[-1])
+        return ModelResponse(parts=[TextPart('ok')])
+
+
+class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        self.model = ScriptedModel()
+        self.agent = build_vkusvill_agent(
+            model=FunctionModel(self.model),
+            toolset=FunctionToolset(),
+            history_storage=None,
+        )
+
+    def test_agent_is_named_and_owns_the_default_mcp_toolset(self) -> None:
+        agent = build_vkusvill_agent(model=FunctionModel(self.model), history_storage=None)
+        self.assertEqual(agent.name, 'ВкусВилл')
+        self.assertIsInstance(agent.toolsets[-1], MCPToolset)
+
+    def test_agent_accepts_an_injected_toolset(self) -> None:
+        self.assertEqual(self.agent.name, 'ВкусВилл')
+        self.assertIsInstance(self.agent.toolsets[-1], FunctionToolset)
+
+    async def test_instructions_carry_the_shopping_contract(self) -> None:
+        await self.agent.run('привет', deps=TelegramDeps())
+        instructions = self.model.requests[-1].instructions or ''
+        self.assertIn('ВкусВилл', instructions)
+        self.assertIn('vkusvill_cart_link_create', instructions)
+        self.assertIn('vkusvill.ru/mobile?basket&share=', instructions)
+        self.assertIn('не оформляешь заказ', instructions)
+
+    async def test_generic_persona_is_not_injected(self) -> None:
+        await self.agent.run('привет', deps=TelegramDeps())
+        instructions = self.model.requests[-1].instructions or ''
+        self.assertNotIn('Kibernikto', instructions)
