@@ -12,6 +12,7 @@ from kibernikto.ai.agent.core.image import generate_image
 from .agent_reaction import AgentReaction
 from .deps import TelegramDeps
 from .identity import get_bot_identity
+from .speech_reply import SpeechReply
 
 
 def _bot_identity_prompt(ctx: RunContext[TelegramDeps]) -> str:
@@ -41,4 +42,4 @@ class TelegramCapability(CombinedCapability[TelegramDeps]):
     """Everything the model needs to live in Telegram; transport I/O stays in ``TelegramBridge``."""
 
     def __init__(self) -> None:
-        super().__init__([_TelegramContext(), AgentReaction()])
+        super().__init__([_TelegramContext(), AgentReaction(), SpeechReply()])

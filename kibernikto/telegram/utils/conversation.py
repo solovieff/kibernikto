@@ -18,6 +18,7 @@ from aiogram.types import (
 from aiogram.types.input_file import BufferedInputFile
 
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
+from kibernikto.telegram.utils.voice import VOICE_PRIVACY_NOTICE, voice_messages_restricted
 from kibernikto.utils.text import (
     clear_text_format,
     markdown_to_html,
@@ -77,6 +78,22 @@ async def reply(
 
     payload = _Payload.of(content)
     reply_mode = _uses_reply(message)
+    voices = [item for item in payload.files if (item.vendor_metadata or {}).get('telegram_voice')]
+    if voices:
+        payload.files = [item for item in payload.files if item not in voices]
+        try:
+            for voice in voices:
+                await message.bot.send_voice(
+                    chat_id=message.chat.id, voice=_as_input_file(voice),
+                    reply_parameters=ReplyParameters(message_id=message.message_id) if reply_mode else None,
+                )
+        except Exception as error:
+            logger.exception('Failed to send voice; falling back to text')
+            if voice_messages_restricted(error):
+                await _send_text(message, VOICE_PRIVACY_NOTICE, reply_mode)
+        else:
+            if not payload.has_media and not re.search(r'https?://|```|`', payload.text):
+                return payload.text
 
     if payload.has_media:
         return await _send_media(message, payload, reply_mode)

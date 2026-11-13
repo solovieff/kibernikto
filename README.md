@@ -10,7 +10,7 @@ Kibernikto is a multi-agent AI framework with a Telegram bot connection, built o
 **Telegram**
 
 - ✍️ conversations with AIs in groups or privately, per-chat history
-- 🔉 voice message transcription
+- 🔉 voice message transcription and optional spoken replies (`/toggle_voice`)
 - 📸 image understanding and generation
 - 🤖 other Telegram bots as delegated sub-agents ([peers](docs/telegram-peers.md))
 - ⭐️ Telegram Stars subscriptions
@@ -44,6 +44,13 @@ Models are provider-prefixed: `openrouter:vendor/model`, OpenAI-compatible gatew
 (`vsegpt:`, `routerai:`, `beget:` — key in `VSEGPT_API_KEY`, `ROUTERAI_API_KEY`, `BEGET_AI_API_KEY`)
 or any [pydantic-ai model string](https://ai.pydantic.dev/models/overview/). A new gateway is one
 `OPENAI_COMPATIBLE_PROVIDERS` entry in `kibernikto/ai/agent/utils.py`.
+
+### Voice replies
+
+Set `TTS_OPENAI_API_KEY` to enable speech synthesis. In a Telegram chat, `/toggle_voice`
+switches between spoken and text replies; existing chats default to text. Voice output is
+generated through an OpenAI-compatible speech endpoint and billed by that provider. See
+the [voice configuration and fallback behavior](deploy/README.md#voice-replies).
 
 ## Deploy
 

@@ -25,6 +25,7 @@ fields change often — read them in source, don't trust a remembered list.
 | Base agent, history, attachments | `kibernikto/ai/agent/core/kibernikto_agent.py` |
 | Model string → model | `kibernikto/ai/agent/utils.py` (`infer_kibernikto_model`) |
 | Telegram agent + active bridge | `kibernikto/ai/agent/telegram/telegram_agent.py`, `kibernikto/telegram/bridge.py` |
+| Voice replies, settings and delivery | `kibernikto/ai/agent/telegram/speech_reply.py`, `kibernikto/ai/speech.py`, `kibernikto/telegram/utils/voice.py` |
 | Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/telegram/multi_agent.py` |
 | App integrations (`vkusvill`, `business`, `travel` + `tutu` + `kiwi`): each has `config.py`, `_prompts.py`, `agent.py` | `kibernikto/ai/agent/addons/` |
 | VkusVill MCP agent (`main.py --vkusvill`) | `kibernikto/ai/agent/addons/vkusvill/` |
@@ -52,9 +53,9 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
 **Agents**
 - `TelegramApp.from_bridge(bridge)` registers the bridge; handlers resolve it per update via `get_telegram_bridge()`.
 - Use `result.output` (text or structured), never `result.data`.
-- Per-conversation history and mid-run steering exist in the overridden async `run` with `conversation_id=` and non-None
+- Per-conversation history and mid-run steering use capabilities with `conversation_id=` and non-None
   `history_storage`. Concurrent `run(..., conversation_id=X)` calls while a run for `X` is active enqueue the new prompt
-  into the live run (`priority='asap'`) and return `None`. An explicit `message_history` (even `[]`) skips loading; saving still happens.
+  into the live run (`priority='asap'`) and return an empty result (`is_steered(result)`). An explicit `message_history` (even `[]`) skips loading; saving still happens.
 - History window alignment walks back to a request and may return more than `HISTORY_SIZE`.
   Intentional — don't "fix" it.
 - Importing core, harness or Telegram agent modules does not construct provider models or default agent
@@ -72,7 +73,7 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
   `multi_agent.py`) selects tier models and spends credits. Peer envelopes set
   `KiberniktoDeps.billable=False`; each successful `delegate_task` also costs
   `AGENT_KIBERNIKTO_SUBAGENT_EFFORT` credits (charged once in `after_run`); explicit `run(model=...)`/`override(model=...)` beat the tier.
-- `chat_data` (`ConversationInfo`) stores credits only; legacy JSON keys are ignored on load.
+- `chat_data` (`ConversationInfo`) stores credits and per-chat `response_mode` (`text` by default); legacy JSON keys are ignored on load.
   `build_deps` loads it once into `KiberniktoDeps.chat_info` (read-only; tier selection reuses it) and
   writes nothing; `CreditTier.after_run` re-reads before charging so a mid-run top-up survives.
   Credits stay out of the system prompt and are inspected on demand via the `CreditTier.check_credits` tool.
@@ -113,7 +114,11 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
 - Module-level routers attach to one Dispatcher per process; tests patch `include_router`.
 - Middleware is per observer (message, edited, error), not one chain. See `TelegramApp.from_bridge`.
 - Preprocessor settings are module-level shared state; treat as read-only.
-- Voice is enabled by the presence of `TRANSCRIBE_OPENAI_API_KEY`. PDF extraction is a stub.
+- Incoming voice transcription uses `TRANSCRIBE_OPENAI_API_KEY`. Outgoing speech uses separate
+  `TTS_OPENAI_*` settings, `/toggle_voice`, and `SpeechReply`: TTS is automatic for human audio-mode
+  replies, not a model-called tool. Text is retained for failures and for replies with links or media;
+  Telegram voice privacy errors produce actionable guidance. Bot/peer replies skip synthesis.
+  PDF extraction is a stub.
 - Media store (private archive, `media/`) ≠ image hosting (public URLs for the model, `public/`).
   They share `APP_STORAGE_S3_*` credentials.
 

@@ -27,6 +27,25 @@ Inside `tg_bots/<bot>/` the bot argument can be omitted.
 Moving an existing bot whose state is in an anonymous volume: copy it out before the first `rebuild.sh`,
 `podman cp <bot>:/data/. tg_bots/<bot>/data/`.
 
+## Voice replies
+
+`/toggle_voice` switches a chat between text (the default) and spoken replies. Voice is synthesized with an
+OpenAI-compatible speech API; configure `TTS_OPENAI_API_KEY` in the private runtime environment. Defaults are
+`TTS_OPENAI_API_BASE_URL=https://openrouter.ai/api/v1`, `TTS_OPENAI_API_MODEL=elevenlabs/eleven-v4`, and
+`TTS_OPENAI_API_VOICE=adam`. For ElevenLabs models, `TTS_OPENAI_API_DELIVERY_TAGS` defaults to
+`[tired] [low, gravelly] [cynical] [dark]`; the agent may also add delivery tags at the start of a voice reply.
+Optional `TTS_OPENAI_API_PROVIDER_OPTIONS` is a JSON object passed as OpenRouter `provider.options`; for example,
+`{"elevenlabs":{"voice_settings":{"stability":0.35,"similarity_boost":0.8}}}`.
+When omitted or empty, no provider options are sent. Synthesis is billed by the provider separately from chat
+credits. A voice reply has a 30-second overall synthesis deadline, without SDK retries; if synthesis or delivery
+fails, the reply falls back to text. A response with links, code, or attachments also retains text.
+
+The command confirms enabling with a voice message and disabling with text. If enabling fails, the chat stays in
+text mode. Telegram recipients can restrict voice messages in **Settings → Privacy and Security → Voice Messages**;
+if Telegram rejects delivery for that reason, the bot reports the restriction and sends text instead. Incoming
+voice transcription is separate and uses `TRANSCRIBE_OPENAI_*`. Bot-to-bot replies are not synthesized. The
+speech provider receives the reply text and delivery tags; no FFmpeg processing is required.
+
 ## Travel expert
 
 `AGENT_TRAVEL_ENABLED=true` enables one travel coordinator in the multi-agent bot. It can delegate to

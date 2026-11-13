@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- Optional Telegram voice replies: `/toggle_voice` stores each chat's text/audio mode (legacy
+  chats default to text). Audio mode uses an OpenAI-compatible TTS service and falls back to
+  text when synthesis or delivery fails. See [voice configuration](deploy/README.md#voice-replies).
+
 ### Breaking
 - `KiberniktoAgent` is gone: `build_kibernikto_agent()` returns a plain `pydantic_ai.Agent`
   with `ConversationHistory` (history + mid-run steering) and `PersonaCapability`.

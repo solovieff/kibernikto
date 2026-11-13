@@ -208,7 +208,7 @@ class PaymentTests(unittest.IsolatedAsyncioTestCase):
 
     def test_legacy_row_keys_are_ignored(self) -> None:
         legacy = '{"tg_id": 1, "credits": 7, "timezone": "Europe/Moscow", "client_app_info": "x", "paid_charge_ids": ["a"]}'
-        self.assertEqual(ConversationInfo.model_validate_json(legacy).model_dump(), {'credits': 7})
+        self.assertEqual(ConversationInfo.model_validate_json(legacy).model_dump(), {'credits': 7, 'response_mode': 'text'})
 
     def command(self, text: str, chat_type: str = 'private') -> tuple[Message, CommandObject]:
         message = Message(message_id=1, date=datetime.now(timezone.utc), from_user=USER, text=text,

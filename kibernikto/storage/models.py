@@ -1,17 +1,20 @@
 """Backend-agnostic storage models — shared by file/sql chat_data stores."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 
 
 class ConversationInfo(BaseModel):
-    """Per-chat app data: credits only. Chat facts come live from getChat, facts about people from ``Memory``.
+    """Per-chat app data: credits and response mode. Chat facts come live from getChat.
 
     Legacy keys in stored rows (timezone, client_app_info, paid_charge_ids, ...) are ignored on load.
     """
 
     credits: int = Field(default=AGENT_KIBERNIKTO_SETTINGS.TRIAL_CREDITS)
+    response_mode: Literal['text', 'audio'] = 'text'
 
     def add_credits(self, amount: int) -> int:
         """Credit a paid amount; returns the new balance."""
