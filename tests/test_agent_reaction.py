@@ -129,7 +129,8 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
         from kibernikto.ai.agent.addons.business.config import BusinessSettings
         from kibernikto.ai.agent.addons.business.agent import build_business_expert
         from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
-        from kibernikto.ai.agent.addons.travel.agent import build_travel_expert, build_tutu_expert
+        from kibernikto.ai.agent.addons.travel.agent import build_travel_expert
+        from kibernikto.ai.agent.addons.travel.tutu.agent import build_tutu_expert
         from kibernikto.ai.agent.addons.vkusvill.config import VkusvillSettings
         from kibernikto.ai.agent.addons.vkusvill.agent import build_vkusvill_expert
 
@@ -161,7 +162,8 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
         from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
         from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
         from kibernikto.ai.agent.addons.travel.config import TRAVEL_SETTINGS
-        from kibernikto.ai.agent.addons.travel.agent import build_travel_expert, build_tutu_expert
+        from kibernikto.ai.agent.addons.travel.agent import build_travel_expert
+        from kibernikto.ai.agent.addons.travel.tutu.agent import build_tutu_expert
         from kibernikto.ai.agent.addons.vkusvill.config import VKUSVILL_SETTINGS
         from kibernikto.storage.base import MemoryHistoryStorage
         from kibernikto.storage.models import ConversationInfo

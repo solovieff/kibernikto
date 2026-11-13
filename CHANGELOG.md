@@ -12,7 +12,7 @@
 - Agent reaction emoji is `Agent(metadata={"reaction": "👀"})`, not an attribute.
 
 ### Changed
-- App integrations moved to `kibernikto.ai.agent.addons.{vkusvill,business,travel}` (`kiwi` lives in `travel/kiwi`); each package is `config.py` + `_prompts.py` + `agent.py` (`expert.py` merged into `agent.py`, `vkusvill/prompts.py` → `_prompts.py`).
+- App integrations moved to `kibernikto.ai.agent.addons.{vkusvill,business,travel}` (`tutu` and `kiwi` live in `travel/tutu` and `travel/kiwi`, each with its own `config.py` + `_prompts.py` + `agent.py`; `AGENT_TRAVEL_TUTU_*` env names unchanged); each package is `config.py` + `_prompts.py` + `agent.py` (`expert.py` merged into `agent.py`, `vkusvill/prompts.py` → `_prompts.py`).
 - `/pay [stars]` works in groups: the invoice is issued in the group and the paid credits go to the group balance.
 
 ## 2.0.0b1 — first 2.x beta

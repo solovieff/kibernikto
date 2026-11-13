@@ -32,35 +32,47 @@ def travel_module():
     return importlib.import_module('kibernikto.ai.agent.addons.travel.agent')
 
 
+def tutu_module():
+    return importlib.import_module('kibernikto.ai.agent.addons.travel.tutu.agent')
+
+
 class TravelTests(unittest.IsolatedAsyncioTestCase):
     def context(self, credits, personal):
         return RunContext(deps=TelegramDeps(is_personal=personal, chat_info=ConversationInfo(credits=credits)),
                           model=TestModel(), usage=RunUsage(), conversation_id='42')
 
     async def test_travel_and_tutu_have_configurable_larger_output(self):
-        travel = travel_module()
+        travel, tutu_agent = travel_module(), tutu_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
-        settings = config.TravelSettings(_env_file=None)
+        tutu_config = importlib.import_module('kibernikto.ai.agent.addons.travel.tutu.config')
+        settings, tutu_settings = config.TravelSettings(_env_file=None), tutu_config.TutuSettings(_env_file=None)
         self.assertEqual(settings.MODEL_MAX_TOKENS, 8192)
         coordinator = travel.build_travel_expert(settings=settings, model=TestModel(), experts=[]).agent
-        tutu = travel.build_tutu_expert(settings=settings, model=TestModel(), toolset=FunctionToolset()).agent
+        tutu = tutu_agent.build_tutu_expert(settings=tutu_settings, model=TestModel(), toolset=FunctionToolset()).agent
         self.assertEqual(coordinator.model_settings['max_tokens'], 8192)
         self.assertEqual(tutu.model_settings['max_tokens'], 8192)
         with patch.dict(os.environ, {'AGENT_TRAVEL_TUTU_MODEL_MAX_TOKENS': '32768'}, clear=False):
-            configured = config.TravelSettings(_env_file=None)
-            tutu = travel.build_tutu_expert(settings=configured, model=TestModel(), toolset=FunctionToolset()).agent
-            coordinator = travel.build_travel_expert(settings=configured, model=TestModel(), experts=[]).agent
+            configured = tutu_config.TutuSettings(_env_file=None)
+            tutu = tutu_agent.build_tutu_expert(settings=configured, model=TestModel(), toolset=FunctionToolset()).agent
+            coordinator = travel.build_travel_expert(settings=settings, model=TestModel(), experts=[]).agent
             self.assertEqual(tutu.model_settings['max_tokens'], 32768)
             self.assertEqual(coordinator.model_settings['max_tokens'], 8192)
         with patch.dict(os.environ, {'AGENT_TRAVEL_MODEL_MAX_TOKENS': '12000'}, clear=False):
             configured = config.TravelSettings(_env_file=None)
-            tutu = travel.build_tutu_expert(settings=configured, model=TestModel(), toolset=FunctionToolset()).agent
+            tutu = tutu_agent.build_tutu_expert(settings=tutu_settings, model=TestModel(), toolset=FunctionToolset()).agent
             coordinator = travel.build_travel_expert(settings=configured, model=TestModel(), experts=[]).agent
             self.assertEqual(tutu.model_settings['max_tokens'], 8192)
             self.assertEqual(coordinator.model_settings['max_tokens'], 12000)
 
+    async def test_tutu_tool_call_limit_follows_travel_knob_unless_overridden(self):
+        tutu_config = importlib.import_module('kibernikto.ai.agent.addons.travel.tutu.config')
+        with patch.dict(os.environ, {'AGENT_TRAVEL_MAX_TOOL_CALLS': '7'}, clear=False):
+            self.assertEqual(tutu_config.TutuSettings(_env_file=None).MAX_TOOL_CALLS, 7)
+            with patch.dict(os.environ, {'AGENT_TRAVEL_TUTU_MAX_TOOL_CALLS': '9'}, clear=False):
+                self.assertEqual(tutu_config.TutuSettings(_env_file=None).MAX_TOOL_CALLS, 9)
+
     async def test_model_requests_receive_configured_output_limits(self):
-        travel = travel_module()
+        travel, tutu_agent = travel_module(), tutu_module()
         from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
         seen = []
         def model(messages, info):
@@ -68,36 +80,38 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
             return ModelResponse(parts=[TextPart('ok')])
         fn = FunctionModel(model)
         agents = [travel.build_travel_expert(model=fn, experts=[]).agent,
-                  travel.build_tutu_expert(model=fn, toolset=FunctionToolset()).agent,
+                  tutu_agent.build_tutu_expert(model=fn, toolset=FunctionToolset()).agent,
                   build_kiwi_expert(model=fn, toolset=FunctionToolset()).agent]
         for agent in agents:
             await agent.run('hello', deps=TelegramDeps())
         self.assertEqual(seen, [8192, 8192, 8192])
 
     async def test_tutu_override_reaches_model_without_changing_coordinator(self):
-        travel = travel_module()
+        travel, tutu_agent = travel_module(), tutu_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
-        settings = config.TravelSettings(_env_file=None, TUTU_MODEL_MAX_TOKENS=32768)
+        tutu_config = importlib.import_module('kibernikto.ai.agent.addons.travel.tutu.config')
+        settings = config.TravelSettings(_env_file=None)
+        tutu_settings = tutu_config.TutuSettings(_env_file=None, MODEL_MAX_TOKENS=32768)
         seen = []
         def model(messages, info):
             seen.append(info.model_settings['max_tokens'])
             return ModelResponse(parts=[TextPart('ok')])
         fn = FunctionModel(model)
         coordinator = travel.build_travel_expert(settings=settings, model=fn, experts=[]).agent
-        tutu = travel.build_tutu_expert(settings=settings, model=fn, toolset=FunctionToolset()).agent
+        tutu = tutu_agent.build_tutu_expert(settings=tutu_settings, model=fn, toolset=FunctionToolset()).agent
         await coordinator.run('hello', deps=TelegramDeps())
         await tutu.run('hello', deps=TelegramDeps())
         self.assertEqual(seen, [8192, 32768])
 
     async def test_tutu_allowlist_excludes_personal_data_and_unknown_tools(self):
-        travel = travel_module()
+        tutu_agent = tutu_module()
         server = FunctionToolset()
         for name in ('search_avia', 'search_hotels', 'get_offer_details', 'create_checkout_link',
                      'register_checkout_passengers', 'future_write_tool'):
             def tool():
                 return 'ok'
             server.add_function(tool, name=name)
-        filtered = travel.tutu_toolset(server)
+        filtered = tutu_agent.tutu_toolset(server)
         ctx = self.context(3000, True)
         async with filtered:
             tools = await filtered.get_tools(ctx)
@@ -108,25 +122,25 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
                 return ModelResponse(parts=[TextPart('not allowed')])
             return ModelResponse(parts=[ToolCallPart('register_checkout_passengers', {})])
 
-        agent = travel.build_tutu_expert(model=FunctionModel(force_forbidden), toolset=server).agent
+        agent = tutu_agent.build_tutu_expert(model=FunctionModel(force_forbidden), toolset=server).agent
         result = await agent.run('register a passport', deps=TelegramDeps())
         self.assertEqual(result.output, 'not allowed')
 
     async def test_elapsed_time_includes_layover_and_timezone(self):
-        travel = travel_module()
-        self.assertEqual(travel.elapsed_minutes('2027-01-27T21:15:00+03:00',
+        tutu_agent = tutu_module()
+        self.assertEqual(tutu_agent.elapsed_minutes('2027-01-27T21:15:00+03:00',
                                                '2027-01-28T18:50:00+07:00'), 1055)
-        self.assertEqual(travel.elapsed_minutes('2027-01-28T08:10:00+08:00',
+        self.assertEqual(tutu_agent.elapsed_minutes('2027-01-28T08:10:00+08:00',
                                                '2027-01-28T13:25:00+08:00'), 315)
         with self.assertRaises(ModelRetry):
-            travel.elapsed_minutes('2027-01-27T21:15:00', '2027-01-28T18:50:00+07:00')
+            tutu_agent.elapsed_minutes('2027-01-27T21:15:00', '2027-01-28T18:50:00+07:00')
         with self.assertRaises(ModelRetry):
-            travel.elapsed_minutes('2027-01-28T18:50:00+07:00', '2027-01-27T21:15:00+03:00')
+            tutu_agent.elapsed_minutes('2027-01-28T18:50:00+07:00', '2027-01-27T21:15:00+03:00')
         with self.assertRaises(ModelRetry):
-            travel.elapsed_minutes('invalid', '2027-01-28T18:50:00+07:00')
+            tutu_agent.elapsed_minutes('invalid', '2027-01-28T18:50:00+07:00')
 
     async def test_duration_tool_retries_bad_input_then_returns_real_result(self):
-        travel = travel_module()
+        tutu_agent = tutu_module()
         def model(messages, info):
             parts = [p for m in messages for p in m.parts]
             if any(isinstance(p, ToolReturnPart) and p.tool_name == 'elapsed_minutes' for p in parts):
@@ -136,22 +150,22 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
             else:
                 args = {'departure': '2027-01-27T21:15:00', 'arrival': '2027-01-28T18:50:00+07:00'}
             return ModelResponse(parts=[ToolCallPart('elapsed_minutes', args)])
-        agent = travel.build_tutu_expert(model=FunctionModel(model), toolset=FunctionToolset()).agent
+        agent = tutu_agent.build_tutu_expert(model=FunctionModel(model), toolset=FunctionToolset()).agent
         result = await agent.run('calculate total travel time', deps=TelegramDeps())
         results = [p.content for m in result.all_messages() for p in m.parts
                    if isinstance(p, ToolReturnPart) and p.tool_name == 'elapsed_minutes']
         self.assertEqual(results, [1055])
 
     async def test_tutu_instruction_requires_timezone_calculation_and_honest_freshness(self):
-        travel = travel_module()
-        text = travel.TUTU_INSTRUCTIONS.lower()
+        from kibernikto.ai.agent.addons.travel.tutu._prompts import TUTU_INSTRUCTIONS
+        text = TUTU_INSTRUCTIONS.lower()
         self.assertIn('elapsed_minutes', text)
         self.assertIn('пересад', text)
         self.assertIn('актуальн', text)
         self.assertIn('цена', text)
 
     async def test_parent_delegates_through_travel_to_tutu_and_denies_low_credit_and_groups(self):
-        travel = travel_module()
+        travel, tutu_agent = travel_module(), tutu_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         seen = []
         server = FunctionToolset()
@@ -166,7 +180,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
                 return ModelResponse(parts=[TextPart('hotel-found-from-tutu')])
             return ModelResponse(parts=[ToolCallPart('search_hotels', {})])
 
-        child = travel.build_tutu_expert(model=FunctionModel(child_model), toolset=server)
+        child = tutu_agent.build_tutu_expert(model=FunctionModel(child_model), toolset=server)
 
         def middle(messages, info):
             returns = [p for m in messages for p in m.parts if isinstance(p, ToolReturnPart)]
@@ -281,12 +295,12 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
                           (await tier.check_credits(self.context(3000, False))).lower())
 
     async def test_expert_failure_is_contained_for_travel_agent(self):
-        travel = travel_module()
+        travel, tutu_agent = travel_module(), tutu_module()
         def fail():
             raise RuntimeError('provider unavailable')
         bad = FunctionToolset()
         bad.add_function(fail, name='search_hotels')
-        child = travel.build_tutu_expert(model=TestModel(), toolset=bad)
+        child = tutu_agent.build_tutu_expert(model=TestModel(), toolset=bad)
         def middle(messages, info):
             if any(p.part_kind == 'retry-prompt' for m in messages for p in m.parts):
                 return ModelResponse(parts=[TextPart('provider unavailable')])

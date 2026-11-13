@@ -36,7 +36,7 @@ CLI (kibernikto command / main.py)
   │     ├── core/kibernikto_agent.py (build_kibernikto_agent)
   │     ├── telegram/telegram_agent.py (build_telegram_agent)
   │     ├── telegram/telegram_capability.py (TelegramCapability)
-  │     ├── addons/ (vkusvill, business, travel+kiwi: config.py, _prompts.py, agent.py)
+  │     ├── addons/ (vkusvill, business, travel+tutu+kiwi: config.py, _prompts.py, agent.py)
   │     │     vkusvill: (build_vkusvill_agent: MCPToolset over mcp.vkusvill.ru + shopping prompt;
   │     │              AGENT_VKUSVILL_* settings, anonymous or OAuth 2.0 + PKCE)
   │     └── utils.py (infer_kibernikto_model)
