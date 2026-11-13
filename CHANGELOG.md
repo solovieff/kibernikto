@@ -6,6 +6,8 @@
 - Optional Telegram voice replies: `/toggle_voice` stores each chat's text/audio mode (legacy
   chats default to text). Audio mode uses an OpenAI-compatible TTS service and falls back to
   text when synthesis or delivery fails. See [voice configuration](deploy/README.md#voice-replies).
+  Speech input is stripped of code blocks, URLs and Markdown markers, split on sentence
+  boundaries, synthesized concurrently, and shows the "recording voice" chat action.
 
 ### Breaking
 - `KiberniktoAgent` is gone: `build_kibernikto_agent()` returns a plain `pydantic_ai.Agent`
@@ -19,7 +21,7 @@
 ### Changed
 - Logging knobs: `APP_LOG_CONSOLE=stdlib|logfire` (merge records and spans into one Logfire console), `APP_LOG_PYDANTIC_LEVEL` (stdlib level of `pydantic_ai`), `APP_LOG_HTTP` (raw provider HTTP spans).
 - App integrations moved to `kibernikto.ai.agent.addons.{vkusvill,business,travel}` (`tutu` and `kiwi` live in `travel/tutu` and `travel/kiwi`, each with its own `config.py` + `_prompts.py` + `agent.py`; `AGENT_TRAVEL_TUTU_*` env names unchanged); each package is `config.py` + `_prompts.py` + `agent.py` (`expert.py` merged into `agent.py`, `vkusvill/prompts.py` → `_prompts.py`).
-- `AGENT_KIBERNIKTO_RUN_EFFORT` (default 1, `0` = free) sets the credits charged per successful main-agent run; `CreditTier.effort` defaults to it.
+- `AGENT_KIBERNIKTO_RUN_EFFORT` (default 1, `0` = free) sets the credits charged per successful main-agent run; `CreditTier.effort` defaults to it. Chats in voice (`audio`) mode pay it twice.
 - Sub-agent delegation is billed: every successful `delegate_task` call costs `AGENT_KIBERNIKTO_SUBAGENT_EFFORT`
   credits (default 1, `0` = free) on top of the run's own cost; failed calls and non-billable runs are free.
 - `/pay [stars]` works in groups: the invoice is issued in the group and the paid credits go to the group balance.

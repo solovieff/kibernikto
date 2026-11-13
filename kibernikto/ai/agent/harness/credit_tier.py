@@ -72,7 +72,8 @@ def format_credit_status(
 class CreditTier(AbstractCapability[KiberniktoDeps]):
     """Pick the model by the conversation's credit tier once per run, then charge ``effort`` after success (``0`` = free run).
 
-    Every successful ``delegate_task`` call adds ``SUBAGENT_EFFORT`` credits on top of the run's ``effort``.
+    Every successful ``delegate_task`` call adds ``SUBAGENT_EFFORT`` credits on top of the run's ``effort``;
+    chats in voice (``audio``) mode pay the run ``effort`` twice.
 
     Explicit ``run(model=...)`` / ``agent.override(model=...)`` still win over the selection;
     non-billable runs use the agent's constructor model. Failed runs are never charged.
@@ -90,6 +91,10 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         """Credits for one successful run: explicit ``effort`` or the env default, never negative."""
         effort = AGENT_KIBERNIKTO_SETTINGS.RUN_EFFORT if self.effort is None else self.effort
         return max(0, effort)
+
+    def _run_cost(self, info: ConversationInfo) -> int:
+        """Run effort, doubled while the chat replies with voice."""
+        return self.run_effort * (2 if info.response_mode == 'audio' else 1)
 
     @classmethod
     def get_serialization_name(cls) -> str | None:
@@ -115,7 +120,7 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         info = await self._load_info(ctx.deps, cid)
         is_admin = isinstance(ctx.deps, KiberniktoDeps) and ctx.deps.is_admin
         status = format_credit_status(
-            info.credits, effort=self.run_effort, subagent_effort=AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT,
+            info.credits, effort=self._run_cost(info), subagent_effort=AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT,
             conversation_id=cid, is_admin=is_admin,
         )
         if not self.extra_features:
@@ -150,10 +155,10 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         cid = _billable_conversation(ctx.deps, self.conversation_id or ctx.conversation_id)
         if cid is None:
             return result
-        total = self.run_effort + self._delegations * max(0, AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT)
+        info = await chat_data.load(cid)  # Fresh read: a top-up landed mid-run must not be overwritten.
+        total = self._run_cost(info) + self._delegations * max(0, AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT)
         if total == 0:
             return result  # Free run: nothing to charge (``charge`` itself bills at least 1).
-        info = await chat_data.load(cid)  # Fresh read: a top-up landed mid-run must not be overwritten.
         previous = credit_tier(info.credits)
         info.charge(effort=total)
         await chat_data.save(cid, info)

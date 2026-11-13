@@ -295,6 +295,13 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
                 await agent.run('hi', conversation_id='7', deps=TelegramDeps())
                 self.assertEqual(self.chat_data.rows['7'].credits, expected)
 
+    async def test_voice_mode_doubles_the_run_cost(self) -> None:
+        agent = self._delegating_agent(calls=1)
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RUN_EFFORT', 3), patch.object(AGENT_KIBERNIKTO_SETTINGS, 'SUBAGENT_EFFORT', 1):
+            await self.chat_data.save('7', ConversationInfo(credits=100, response_mode='audio'))
+            await agent.run('hi', conversation_id='7', deps=TelegramDeps())
+            self.assertEqual(self.chat_data.rows['7'].credits, 100 - 2 * 3 - 1)  # Delegation is not doubled.
+
     async def test_failed_delegation_and_non_billable_runs_are_not_charged_extra(self) -> None:
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'SUBAGENT_EFFORT', 3):
             await self.set_credits('7', 100)
