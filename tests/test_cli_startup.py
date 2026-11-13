@@ -150,7 +150,7 @@ class CliStartupTests(unittest.TestCase):
             "kibernikto.ai.agent.telegram.multi_agent": SimpleNamespace(
                 build_multi_agent=lambda: agents["multi-agent"],
             ),
-            "kibernikto.ai.agent.vkusvill": SimpleNamespace(
+            "kibernikto.ai.agent.addons.vkusvill": SimpleNamespace(
                 build_vkusvill_agent=lambda: agents["vkusvill"],
             ),
         }
@@ -218,7 +218,7 @@ class CliStartupTests(unittest.TestCase):
 
     def test_vkusvill_registers_and_polls_the_shop_agent(self) -> None:
         result = self.run_startup(["--vkusvill"])
-        self.assertIn(("import:kibernikto.ai.agent.vkusvill", "selected-file"), result.events)
+        self.assertIn(("import:kibernikto.ai.agent.addons.vkusvill", "selected-file"), result.events)
         self.assertEqual([name for name, _ in result.events if not name.startswith("import:")], [
             "dotenv:.env", "logger", "banner", "storage", "bridge", "summary:vkusvill", "poll_vkusvill",
         ])

@@ -51,11 +51,11 @@ class MemoryChatData:
 
 
 def paid_message(bot: Bot, *, amount: int = 52, payload: str = TOPUP_PAYLOAD, charge: str = 'charge',
-                 currency: str = 'XTR') -> Message:
+                 currency: str = 'XTR', chat: Chat | None = None) -> Message:
     payment = SuccessfulPayment(currency=currency, total_amount=amount, invoice_payload=payload,
                                 telegram_payment_charge_id=charge, provider_payment_charge_id='')
     return Message(message_id=1, date=datetime.now(timezone.utc), from_user=USER,
-                   chat=Chat(id=200, type='private'), successful_payment=payment).as_(bot)
+                   chat=chat or Chat(id=200, type='private'), successful_payment=payment).as_(bot)
 
 
 class PaymentTests(unittest.IsolatedAsyncioTestCase):
@@ -225,9 +225,19 @@ class PaymentTests(unittest.IsolatedAsyncioTestCase):
                                  (TOPUP_PAYLOAD, 'XTR', stars))
                 self.assertIsNone(getattr(invoice, 'subscription_period', None))
 
-    async def test_pay_rejects_bad_amounts_and_groups(self) -> None:
+    async def test_pay_in_group_invoices_the_group(self) -> None:
+        for chat_type in ('group', 'supergroup'):
+            with self.subTest(chat_type=chat_type):
+                await cmd_pay(*self.command('/pay 100', chat_type))
+                self.assertEqual((self.sent().payload, self.sent().prices[0].amount), (TOPUP_PAYLOAD, 100))
+
+    async def test_group_payment_credits_the_group_chat(self) -> None:
+        await handle_successful_payment(paid_message(self.bot, amount=100, chat=Chat(id=-1001, type='supergroup')))
+        self.assertEqual((await self.chat_data.load(-1001)).credits, (await self.chat_data.load(200)).credits + 100)
+
+    async def test_pay_rejects_bad_amounts(self) -> None:
         for text, chat_type in (('/pay 0', 'private'), ('/pay 10001', 'private'), ('/pay abc', 'private'),
-                                ('/pay -5', 'private'), ('/pay', 'group')):
+                                ('/pay -5', 'private'), ('/pay 0', 'group')):
             with self.subTest(text=text, chat_type=chat_type):
                 await cmd_pay(*self.command(text, chat_type))
                 self.assertFalse(hasattr(self.sent(), 'prices'))

@@ -126,15 +126,15 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_experts_react_when_delegated(self) -> None:
         from pydantic import SecretStr
         from pydantic_ai.toolsets import FunctionToolset
-        from kibernikto.ai.agent.business.config import BusinessSettings
-        from kibernikto.ai.agent.business.expert import build_business_expert
-        from kibernikto.ai.agent.kiwi.expert import build_kiwi_expert
-        from kibernikto.ai.agent.travel.expert import build_travel_expert, build_tutu_expert
-        from kibernikto.ai.agent.vkusvill.config import VkusvillSettings
-        from kibernikto.ai.agent.vkusvill.expert import build_vkusvill_expert
+        from kibernikto.ai.agent.addons.business.config import BusinessSettings
+        from kibernikto.ai.agent.addons.business.agent import build_business_expert
+        from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
+        from kibernikto.ai.agent.addons.travel.agent import build_travel_expert, build_tutu_expert
+        from kibernikto.ai.agent.addons.vkusvill.config import VkusvillSettings
+        from kibernikto.ai.agent.addons.vkusvill.agent import build_vkusvill_expert
 
-        with patch('kibernikto.ai.agent.vkusvill.expert.build_vkusvill_toolset', return_value=FunctionToolset()), \
-             patch('kibernikto.ai.agent.utils.infer_kibernikto_model', return_value=scripted_model()):
+        with patch('kibernikto.ai.agent.addons.vkusvill.agent.build_vkusvill_toolset', return_value=FunctionToolset()), \
+             patch('kibernikto.ai.agent.harness.delegation.infer_kibernikto_model', return_value=scripted_model()):
             shop = build_vkusvill_expert(VkusvillSettings(_env_file=None, MODEL_NAME='openrouter:test/offline'))
         experts = [
             (build_travel_expert(model=scripted_model(), experts=[]), '👀'),
@@ -158,11 +158,11 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
     async def test_nested_travel_reactions_through_real_parent(self) -> None:
         from pydantic_ai.capabilities import AbstractCapability
         from pydantic_ai.toolsets import FunctionToolset
-        from kibernikto.ai.agent.kiwi.expert import build_kiwi_expert
+        from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
         from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
-        from kibernikto.ai.agent.travel.config import TRAVEL_SETTINGS
-        from kibernikto.ai.agent.travel.expert import build_travel_expert, build_tutu_expert
-        from kibernikto.ai.agent.vkusvill.config import VKUSVILL_SETTINGS
+        from kibernikto.ai.agent.addons.travel.config import TRAVEL_SETTINGS
+        from kibernikto.ai.agent.addons.travel.agent import build_travel_expert, build_tutu_expert
+        from kibernikto.ai.agent.addons.vkusvill.config import VKUSVILL_SETTINGS
         from kibernikto.storage.base import MemoryHistoryStorage
         from kibernikto.storage.models import ConversationInfo
 
@@ -178,7 +178,7 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
                     return build_travel_expert(model=scripted_model(delegate), experts=[child], **kwargs)
                 with patch.object(TRAVEL_SETTINGS, 'ENABLED', True), \
                      patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
-                     patch('kibernikto.ai.agent.travel.expert.build_travel_expert', side_effect=factory), \
+                     patch('kibernikto.ai.agent.addons.travel.agent.build_travel_expert', side_effect=factory), \
                      patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
                      patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()), \
                      patch('kibernikto.ai.agent.telegram.multi_agent.CreditTier', return_value=AbstractCapability()):

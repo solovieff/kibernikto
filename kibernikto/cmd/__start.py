@@ -7,7 +7,7 @@ def build_bridge(multi_agent: bool = False, vkusvill: bool = False):
     from kibernikto.telegram.bridge import TelegramBridge, get_telegram_bridge
 
     if vkusvill:
-        from kibernikto.ai.agent.vkusvill import build_vkusvill_agent
+        from kibernikto.ai.agent.addons.vkusvill import build_vkusvill_agent
 
         return TelegramBridge(build_vkusvill_agent()), 'vkusvill'
     if multi_agent:

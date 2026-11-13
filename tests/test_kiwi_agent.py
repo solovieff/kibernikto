@@ -14,10 +14,10 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai_harness.subagents import SubAgent
 
-from kibernikto.ai.agent.kiwi.config import KiwiSettings
-from kibernikto.ai.agent.kiwi.expert import build_kiwi_expert, search_only_toolset
+from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
+from kibernikto.ai.agent.addons.travel.kiwi.config import KiwiSettings
+from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert, search_only_toolset
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
-from kibernikto.ai.agent.vkusvill.expert import CreditGatedSubAgents
 from kibernikto.storage.models import ConversationInfo
 
 

@@ -24,21 +24,17 @@ from pydantic_ai.models.test import TestModel
 
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
-from kibernikto.ai.agent.vkusvill.agent import build_vkusvill_agent
-from kibernikto.ai.agent.vkusvill.config import (
+from kibernikto.ai.agent.addons.vkusvill.agent import build_vkusvill_agent
+from kibernikto.ai.agent.addons.vkusvill.config import (
     DEFAULT_MCP_URL,
     DEFAULT_SCOPES,
     VKUSVILL_SETTINGS,
     VkusvillSettings,
     resolve_token_dir,
 )
-from kibernikto.ai.agent.vkusvill.expert import (
-    VKUSVILL_EXPERT_NAME,
-    CreditGatedSubAgents,
-    build_vkusvill_expert,
-    expert_allowed,
-)
-from kibernikto.ai.agent.vkusvill.mcp import build_vkusvill_toolset
+from kibernikto.ai.agent.addons.vkusvill.agent import VKUSVILL_EXPERT_NAME, build_vkusvill_expert
+from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents, expert_allowed
+from kibernikto.ai.agent.addons.vkusvill.mcp import build_vkusvill_toolset
 from kibernikto.storage.models import ConversationInfo
 
 
@@ -61,7 +57,7 @@ class VkusvillSettingsTests(unittest.TestCase):
 
     def test_token_dir_defaults_under_filestore(self) -> None:
         settings = VkusvillSettings()
-        with patch('kibernikto.ai.agent.vkusvill.config.STORAGE_SETTINGS') as storage:
+        with patch('kibernikto.ai.agent.addons.vkusvill.config.STORAGE_SETTINGS') as storage:
             storage.FILESTORE_LOCATION = '/tmp/kibernikto-store'
             self.assertEqual(resolve_token_dir(settings), Path('/tmp/kibernikto-store/vkusvill-oauth'))
 
@@ -180,11 +176,11 @@ class VkusvillExpertGateTests(unittest.TestCase):
 
     def test_enabled_multi_agent_registers_the_gated_roster(self) -> None:
         with patch.object(VKUSVILL_SETTINGS, 'ENABLED', True), \
-                patch('kibernikto.ai.agent.vkusvill.expert.CreditGatedSubAgents') as gated, \
-                patch('kibernikto.ai.agent.vkusvill.expert.build_vkusvill_expert') as expert:
+                patch('kibernikto.ai.agent.harness.delegation.CreditGatedSubAgents') as gated, \
+                patch('kibernikto.ai.agent.addons.vkusvill.agent.build_vkusvill_expert') as expert:
             build_multi_agent()
         expert.assert_called_once_with()
-        self.assertEqual(gated.call_args.kwargs['min_credits'], VKUSVILL_SETTINGS.MIN_CREDITS)
+        self.assertEqual(gated.call_args.kwargs['gated_thresholds'], {'vkusvill': VKUSVILL_SETTINGS.MIN_CREDITS})
         self.assertIn(expert.return_value, gated.call_args.kwargs['agents'])
 
 
@@ -194,17 +190,17 @@ class CreditGatedRosterTests(unittest.IsolatedAsyncioTestCase):
         return RunContext(deps=deps, model=TestModel(), usage=RunUsage(), conversation_id='42')
 
     async def test_group_chat_run_drops_the_shop(self) -> None:
-        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], min_credits=2000)
+        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], gated_thresholds={VKUSVILL_EXPERT_NAME: 2000})
         run = await roster.for_run(self.make_ctx(credits=50_000, is_personal=False))
         self.assertEqual(run.agents, [])
 
     async def test_poor_personal_chat_drops_the_shop(self) -> None:
-        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], min_credits=2000)
+        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], gated_thresholds={VKUSVILL_EXPERT_NAME: 2000})
         run = await roster.for_run(self.make_ctx(credits=1999, is_personal=True))
         self.assertEqual(run.agents, [])
 
     async def test_rich_personal_chat_keeps_the_shop(self) -> None:
-        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], min_credits=2000)
+        roster = CreditGatedSubAgents(agents=[build_vkusvill_expert()], gated_thresholds={VKUSVILL_EXPERT_NAME: 2000})
         run = await roster.for_run(self.make_ctx(credits=2001, is_personal=True))
         self.assertEqual([a.name for a in run.agents], [VKUSVILL_EXPERT_NAME])
 
@@ -215,7 +211,7 @@ class BasketMemoTests(unittest.IsolatedAsyncioTestCase):
         return SimpleNamespace(deps=SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id))))
 
     async def test_products_and_cart_land_in_the_conversation_memo(self) -> None:
-        from kibernikto.ai.agent.vkusvill.memory import basket_note, clear_basket, remember_basket
+        from kibernikto.ai.agent.addons.vkusvill.memory import basket_note, clear_basket, remember_basket
 
         ctx = self.make_ctx()
         clear_basket(ctx.deps)
@@ -234,7 +230,7 @@ class BasketMemoTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('предыдущую корзину не открывай', note)
 
     async def test_conversations_do_not_leak_baskets(self) -> None:
-        from kibernikto.ai.agent.vkusvill.memory import basket_note, clear_basket, remember_basket
+        from kibernikto.ai.agent.addons.vkusvill.memory import basket_note, clear_basket, remember_basket
 
         owner = self.make_ctx(chat_id=888)
         stranger = self.make_ctx(chat_id=999)
@@ -249,7 +245,7 @@ class BasketMemoTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(basket_note(stranger.deps), '')
 
     def test_conversation_key_falls_back_to_user_id(self) -> None:
-        from kibernikto.ai.agent.vkusvill.memory import conversation_key
+        from kibernikto.ai.agent.addons.vkusvill.memory import conversation_key
 
         self.assertEqual(conversation_key(SimpleNamespace(message=None, user_id=42)), '42')
         self.assertIsNone(conversation_key(SimpleNamespace(message=None, user_id=None)))
@@ -261,7 +257,7 @@ class CatalogMemoTests(unittest.IsolatedAsyncioTestCase):
         return SimpleNamespace(deps=SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id))))
 
     async def test_found_products_are_injected_with_prices(self) -> None:
-        from kibernikto.ai.agent.vkusvill.memory import catalog_note, clear_basket, remember_basket
+        from kibernikto.ai.agent.addons.vkusvill.memory import catalog_note, clear_basket, remember_basket
 
         ctx = self.make_ctx()
         clear_basket(ctx.deps)
@@ -279,7 +275,7 @@ class CatalogMemoTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('id 6: Сметана 15% — 94 ₽', note)
 
     async def test_catalog_memo_is_bounded(self) -> None:
-        from kibernikto.ai.agent.vkusvill.memory import MAX_SEEN_PRODUCTS, catalog_note, clear_basket, remember_basket
+        from kibernikto.ai.agent.addons.vkusvill.memory import MAX_SEEN_PRODUCTS, catalog_note, clear_basket, remember_basket
 
         ctx = self.make_ctx(chat_id=405)
         clear_basket(ctx.deps)
@@ -307,7 +303,7 @@ class ShopMemoPersistenceTests(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch as mock_patch
         from pydantic_ai_harness.memory import InMemoryStore
 
-        from kibernikto.ai.agent.vkusvill import memory as memo
+        from kibernikto.ai.agent.addons.vkusvill import memory as memo
 
         store = InMemoryStore()
         deps = SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=31337)))
@@ -339,7 +335,7 @@ class ForgetShopCartTests(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch as mock_patch
         from pydantic_ai_harness.memory import InMemoryStore
 
-        from kibernikto.ai.agent.vkusvill import memory as memo
+        from kibernikto.ai.agent.addons.vkusvill import memory as memo
 
         store = InMemoryStore()
         deps = SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=5150)))

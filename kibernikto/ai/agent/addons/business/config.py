@@ -9,6 +9,7 @@ class BusinessSettings(BaseSettings):
 
     DADATA_TOKEN: SecretStr | None = None
     MODEL_NAME: str | None = None
+    MODEL_MAX_TOKENS: int = Field(default=8192, ge=1)
     MIN_CREDITS: int = Field(default=2000, ge=0)
     MAX_TOOL_CALLS: int = Field(default=20, ge=1)
 

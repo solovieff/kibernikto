@@ -53,15 +53,13 @@ async def _admin_grant(message: Message, amount_raw: str, target_raw: str) -> No
 
 @payments_router.message(Command('pay'))
 async def cmd_pay(message: Message, command: CommandObject) -> None:
+    """`/pay [stars]` invoices the current chat: a group top-up lands on the group balance."""
     args = (command.args or '').split()
     if len(args) >= 2:
         if not _is_admin(message):
             await message.answer('Only admins can top up other users.')
             return
         await _admin_grant(message, args[0], args[1])
-        return
-    if message.chat.type != 'private':
-        await message.answer('Top-ups work in a private chat with me only.')
         return
     stars = _parse_stars(args[0] if args else None)
     if stars is None:

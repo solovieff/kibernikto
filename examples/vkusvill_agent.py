@@ -2,7 +2,7 @@
 
 import asyncio
 
-from kibernikto.ai.agent.vkusvill import build_vkusvill_agent
+from kibernikto.ai.agent.addons.vkusvill import build_vkusvill_agent
 from kibernikto.storage.base import MemoryHistoryStorage
 
 

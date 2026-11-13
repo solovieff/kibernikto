@@ -11,6 +11,10 @@
   `TelegramApp.from_bridge(bridge)`. `get/set_telegram_agent` → `get/set_telegram_bridge`.
 - Agent reaction emoji is `Agent(metadata={"reaction": "👀"})`, not an attribute.
 
+### Changed
+- App integrations moved to `kibernikto.ai.agent.addons.{vkusvill,business,travel}` (`kiwi` lives in `travel/kiwi`); each package is `config.py` + `_prompts.py` + `agent.py` (`expert.py` merged into `agent.py`, `vkusvill/prompts.py` → `_prompts.py`).
+- `/pay [stars]` works in groups: the invoice is issued in the group and the paid credits go to the group balance.
+
 ## 2.0.0b1 — first 2.x beta
 
 Complete rewrite on [pydantic-ai](https://ai.pydantic.dev) + aiogram 3. Not API-compatible with 1.x:

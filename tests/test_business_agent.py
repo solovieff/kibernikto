@@ -16,19 +16,19 @@ from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
+from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
-from kibernikto.ai.agent.travel.config import TRAVEL_SETTINGS
-from kibernikto.ai.agent.vkusvill.config import VKUSVILL_SETTINGS
-from kibernikto.ai.agent.vkusvill.expert import CreditGatedSubAgents
+from kibernikto.ai.agent.addons.travel.config import TRAVEL_SETTINGS
+from kibernikto.ai.agent.addons.vkusvill.config import VKUSVILL_SETTINGS
 from kibernikto.storage.base import MemoryHistoryStorage
 from kibernikto.storage.models import ConversationInfo
 
 
 def business_module():
-    if importlib.util.find_spec('kibernikto.ai.agent.business') is None:
+    if importlib.util.find_spec('kibernikto.ai.agent.addons.business') is None:
         raise AssertionError('business expert package is missing')
-    return importlib.import_module('kibernikto.ai.agent.business.expert')
+    return importlib.import_module('kibernikto.ai.agent.addons.business.agent')
 
 
 class BusinessTests(unittest.IsolatedAsyncioTestCase):
@@ -38,7 +38,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_settings_are_optional_and_secret_redacted(self):
         business_module()
-        config = importlib.import_module('kibernikto.ai.agent.business.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         with patch.dict(os.environ, {}, clear=True):
             missing = config.BusinessSettings(_env_file=None)
             self.assertFalse(missing.configured)
@@ -53,7 +53,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_authorization_uses_bearer_auth_not_url(self):
         business = business_module()
-        config = importlib.import_module('kibernikto.ai.agent.business.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         settings = config.BusinessSettings(_env_file=None, DADATA_TOKEN='demo-api:demo-secret')
         toolset = business.build_dadata_toolset(settings)
         transport = toolset.client.transport
@@ -108,7 +108,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_no_key_means_no_business_agent(self):
         business_module()
-        config = importlib.import_module('kibernikto.ai.agent.business.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         from kibernikto.ai.agent.harness.credit_tier import CreditTier
         with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', None), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', False), \
@@ -120,7 +120,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_invalid_token_warns_without_disclosing_it(self):
         business_module()
-        config = importlib.import_module('kibernikto.ai.agent.business.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         from pydantic import SecretStr
         with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('bad-secret-token')), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', False), \
@@ -132,7 +132,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_parent_delegates_only_private_and_strictly_above_threshold(self):
         business = business_module()
-        config = importlib.import_module('kibernikto.ai.agent.business.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         from pydantic import SecretStr
         seen = []
         server = FunctionToolset()
@@ -155,7 +155,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('demo-api:demo-secret')), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', False), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
-             patch('kibernikto.ai.agent.business.expert.build_business_expert', return_value=expert), \
+             patch('kibernikto.ai.agent.addons.business.agent.build_business_expert', return_value=expert), \
              patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
              patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()):
             parent = build_multi_agent()
@@ -172,7 +172,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_business_roster_is_separately_gated_and_advertised(self):
         business_module()
-        config = importlib.import_module('kibernikto.ai.agent.business.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         from kibernikto.ai.agent.harness.credit_tier import CreditTier
         from pydantic import SecretStr
         with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('demo-api:demo-secret')), \

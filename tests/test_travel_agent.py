@@ -17,19 +17,19 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry
 
+from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
-from kibernikto.ai.agent.vkusvill.config import VKUSVILL_SETTINGS
-from kibernikto.ai.agent.vkusvill.expert import CreditGatedSubAgents
+from kibernikto.ai.agent.addons.vkusvill.config import VKUSVILL_SETTINGS
 from kibernikto.storage.base import MemoryHistoryStorage
 from kibernikto.storage.models import ConversationInfo
 
 
 def travel_module():
-    spec = importlib.util.find_spec('kibernikto.ai.agent.travel')
+    spec = importlib.util.find_spec('kibernikto.ai.agent.addons.travel')
     if spec is None:
         raise AssertionError('travel expert package is missing')
-    return importlib.import_module('kibernikto.ai.agent.travel.expert')
+    return importlib.import_module('kibernikto.ai.agent.addons.travel.agent')
 
 
 class TravelTests(unittest.IsolatedAsyncioTestCase):
@@ -39,7 +39,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_travel_and_tutu_have_configurable_larger_output(self):
         travel = travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.travel.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         settings = config.TravelSettings(_env_file=None)
         self.assertEqual(settings.MODEL_MAX_TOKENS, 8192)
         coordinator = travel.build_travel_expert(settings=settings, model=TestModel(), experts=[]).agent
@@ -61,7 +61,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_model_requests_receive_configured_output_limits(self):
         travel = travel_module()
-        from kibernikto.ai.agent.kiwi.expert import build_kiwi_expert
+        from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
         seen = []
         def model(messages, info):
             seen.append(info.model_settings['max_tokens'])
@@ -76,7 +76,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_tutu_override_reaches_model_without_changing_coordinator(self):
         travel = travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.travel.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         settings = config.TravelSettings(_env_file=None, TUTU_MODEL_MAX_TOKENS=32768)
         seen = []
         def model(messages, info):
@@ -152,7 +152,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_parent_delegates_through_travel_to_tutu_and_denies_low_credit_and_groups(self):
         travel = travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.travel.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         seen = []
         server = FunctionToolset()
 
@@ -186,7 +186,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
-             patch('kibernikto.ai.agent.travel.expert.build_travel_expert', return_value=expert), \
+             patch('kibernikto.ai.agent.addons.travel.agent.build_travel_expert', return_value=expert), \
              patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
              patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()):
             parent = build_multi_agent()
@@ -203,7 +203,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_parent_roster_exposes_travel_not_kiwi_and_reports_credit_status(self):
         travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.travel.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         from kibernikto.ai.agent.harness.credit_tier import CreditTier
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
@@ -230,7 +230,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_defaults_flags_and_shop_are_independent(self):
         travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.travel.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         defaults = config.TravelSettings(_env_file=None)
         self.assertFalse(defaults.ENABLED)
         self.assertEqual(defaults.MIN_CREDITS, 2000)
@@ -250,7 +250,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_travel_and_shop_thresholds_are_independent(self):
         travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.travel.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
              patch.object(config.TRAVEL_SETTINGS, 'MIN_CREDITS', 2000), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', True), \
@@ -268,7 +268,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_zero_credit_threshold_remains_private(self):
         travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.travel.config')
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         from kibernikto.ai.agent.harness.credit_tier import CreditTier
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
              patch.object(config.TRAVEL_SETTINGS, 'MIN_CREDITS', 0), \

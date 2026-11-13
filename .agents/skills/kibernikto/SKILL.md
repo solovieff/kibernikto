@@ -26,7 +26,8 @@ fields change often — read them in source, don't trust a remembered list.
 | Model string → model | `kibernikto/ai/agent/utils.py` (`infer_kibernikto_model`) |
 | Telegram agent + active bridge | `kibernikto/ai/agent/telegram/telegram_agent.py`, `kibernikto/telegram/bridge.py` |
 | Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/telegram/multi_agent.py` |
-| VkusVill MCP agent (`main.py --vkusvill`) | `kibernikto/ai/agent/vkusvill/` |
+| App integrations (`vkusvill`, `business`, `travel` + `kiwi`): each has `config.py`, `_prompts.py`, `agent.py` | `kibernikto/ai/agent/addons/` |
+| VkusVill MCP agent (`main.py --vkusvill`) | `kibernikto/ai/agent/addons/vkusvill/` |
 | Harness capabilities (transport-free, keyed on `RunContext.conversation_id`): `CreditTier`, `chat_memory`, delegation roster, web layout, experts | `kibernikto/ai/agent/harness/` |
 | Bot, Dispatcher, middleware order, lifecycle | `kibernikto/telegram/agent/telegram_app.py` |
 | Handlers / middlewares / preprocessing | `kibernikto/telegram/handlers/`, `kibernikto/telegram/middleware/`, `kibernikto/telegram/pre_processors/` |
@@ -121,7 +122,8 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
 
 **Payments / ops**
 - Every successful Stars payment (`/pay` top-up or subscription) adds 1 credit per Star to
-  `chat_data`; no charge-id dedup by decision (a crash-redelivered update may credit twice). Top-ups work with `SUBSCRIPTION_ENABLED=false`.
+  `chat_data` of the chat where it was paid (`/pay` in a group invoices and tops up the group);
+  no charge-id dedup by decision (a crash-redelivered update may credit twice). Top-ups work with `SUBSCRIPTION_ENABLED=false`.
   Admins (`TG_MASTER_ID(S)`, `TG_ADMIN_COMMANDS_ALLOWED`) adjust balances directly: `/pay ±N tg_id`, `/balance tg_id`.
 - `/reset` (private: the user; groups: admins only, needs `TG_ADMIN_COMMANDS_ALLOWED`) asks for inline
   confirmation, then erases that chat's history and notebook (`storage/chat_wipe.py`). Credits and media stay.
