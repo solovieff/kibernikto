@@ -56,19 +56,42 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
         image_agent.model = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.POOR_MODEL)
     web_capabilities, web_experts = web_layout()
     experts = [*(SubAgent(agent) for agent in _EXPERT_AGENTS), *web_experts, *delegates]
+    gated_thresholds: dict[str, int] = {}
     roster: KiberniktoSubAgents
-    # The shop expert is opt-in and lazily imported: default installs keep the stock roster untouched.
+    # Optional experts are loaded only when enabled.
+    from kibernikto.ai.agent.business.config import BUSINESS_SETTINGS
+    from kibernikto.ai.agent.travel.config import TRAVEL_SETTINGS
     from kibernikto.ai.agent.vkusvill.config import VKUSVILL_SETTINGS
 
-    if VKUSVILL_SETTINGS.ENABLED:
-        from kibernikto.ai.agent.vkusvill.expert import CreditGatedSubAgents, build_vkusvill_expert
+    if BUSINESS_SETTINGS.DADATA_TOKEN is not None and not BUSINESS_SETTINGS.configured:
+        logger.warning('Invalid AGENT_BUSINESS_DADATA_TOKEN; business expert is disabled')
 
+    if VKUSVILL_SETTINGS.ENABLED or TRAVEL_SETTINGS.ENABLED or BUSINESS_SETTINGS.configured:
+        from kibernikto.ai.agent.vkusvill.expert import CreditGatedSubAgents
+
+        if VKUSVILL_SETTINGS.ENABLED:
+            from kibernikto.ai.agent.vkusvill.expert import build_vkusvill_expert
+
+            experts.append(build_vkusvill_expert())
+            gated_thresholds['vkusvill'] = VKUSVILL_SETTINGS.MIN_CREDITS
+        if TRAVEL_SETTINGS.ENABLED:
+            from kibernikto.ai.agent.travel.expert import build_travel_expert
+
+            experts.append(build_travel_expert(shared_capabilities=[AgentReaction()]))
+            gated_thresholds['travel'] = TRAVEL_SETTINGS.MIN_CREDITS
+        if BUSINESS_SETTINGS.configured:
+            from kibernikto.ai.agent.business.expert import build_business_expert
+
+            experts.append(build_business_expert())
+            gated_thresholds['business'] = BUSINESS_SETTINGS.MIN_CREDITS
         roster = CreditGatedSubAgents(
-            agents=[*experts, build_vkusvill_expert()],
+            agents=experts,
             agent_folders=None,
             contain_errors=True,
-            shared_capabilities=[AgentReaction()],  # Each delegate marks the user's message with its own emoji.
+            shared_capabilities=[AgentReaction()],
             min_credits=VKUSVILL_SETTINGS.MIN_CREDITS,
+            gated_names=(),
+            gated_thresholds=gated_thresholds,
         )
     else:
         roster = KiberniktoSubAgents(
@@ -84,7 +107,7 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
         reaction=AGENT_KIBERNIKTO_SETTINGS.REACTION,
         history_storage=get_history_storage(name),
         # Memory/recall live on the parent: no extra LLM hop per remembered fact.
-        capabilities=[CreditTier(), ConversationMemory(name), *web_capabilities, roster],
+        capabilities=[CreditTier(extra_features=gated_thresholds), ConversationMemory(name), *web_capabilities, roster],
     )
 
 

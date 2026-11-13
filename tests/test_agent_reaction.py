@@ -3,7 +3,7 @@
 import os
 import unittest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 # Keep import-time model/storage singletons independent of live credentials.
 os.environ['OPENROUTER_API_KEY'] = 'test-not-a-real-key'
@@ -122,6 +122,75 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
     async def test_deps_less_run_is_untouched(self) -> None:
         agent = build(parent='👀', child='✍', calls=(LOOKUP, DELEGATE))
         self.assertEqual((await agent.run('hi')).output, 'final')
+
+    async def test_new_experts_react_when_delegated(self) -> None:
+        from pydantic import SecretStr
+        from pydantic_ai.toolsets import FunctionToolset
+        from kibernikto.ai.agent.business.config import BusinessSettings
+        from kibernikto.ai.agent.business.expert import build_business_expert
+        from kibernikto.ai.agent.kiwi.expert import build_kiwi_expert
+        from kibernikto.ai.agent.travel.expert import build_travel_expert, build_tutu_expert
+        from kibernikto.ai.agent.vkusvill.config import VkusvillSettings
+        from kibernikto.ai.agent.vkusvill.expert import build_vkusvill_expert
+
+        with patch('kibernikto.ai.agent.vkusvill.expert.build_vkusvill_toolset', return_value=FunctionToolset()), \
+             patch('kibernikto.ai.agent.utils.infer_kibernikto_model', return_value=scripted_model()):
+            shop = build_vkusvill_expert(VkusvillSettings(_env_file=None, MODEL_NAME='openrouter:test/offline'))
+        experts = [
+            (build_travel_expert(model=scripted_model(), experts=[]), '👀'),
+            (build_tutu_expert(model=scripted_model(), toolset=FunctionToolset()), '🤓'),
+            (build_kiwi_expert(model=scripted_model(), toolset=FunctionToolset()), '😎'),
+            (build_business_expert(settings=BusinessSettings(_env_file=None, DADATA_TOKEN=SecretStr('fake:fake')),
+                                   model=scripted_model(), toolset=FunctionToolset()), '🤝'),
+            (shop, '👍'),
+        ]
+        for expert, expected in experts:
+            with self.subTest(agent=expert.name):
+                message = user_message()
+                delegate = ToolCallPart('delegate_task', {'agent_name': expert.name, 'task': 'test'})
+                roster = KiberniktoSubAgents(agents=[expert], agent_folders=None,
+                                             shared_capabilities=[AgentReaction()])
+                parent = build_telegram_agent(model=scripted_model(delegate), name='parent', history_storage=None,
+                                              persona=False, reaction='👀', capabilities=[roster])
+                self.assertEqual(await run(parent, message), 'final')
+                self.assertEqual(emojis(message), [expected])
+
+    async def test_nested_travel_reactions_through_real_parent(self) -> None:
+        from pydantic_ai.capabilities import AbstractCapability
+        from pydantic_ai.toolsets import FunctionToolset
+        from kibernikto.ai.agent.kiwi.expert import build_kiwi_expert
+        from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
+        from kibernikto.ai.agent.travel.config import TRAVEL_SETTINGS
+        from kibernikto.ai.agent.travel.expert import build_travel_expert, build_tutu_expert
+        from kibernikto.ai.agent.vkusvill.config import VKUSVILL_SETTINGS
+        from kibernikto.storage.base import MemoryHistoryStorage
+        from kibernikto.storage.models import ConversationInfo
+
+        for name, builder, expected in [('tutu', build_tutu_expert, '🤓'), ('kiwi', build_kiwi_expert, '😎')]:
+            with self.subTest(agent=name):
+                seen = []
+                def child_model(messages, info):
+                    seen.append(name)
+                    return ModelResponse(parts=[TextPart('found')])
+                child = builder(model=FunctionModel(child_model), toolset=FunctionToolset())
+                delegate = ToolCallPart('delegate_task', {'agent_name': name, 'task': 'find'})
+                def factory(**kwargs):
+                    return build_travel_expert(model=scripted_model(delegate), experts=[child], **kwargs)
+                with patch.object(TRAVEL_SETTINGS, 'ENABLED', True), \
+                     patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
+                     patch('kibernikto.ai.agent.travel.expert.build_travel_expert', side_effect=factory), \
+                     patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
+                     patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()), \
+                     patch('kibernikto.ai.agent.telegram.multi_agent.CreditTier', return_value=AbstractCapability()):
+                    parent = build_multi_agent()
+                    message = user_message()
+                    root_call = ToolCallPart('delegate_task', {'agent_name': 'travel', 'task': 'find'})
+                    deps = TelegramDeps(message=message, is_personal=True, chat_info=ConversationInfo(credits=3000))
+                    with parent.override(model=scripted_model(root_call)):
+                        result = await parent.run('test', deps=deps, conversation_id=f'reaction-{name}')
+                    self.assertEqual(result.output, 'final')
+                    self.assertEqual(seen, [name])
+                    self.assertEqual(emojis(message), ['👀', expected])
 
     async def test_default_experts_carry_their_reactions(self) -> None:
         from pydantic_ai.models.test import TestModel

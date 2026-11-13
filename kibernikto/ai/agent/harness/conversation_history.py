@@ -12,7 +12,7 @@ from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.capabilities import AbstractCapability, CapabilityOrdering, CombinedCapability, ProcessHistory
 from pydantic_ai.capabilities.abstract import WrapRunHandler
 from pydantic_ai.messages import (
-    BinaryContent, FilePart, ModelMessage, ModelRequest, ModelResponse, TextPart, UserContent, UserPromptPart,
+    BinaryContent, FilePart, ModelMessage, ModelResponse, TextPart, UserContent,
 )
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
@@ -204,11 +204,10 @@ class ConversationHistory(CombinedCapability[KiberniktoDeps]):
         self.active_runs = active_runs if active_runs is not None else {}
 
         def process_messages(ctx: RunContext[KiberniktoDeps], messages: list[ModelMessage]) -> list[ModelMessage]:
-            # Window only the history that precedes this turn: a long tool loop must keep the user's prompt,
-            # otherwise the model sees bare tool returns and answers an empty question.
+            # A steered message belongs to the same run; never treat it as a new turn boundary.
             if not messages or not self.history_size or len(messages) <= self.history_size:
                 return messages
-            turn_start = _current_turn_start(messages)
+            turn_start = _current_turn_start(messages, ctx.run_id)
             current_turn = messages[turn_start:]
             budget = max(self.history_size - len(current_turn), 0)
             head = _window(messages[:turn_start], budget) if budget else []
@@ -231,10 +230,10 @@ class ConversationHistory(CombinedCapability[KiberniktoDeps]):
         return steer_active_run(self.active_runs, conversation_id, user_prompt, new_deps)
 
 
-def _current_turn_start(messages: Sequence[ModelMessage]) -> int:
-    """Index of the request that opened the current turn: the last one carrying a user prompt."""
-    for index in range(len(messages) - 1, -1, -1):
-        message = messages[index]
-        if isinstance(message, ModelRequest) and any(isinstance(part, UserPromptPart) for part in message.parts):
-            return index
+def _current_turn_start(messages: Sequence[ModelMessage], run_id: str | None) -> int:
+    """First message of this run; preserve everything if the boundary cannot be identified."""
+    if run_id is not None:
+        for index, message in enumerate(messages):
+            if message.run_id == run_id:
+                return index
     return 0

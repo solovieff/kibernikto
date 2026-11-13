@@ -16,7 +16,7 @@ os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 from aiogram import Bot
 from aiogram.methods import SendMessage, SetMessageReaction
 from aiogram.types import Chat, Message, ReactionTypeEmoji, User
-from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
+from pydantic_ai import ModelMessage, ModelRequest, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.messages import ImageUrl, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai_harness.subagents import SubAgent
@@ -44,6 +44,48 @@ def _user_texts(messages: list[ModelMessage]) -> list[str]:
 
 
 class SteeringTests(unittest.IsolatedAsyncioTestCase):
+    async def test_long_active_turn_survives_midrun_steering(self) -> None:
+        from pydantic_ai import ToolReturnPart
+
+        history = MemoryHistoryStorage(history_size=20)
+        tool_started = asyncio.Event()
+        release_tool = asyncio.Event()
+        await history.add_messages('chat-window', [
+            ModelRequest(parts=[UserPromptPart(content='old question')]),
+            ModelResponse(parts=[TextPart(content='old answer')]),
+        ])
+        seen: list[list[ModelMessage]] = []
+
+        async def model_fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            seen.append(list(messages))
+            if len(seen) <= 4:
+                return ModelResponse(parts=[ToolCallPart('slow_ping', {'n': len(seen) - 1})])
+            return ModelResponse(parts=[TextPart(content='done')])
+
+        agent = build_kibernikto_agent(model=FunctionModel(model_fn), name='steer-window',
+                                       history_storage=history, history_size=2, persona=False)
+
+        @agent.tool_plain
+        async def slow_ping(n: int) -> str:
+            if n == 3:
+                tool_started.set()
+                await release_tool.wait()
+            return f'pong-{n}'
+
+        first = asyncio.create_task(agent.run('first request', conversation_id='chat-window'))
+        await asyncio.wait_for(tool_started.wait(), 3)
+        second = await agent.run('second request', conversation_id='chat-window')
+        self.assertTrue(is_steered(second))
+        release_tool.set()
+        result = await asyncio.wait_for(first, 3)
+        self.assertEqual(result.output, 'done')
+        texts = _user_texts(seen[-1])
+        self.assertIn('first request', texts)
+        self.assertIn('second request', texts)
+        self.assertNotIn('old question', texts)
+        results = [p.content for m in seen[-1] for p in m.parts if isinstance(p, ToolReturnPart)]
+        self.assertEqual(results, ['pong-0', 'pong-1', 'pong-2', 'pong-3'])
+
     async def test_concurrent_run_with_same_conversation_id_steers_mid_tool_and_returns_none(self) -> None:
         history = MemoryHistoryStorage(history_size=20)
         tool_started = asyncio.Event()

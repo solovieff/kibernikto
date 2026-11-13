@@ -13,6 +13,7 @@ from pydantic_ai.messages import BinaryContent, BinaryImage, FilePart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent
 from kibernikto.ai.agent.harness.conversation_history import ConversationHistory
 from kibernikto.storage.base import MemoryHistoryStorage
 
@@ -86,6 +87,22 @@ class ConversationHistoryTests(unittest.IsolatedAsyncioTestCase):
         for msg in seen_messages[0]:
             if isinstance(msg, ModelResponse):
                 self.assertFalse(any(isinstance(p, ThinkingPart) for p in msg.parts))
+
+    async def test_prior_runs_still_obey_history_window(self) -> None:
+        for i in range(3):
+            await self.storage.add_messages('window-prior', [
+                ModelRequest(parts=[UserPromptPart(content=f'old-{i}')]),
+                ModelResponse(parts=[TextPart(content=f'answer-{i}')]),
+            ])
+        seen = []
+        def model_fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            seen.extend(messages)
+            return ModelResponse(parts=[TextPart('done')])
+        agent = build_kibernikto_agent(model=FunctionModel(model_fn), name='window-prior',
+                                       history_storage=self.storage, history_size=3, persona=False)
+        await agent.run('new question', conversation_id='window-prior')
+        user_prompts = [p.content for m in seen for p in m.parts if isinstance(p, UserPromptPart)]
+        self.assertEqual(user_prompts, ['old-2', 'new question'])
 
     def test_history_storage_of_finds_storage_or_none(self) -> None:
         from kibernikto.ai.agent.harness.conversation_history import ConversationHistory, history_storage_of

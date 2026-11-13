@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from pydantic_ai import RunContext
 from pydantic_ai.usage import UsageLimits
@@ -45,6 +45,7 @@ def build_vkusvill_expert_agent(settings: VkusvillSettings = VKUSVILL_SETTINGS):
         history_size=settings.HISTORY_SIZE,
         deps_type=TelegramDeps,
         name=settings.NAME,
+        metadata={'reaction': '👍'},
         persona=False,
         instructions=_delegated_instructions,
         model_settings={**default_model_settings(), 'parallel_tool_calls': settings.PARALLEL_TOOL_CALLS},
@@ -92,26 +93,29 @@ class CreditGatedSubAgents(KiberniktoSubAgents):
 
     gated_names: tuple[str, ...] = (VKUSVILL_EXPERT_NAME,)
     min_credits: int = 0
+    gated_thresholds: dict[str, int] = field(default_factory=dict)
 
     async def for_run(self, ctx: RunContext[TelegramDeps]) -> KiberniktoSubAgents:
         run = await super().for_run(ctx)
-        if not self.gated_names:
+        thresholds = {name: self.min_credits for name in self.gated_names}
+        thresholds.update(self.gated_thresholds)
+        if not thresholds:
             return run
         credits = await conversation_credits(ctx)
-        allowed = expert_allowed(
-            credits=credits,
-            is_personal=getattr(ctx.deps, 'is_personal', True),
-            min_credits=self.min_credits,
-        )
-        if allowed:
-            return run
-        kept = [agent for agent in run.agents if _agent_name(agent) not in self.gated_names]
+        personal = getattr(ctx.deps, 'is_personal', True)
+        def permitted(agent: SubAgent) -> bool:
+            name = _agent_name(agent)
+            if name is None or name not in thresholds:
+                return True
+            return expert_allowed(credits=credits, is_personal=personal, min_credits=thresholds[name])
+
+        kept = [agent for agent in run.agents if permitted(agent)]
         if len(kept) == len(run.agents):
             return run
         gated = replace(run, agents=kept)
         gated._per_run = True  # noqa: SLF001 — the harness' own per-run copy contract
         gated._run_toolset = gated._make_toolset()  # noqa: SLF001
-        logger.info('VkusVill expert withheld: credits=%s, personal=%s', credits, getattr(ctx.deps, 'is_personal', True))
+        logger.info('Restricted experts withheld: credits=%s, personal=%s', credits, personal)
         return gated
 
 
