@@ -8,11 +8,13 @@ from pydantic_ai_harness.subagents import SubAgent
 
 from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent, default_model_settings
 from kibernikto.ai.agent.harness.delegation import allow_tools, resolve_expert_model
+from kibernikto.ai.agent.harness.expert_memory import expert_memory
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
-from ._prompts import BUSINESS_INSTRUCTIONS
+from ._prompts import BUSINESS_INSTRUCTIONS, BUSINESS_MEMORY_GUIDANCE, BUSINESS_MEMORY_HEADING
 from .config import BUSINESS_SETTINGS, BusinessSettings
 
+BUSINESS_EXPERT_NAME = 'business'
 DADATA_MCP_URL = 'https://mcp.dadata.ru/mcp'
 DADATA_ALLOWED_TOOLS = frozenset({'find_party', 'clean_address', 'find_company_by_domain', 'find_company_by_email'})
 
@@ -36,12 +38,14 @@ def build_business_expert(*, settings: BusinessSettings = BUSINESS_SETTINGS, mod
     agent = build_kibernikto_agent(
         model=resolve_expert_model(model, settings.MODEL_NAME),
         deps_type=TelegramDeps,
-        name='business',
+        name=BUSINESS_EXPERT_NAME,
         persona=False,
         history_storage=None,
         instructions=BUSINESS_INSTRUCTIONS,
         model_settings={**default_model_settings(), 'max_tokens': settings.MODEL_MAX_TOKENS},
         toolsets=[dadata_toolset(remote)],
+        capabilities=[expert_memory(BUSINESS_EXPERT_NAME, heading=BUSINESS_MEMORY_HEADING,
+                                    guidance=BUSINESS_MEMORY_GUIDANCE)],
         metadata={'reaction': '🤝'},
     )
     return SubAgent(

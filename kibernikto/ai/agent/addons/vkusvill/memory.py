@@ -12,6 +12,7 @@ from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.mcp import CallToolFunc, ToolResult
 from pydantic_ai_harness.memory import Memory
 
+from kibernikto.ai.agent.harness.expert_memory import conversation_key, expert_memory
 from kibernikto.storage.factory import get_memory_store
 
 logger = logging.getLogger(__name__)
@@ -25,17 +26,6 @@ MAX_SEEN_PRODUCTS = 25
 
 _SEEN_PRODUCTS: dict[str, dict[int, str]] = {}
 _LAST_BASKET: dict[str, str] = {}
-
-
-def conversation_key(deps: object) -> str | None:
-    """Chat id of this run: the parent's Telegram message survives into delegated runs."""
-    message = getattr(deps, 'message', None)
-    chat = getattr(message, 'chat', None)
-    chat_id = getattr(chat, 'id', None)
-    if chat_id is not None:
-        return str(chat_id)
-    user_id = getattr(deps, 'user_id', None)
-    return str(user_id) if user_id is not None else None
 
 
 def _as_text(result: ToolResult) -> str:
@@ -175,20 +165,9 @@ SHOP_MEMORY_GUIDANCE = (
 )
 
 
-def shop_namespace(ctx: RunContext) -> str:
-    """Notebook tenant = the chat, not the delegated task id."""
-    return conversation_key(ctx.deps) or (ctx.conversation_id or 'no-chat')
-
-
 def shop_memory(name: str) -> Memory:
     """Notebook capability: the agent curates what the shopper likes and dislikes."""
-    return Memory(
-        get_memory_store(),
-        agent_name=name,
-        namespace=shop_namespace,
-        guidance=SHOP_MEMORY_GUIDANCE,
-        heading=SHOP_MEMORY_HEADING,
-    )
+    return expert_memory(name, heading=SHOP_MEMORY_HEADING, guidance=SHOP_MEMORY_GUIDANCE)
 
 
 @dataclass

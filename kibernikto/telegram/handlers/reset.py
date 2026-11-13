@@ -8,6 +8,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 import kibernikto.telegram.bridge as _bridge_module
+from kibernikto.ai.agent.harness.expert_memory import EXPERT_NOTEBOOKS
 from kibernikto.storage.chat_wipe import wipe_chat
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.utils.permissions import is_admin_id
@@ -54,7 +55,8 @@ async def handle_reset_choice(query: CallbackQuery) -> None:
         await query.answer()
         return
     bridge = _bridge_module.get_telegram_bridge()
-    notes = await wipe_chat(str(prompt.chat.id), history=bridge.history_storage, agent_name=bridge.agent.name)
+    notes = await wipe_chat(str(prompt.chat.id), history=bridge.history_storage, agent_name=bridge.agent.name,
+                            expert_names=sorted(EXPERT_NOTEBOOKS))
     logger.info('User %s reset chat %s (%d note files)', query.from_user.id, prompt.chat.id, notes)
     await prompt.edit_text('✅ History and notes erased.')
     await query.answer()

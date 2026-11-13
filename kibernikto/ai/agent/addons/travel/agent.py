@@ -11,11 +11,13 @@ from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
 from kibernikto.ai.agent.addons.travel.tutu.agent import build_tutu_expert
 from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent, default_model_settings
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents, resolve_expert_model
+from kibernikto.ai.agent.harness.expert_memory import expert_memory
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
-from ._prompts import TRAVEL_INSTRUCTIONS
+from ._prompts import TRAVEL_INSTRUCTIONS, TRAVEL_MEMORY_GUIDANCE, TRAVEL_MEMORY_HEADING
 from .config import TRAVEL_SETTINGS, TravelSettings
 
+TRAVEL_EXPERT_NAME = 'travel'
 # Coordinator only dispatches to tutu/kiwi; keep its tool-call ceiling tight.
 COORDINATOR_MAX_TOOL_CALLS = 8
 
@@ -28,12 +30,14 @@ def build_travel_expert(*, settings: TravelSettings = TRAVEL_SETTINGS, model: Mo
     roster = KiberniktoSubAgents(agents=children, agent_folders=None, contain_errors=True,
                                 shared_capabilities=shared_capabilities)
     agent = build_kibernikto_agent(
-        model=resolve_expert_model(model, settings.MODEL_NAME), deps_type=TelegramDeps, name='travel',
-        persona=False, history_storage=None, instructions=TRAVEL_INSTRUCTIONS, capabilities=[roster],
+        model=resolve_expert_model(model, settings.MODEL_NAME), deps_type=TelegramDeps, name=TRAVEL_EXPERT_NAME,
+        persona=False, history_storage=None, instructions=TRAVEL_INSTRUCTIONS, capabilities=[
+            roster, expert_memory(TRAVEL_EXPERT_NAME, heading=TRAVEL_MEMORY_HEADING, guidance=TRAVEL_MEMORY_GUIDANCE),
+        ],
         metadata={'reaction': '👀'},
         model_settings={**default_model_settings(), 'max_tokens': settings.MODEL_MAX_TOKENS},
     )
-    return SubAgent(agent, name='travel',
+    return SubAgent(agent, name=TRAVEL_EXPERT_NAME,
                     description=(
                         'Живой поиск путешествий: авиабилеты, отели, поезда, автобусы и электрички через Туту и Kiwi. '
                         'Только поиск предложений и расписаний, не для общих советов о городах, визах и погоде.'

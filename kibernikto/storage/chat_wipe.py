@@ -1,5 +1,6 @@
 """Erase one chat's persisted conversation and the agent's notebook for it; credits (chat_data) stay."""
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from kibernikto.storage.base import HistoryStorage
@@ -26,9 +27,12 @@ async def wipe_chat_memory(conversation_id: str, agent_name: str, store: "Memory
 
 
 async def wipe_chat(conversation_id: str, *, history: HistoryStorage | None, agent_name: str,
-                    memory: "MemoryStore | None" = None) -> int:
+                    memory: "MemoryStore | None" = None, expert_names: Iterable[str] = ()) -> int:
     """Clear the conversation's history and notebook; returns the number of notebook files removed."""
     cid = str(conversation_id)
     if history is not None:
         await history.replace_messages(cid, [])
-    return await wipe_chat_memory(cid, agent_name, memory)
+    removed = await wipe_chat_memory(cid, agent_name, memory)
+    for name in expert_names:
+        removed += await wipe_chat_memory(cid, name, memory)
+    return removed
