@@ -5,11 +5,13 @@ import logging
 import re
 from dataclasses import replace
 
+from aiogram.exceptions import TelegramAPIError
+from aiogram.types import Message
 from pydantic_ai import AgentRunResult, BinaryContent, RunContext
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.messages import FilePart
 
-from kibernikto.ai.speech import TTS_TIMEOUT_SECONDS, synthesize_speech
+from kibernikto.ai.speech import TTS_TIMEOUT_SECONDS, prepare_for_speech, split_for_speech, synthesize_speech
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,14 @@ def _voice_instructions(ctx: RunContext[TelegramDeps]) -> str:
     )
 
 
+async def _show_recording(message: Message) -> None:
+    """Best-effort "recording voice" indicator while TTS runs."""
+    try:
+        await message.bot.send_chat_action(message.chat.id, 'record_voice')
+    except (TelegramAPIError, AttributeError):
+        logger.debug('Chat action not sent', exc_info=True)
+
+
 class SpeechReply(AbstractCapability[TelegramDeps]):
     """Attach speech to human replies while retaining their original text and history."""
 
@@ -51,11 +61,14 @@ class SpeechReply(AbstractCapability[TelegramDeps]):
             return result
         # Tags belong to the speech input, never to a text fallback or caption.
         result.output = re.sub(r'^(?:\s*\[[a-zA-Z ,\-]{1,50}\](?!\()\s*)+', '', text)
+        spoken = prepare_for_speech(text)
+        if not spoken:
+            return result
+        await _show_recording(deps.message)
         try:
-            # Eleven v4 accepts at most 10,000 characters per request; send long responses in parts.
-            chunks = [text[i:i + 9000] for i in range(0, len(text), 9000)]
+            # One deadline for all chunks; they synthesize concurrently, gather keeps their order.
             async with asyncio.timeout(TTS_TIMEOUT_SECONDS):
-                audio = [await synthesize_speech(chunk) for chunk in chunks]
+                audio = await asyncio.gather(*(synthesize_speech(chunk) for chunk in split_for_speech(spoken)))
         except Exception:
             logger.exception('Voice synthesis failed; sending text instead')
             return result

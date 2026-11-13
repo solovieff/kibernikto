@@ -243,7 +243,7 @@ class VoiceDeliveryTests(unittest.IsolatedAsyncioTestCase):
         from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
         async def slow_chunk(text):
-            await asyncio.sleep(0.03)
+            await asyncio.sleep(0.2)
             return b'ID3test'
 
         bot = AsyncMock(spec=Bot)
@@ -384,3 +384,20 @@ class VoiceDeliveryTests(unittest.IsolatedAsyncioTestCase):
         bot.send_voice.assert_awaited_once()
         bot.send_audio.assert_not_awaited()
         bot.send_message.assert_not_awaited()
+
+
+class SpeechPreparationTests(unittest.TestCase):
+    def test_markup_and_links_are_not_spoken(self):
+        from kibernikto.ai.speech import prepare_for_speech
+        text = '[sarcastic] Hi\n# Title\n- **bold** see [docs](https://a.b/c) and https://x.y\n```py\nprint(1)\n```\nsnake_case ok'
+        spoken = prepare_for_speech(text)
+        self.assertEqual(spoken, '[sarcastic] Hi\nTitle\nbold see docs and\n\nsnake_case ok')
+
+    def test_split_respects_limit_and_keeps_all_words(self):
+        from kibernikto.ai.speech import split_for_speech
+        text = ' '.join(['Слово.'] * 50)
+        chunks = split_for_speech(text, 100)
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk) <= 100 for chunk in chunks))
+        self.assertEqual(' '.join(chunks).split(), text.split())
+        self.assertEqual(split_for_speech('X' * 25, 10), ['X' * 10, 'X' * 10, 'X' * 5])

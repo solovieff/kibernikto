@@ -1,6 +1,7 @@
 """OpenAI-compatible text-to-speech service."""
 
 import asyncio
+import re
 
 from openai import AsyncOpenAI
 from pydantic import SecretStr
@@ -20,6 +21,42 @@ class SpeechSettings(BaseSettings):
 
 SPEECH_SETTINGS = SpeechSettings()
 TTS_TIMEOUT_SECONDS = 30.0
+# Eleven v4 accepts at most 10,000 characters per request; keep a margin for delivery tags.
+TTS_CHUNK_LIMIT = 9000
+
+_SPEECH_CLEANUPS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r'```.*?```', re.DOTALL), ''),
+    (re.compile(r'!?\[([^\]]+)\]\([^)\s]*\)'), r'\1'),
+    (re.compile(r'https?://\S+'), ''),
+    (re.compile(r'^\s{0,3}(?:#{1,6}|>|[-*+])\s+', re.MULTILINE), ''),
+    (re.compile(r'[`*]+|(?<!\w)_+|_+(?!\w)'), ''),
+    (re.compile(r'[ \t]{2,}'), ' '),
+    (re.compile(r'[ \t]+$', re.MULTILINE), ''),
+    (re.compile(r'\n{3,}'), '\n\n'),
+)
+
+
+def prepare_for_speech(text: str) -> str:
+    """Drop what sounds wrong aloud: code blocks, URLs, Markdown markers (link labels stay)."""
+    for pattern, replacement in _SPEECH_CLEANUPS:
+        text = pattern.sub(replacement, text)
+    return text.strip()
+
+
+def split_for_speech(text: str, limit: int = TTS_CHUNK_LIMIT) -> list[str]:
+    """Split on paragraph, sentence or word boundaries so no chunk exceeds ``limit`` characters."""
+    chunks: list[str] = []
+    rest = text.strip()
+    while len(rest) > limit:
+        window = rest[:limit]
+        # Keep the sentence period with its chunk; fall back to a hard cut when no boundary is late enough.
+        end = next((i + len(sep.rstrip(' ')) for sep in ('\n\n', '\n', '. ', ' ')
+                    if (i := window.rfind(sep)) > limit // 2), limit)
+        chunks.append(rest[:end].strip())
+        rest = rest[end:].strip()
+    if rest:
+        chunks.append(rest)
+    return chunks
 
 
 async def synthesize_speech(text: str) -> bytes:
