@@ -58,6 +58,8 @@ CLI (kibernikto command / main.py)
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)
 - Prefer pydantic_ai patterns for new model calls (auto-traced)
+- Env switches: `APP_LOG_CONSOLE=stdlib|logfire` (one merged console stream), `APP_LOG_PYDANTIC_LEVEL`, `APP_LOG_HTTP` (raw HTTP, not for prod)
+- Tool-call arguments are already in Logfire spans (`gen_ai.tool.call.arguments`); console shows them with `LOGFIRE_CONSOLE_VERBOSE=true` — no agent wrapper needed
 
 ## Known Gotchas
 

@@ -12,10 +12,13 @@
 - Agent reaction emoji is `Agent(metadata={"reaction": "👀"})`, not an attribute.
 
 ### Changed
+- Logging knobs: `APP_LOG_CONSOLE=stdlib|logfire` (merge records and spans into one Logfire console), `APP_LOG_PYDANTIC_LEVEL` (stdlib level of `pydantic_ai`), `APP_LOG_HTTP` (raw provider HTTP spans).
 - App integrations moved to `kibernikto.ai.agent.addons.{vkusvill,business,travel}` (`tutu` and `kiwi` live in `travel/tutu` and `travel/kiwi`, each with its own `config.py` + `_prompts.py` + `agent.py`; `AGENT_TRAVEL_TUTU_*` env names unchanged); each package is `config.py` + `_prompts.py` + `agent.py` (`expert.py` merged into `agent.py`, `vkusvill/prompts.py` → `_prompts.py`).
 - Sub-agent delegation is billed: every successful `delegate_task` call costs `AGENT_KIBERNIKTO_SUBAGENT_EFFORT`
   credits (default 1, `0` = free) on top of the run's own cost; failed calls and non-billable runs are free.
 - `/pay [stars]` works in groups: the invoice is issued in the group and the paid credits go to the group balance.
+- `business` and `travel` experts keep a per-chat notebook like VkusVill (stock `Memory` via `harness/expert_memory.py`,
+  namespace = Telegram chat id, not the delegated task id); `/reset` wipes it with the chat.
 
 ## 2.0.0b1 — first 2.x beta
 

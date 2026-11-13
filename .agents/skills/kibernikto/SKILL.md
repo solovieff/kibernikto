@@ -105,6 +105,9 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
   `PostgresMemoryStore`) + `ConversationSearch` over our own `HistoryStorage`, bound per run to
   the caller's conversation. No `StepPersistence`; `ConversationInfo` holds no facts about people.
   Live pg check (opt-in): `KIBERNIKTO_TEST_PG_DSN=postgresql+asyncpg://... python -m unittest tests.test_chat_memory`.
+- Expert notebooks (`vkusvill`, `business`, `travel`): `harness/expert_memory.expert_memory(name, heading=, guidance=)` = `Memory`
+  namespaced by the Telegram chat id (delegates get their own task id as `conversation_id`). Builders register their
+  name in `EXPERT_NOTEBOOKS`, which `/reset` passes to `wipe_chat(expert_names=)`. VkusVill also keeps its cart cache.
 
 **Telegram**
 - Module-level routers attach to one Dispatcher per process; tests patch `include_router`.
@@ -133,6 +136,12 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
 - ServiceMiddleware skips admins. Don't reintroduce the old `or 1 == 1` forwarding shortcut.
 - Logging: `LogfireLoggingHandler` ignores formatters, so the console uses its own StreamHandler.
   Logfire's handler runs with `console_log=False` so each record prints once.
+- Log switches (env, `AppSettings` in `config.py`): `APP_LOG_CONSOLE=stdlib|logfire` (`logfire` = one Logfire console
+  stream, records nested in spans, `LOG_FORMAT` unused); `APP_LOG_PYDANTIC_LEVEL` (stdlib level of `pydantic_ai`);
+  `APP_LOG_HTTP=true` (`instrument_httpx(capture_all=True)`: raw provider requests/responses, noisy, never in prod).
+- Tool arguments need no wrapper: the `running tool: <name>` span carries `gen_ai.tool.call.arguments` when it opens
+  (before the tool runs), as long as `include_content=True` (default; don't turn it off). The console shows them only
+  with `LOGFIRE_CONSOLE_VERBOSE=true`; the Logfire web UI always does. Subagents and MCP tools are covered the same way.
 
 ## Rules
 

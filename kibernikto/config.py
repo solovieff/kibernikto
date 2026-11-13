@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Literal
 
 import logfire
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,6 +13,11 @@ class AppSettings(BaseSettings):
     INSTANCE_NAME: str = 'kibernikto-app'
     URL: str = 'https://none.com'
     TAG_NAME: str = 'kibernikto'
+    # stdlib: our formatted records next to Logfire span lines; logfire: one Logfire console stream for both
+    LOG_CONSOLE: Literal['stdlib', 'logfire'] = 'stdlib'
+    LOG_PYDANTIC_LEVEL: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
+    # raw provider HTTP request/response bodies as Logfire spans (noisy, may contain user content)
+    LOG_HTTP: bool = False
 
 
 APP_SETTINGS = AppSettings()
@@ -57,28 +63,40 @@ def _storage_dump() -> dict:
 
 LOG_FORMAT = '%(levelname)-8s %(asctime)s %(name)s:%(filename)s:%(lineno)d %(message)s'
 LOG_DATE_FORMAT = '%Y-%m-%d:%H:%M:%S'
-LOGGER_LEVELS = {'kibernikto': logging.DEBUG, 'aiogram': logging.INFO, 'pydantic_ai': logging.INFO}
+LOGGER_LEVELS = {
+    'kibernikto': logging.DEBUG,
+    'aiogram': logging.ERROR,
+    'pydantic_ai': logging.getLevelNamesMapping()[APP_SETTINGS.LOG_PYDANTIC_LEVEL],
+}
 
 
 def configure_logger() -> None:
-    """Stdlib records: formatted stderr + Logfire export. Spans: Logfire console (``LOGFIRE_CONSOLE*``) + export.
+    """Stdlib records + Logfire spans/export. ``APP_LOG_CONSOLE`` picks who prints: our handler or Logfire's console.
 
-    Root stays at WARN, so third-party warnings and errors reach both sinks; project loggers are more verbose.
-    Logfire ignores formatters, hence the separate console handler. Safe to call more than once.
+    Root stays at WARN, so third-party warnings and errors reach every sink; project loggers are more verbose.
+    Logfire ignores formatters, hence the separate stdlib console handler. Safe to call more than once.
     """
     logfire.configure(service_name=APP_SETTINGS.INSTANCE_NAME, send_to_logfire='if-token-present')
     logfire.instrument_pydantic_ai()
+    if APP_SETTINGS.LOG_HTTP:
+        logfire.instrument_httpx(capture_all=True)
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(logging.Formatter(fmt=LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
 
-    # console_log=False: Logfire's console already shows spans; records are printed once, by our handler.
-    # NullHandler fallback: records under suppressed instrumentation are already printed by our handler.
-    logfire_handler = logfire.LogfireLoggingHandler(
-        fallback=logging.NullHandler(),
-        logfire_instance=logfire.with_settings(console_log=False),
-    )
+    if APP_SETTINGS.LOG_CONSOLE == 'logfire':
+        # Logfire prints records and spans in one timeline; stdlib stream is only the suppressed-instrumentation fallback.
+        logfire_handler = logfire.LogfireLoggingHandler(fallback=console_handler)
+        handlers = [logfire_handler]
+    else:
+        # console_log=False: Logfire's console already shows spans; records are printed once, by our handler.
+        # NullHandler fallback: records under suppressed instrumentation are already printed by our handler.
+        logfire_handler = logfire.LogfireLoggingHandler(
+            fallback=logging.NullHandler(),
+            logfire_instance=logfire.with_settings(console_log=False),
+        )
+        handlers = [console_handler, logfire_handler]
 
-    logging.basicConfig(level=logging.WARN, handlers=[console_handler, logfire_handler], force=True)
+    logging.basicConfig(level=logging.WARN, handlers=handlers, force=True)
     for name, level in LOGGER_LEVELS.items():
         logging.getLogger(name).setLevel(level)
