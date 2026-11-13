@@ -11,11 +11,11 @@ os.environ['AGENT_KIBERNIKTO_IMAGE_MODEL_NAME'] = ''
 os.environ['APP_STORAGE_DATA_BACKEND'] = 'file'
 os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 
-from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart, ToolReturnPart
+from pydantic_ai import ModelMessage, ModelResponse, RetryPromptPart, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai_harness.exa import ExaSearch
-from pydantic_ai_harness.subagents import SubAgents
+from pydantic_ai_harness.subagents import SubAgent, SubAgents
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
@@ -258,6 +258,50 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
         self.assertEqual(self.chat_data.rows['7'].credits, 100)
+
+    def _delegating_agent(self, calls: int, *, child_fails: bool = False):
+        def child_model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            if child_fails:
+                raise RuntimeError('child down')
+            return ModelResponse(parts=[TextPart('child-done')])
+
+        child = build_kibernikto_agent(model=FunctionModel(child_model), name='child', history_storage=None)
+        child.description = 'test child'
+
+        def parent_model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            done = sum(isinstance(p, ToolReturnPart | RetryPromptPart) for m in messages for p in getattr(m, 'parts', ()))
+            if done < calls:
+                return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'child', 'task': 'go'})])
+            return ModelResponse(parts=[TextPart('parent-done')])
+
+        roster = SubAgents(agents=[SubAgent(child)], agent_folders=None, contain_errors=True)
+        return build_telegram_agent(model=FunctionModel(parent_model), name='delegating', history_storage=None,
+                                    capabilities=[CreditTier(models={MEDIUM: FunctionModel(parent_model)}), roster])
+
+    async def test_each_successful_delegation_is_charged_on_top_of_the_run(self) -> None:
+        agent = self._delegating_agent(calls=2)
+        for effort, expected in ((2, 100 - 1 - 2 * 2), (0, 100 - 1)):
+            with self.subTest(subagent_effort=effort), patch.object(AGENT_KIBERNIKTO_SETTINGS, 'SUBAGENT_EFFORT', effort):
+                await self.set_credits('7', 100)
+                result = await agent.run('hi', conversation_id='7', deps=TelegramDeps())
+                self.assertEqual(result.output, 'parent-done')
+                self.assertEqual(self.chat_data.rows['7'].credits, expected)
+
+    async def test_failed_delegation_and_non_billable_runs_are_not_charged_extra(self) -> None:
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'SUBAGENT_EFFORT', 3):
+            await self.set_credits('7', 100)
+            await self._delegating_agent(calls=1, child_fails=True).run('hi', conversation_id='7', deps=TelegramDeps())
+            self.assertEqual(self.chat_data.rows['7'].credits, 99)
+            await self._delegating_agent(calls=1).run('hi', conversation_id='7', deps=TelegramDeps(billable=False))
+            self.assertEqual(self.chat_data.rows['7'].credits, 99)
+
+    async def test_delegation_charge_does_not_leak_between_runs(self) -> None:
+        agent = self._delegating_agent(calls=1)
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'SUBAGENT_EFFORT', 2):
+            await self.set_credits('7', 100)
+            await agent.run('hi', conversation_id='7', deps=TelegramDeps())
+            await agent.run('hi', conversation_id='7', deps=TelegramDeps())
+        self.assertEqual(self.chat_data.rows['7'].credits, 100 - 2 * (1 + 2))
 
     async def test_check_credits_tool_returns_balance_tier_and_reuses_run_snapshot(self) -> None:
         observed_tool_returns: list[str] = []

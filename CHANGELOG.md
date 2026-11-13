@@ -13,6 +13,8 @@
 
 ### Changed
 - App integrations moved to `kibernikto.ai.agent.addons.{vkusvill,business,travel}` (`tutu` and `kiwi` live in `travel/tutu` and `travel/kiwi`, each with its own `config.py` + `_prompts.py` + `agent.py`; `AGENT_TRAVEL_TUTU_*` env names unchanged); each package is `config.py` + `_prompts.py` + `agent.py` (`expert.py` merged into `agent.py`, `vkusvill/prompts.py` → `_prompts.py`).
+- Sub-agent delegation is billed: every successful `delegate_task` call costs `AGENT_KIBERNIKTO_SUBAGENT_EFFORT`
+  credits (default 1, `0` = free) on top of the run's own cost; failed calls and non-billable runs are free.
 - `/pay [stars]` works in groups: the invoice is issued in the group and the paid credits go to the group balance.
 
 ## 2.0.0b1 — first 2.x beta

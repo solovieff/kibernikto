@@ -8,8 +8,11 @@ from typing import Literal
 
 from pydantic_ai import AgentRunResult, ModelSelectionContext, RunContext
 from pydantic_ai.capabilities import AbstractCapability, ModelSelector
+from pydantic_ai.capabilities.abstract import ValidatedToolArgs
 from pydantic_ai.exceptions import UserError
+from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.models import Model
+from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets import FunctionToolset
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
@@ -20,6 +23,8 @@ from kibernikto.storage.models import ConversationInfo
 from kibernikto.storage.singletons import chat_data
 
 logger = logging.getLogger(__name__)
+
+DELEGATE_TOOL_NAME = "delegate_task"  # Tool name of the harness ``SubAgents`` capability.
 
 type Tier = Literal["poor", "medium", "rich"]
 
@@ -38,6 +43,7 @@ def format_credit_status(
         credits: int,
         *,
         effort: int = 1,
+        subagent_effort: int = 0,
         conversation_id: str | None = None,
         is_admin: bool = False,
 ) -> str:
@@ -46,7 +52,7 @@ def format_credit_status(
     tier = credit_tier(credits)
     zero_policy = "switches to poor tier" if s.ALLOW_ZERO_CREDITS else "blocks runs until topped up"
     status = (
-        f"credits: {credits} | tier: {tier} | cost_per_run: {effort} | "
+        f"credits: {credits} | tier: {tier} | cost_per_run: {effort} | cost_per_subagent_call: {subagent_effort} | "
         f"tiers: poor (<{s.POOR_CREDITS}), medium ({s.POOR_CREDITS}..{s.RICH_CREDITS - 1}), rich (>={s.RICH_CREDITS}) | "
         f"at_zero: {zero_policy} | "
         "commands: /balance (check balance), /pay [stars] (top up in private chat with Telegram Stars, 1 Star = 1 credit)"
@@ -66,6 +72,8 @@ def format_credit_status(
 class CreditTier(AbstractCapability[KiberniktoDeps]):
     """Pick the model by the conversation's credit tier once per run, then charge ``effort`` after success.
 
+    Every successful ``delegate_task`` call adds ``SUBAGENT_EFFORT`` credits on top of the run's ``effort``.
+
     Explicit ``run(model=...)`` / ``agent.override(model=...)`` still win over the selection;
     non-billable runs use the agent's constructor model. Failed runs are never charged.
     """
@@ -75,6 +83,7 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
     conversation_id: str | None = None
     extra_features: dict[str, int] = field(default_factory=dict)
     _run_info: ConversationInfo | None = field(default=None, init=False, repr=False)
+    _delegations: int = field(default=0, init=False, repr=False)  # Per-run copy only (see ``for_run``).
 
     @classmethod
     def get_serialization_name(cls) -> str | None:
@@ -99,7 +108,10 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
             return "credits: untracked (non-billable run)"
         info = await self._load_info(ctx.deps, cid)
         is_admin = isinstance(ctx.deps, KiberniktoDeps) and ctx.deps.is_admin
-        status = format_credit_status(info.credits, effort=self.effort, conversation_id=cid, is_admin=is_admin)
+        status = format_credit_status(
+            info.credits, effort=self.effort, subagent_effort=AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT,
+            conversation_id=cid, is_admin=is_admin,
+        )
         if not self.extra_features:
             return status
         personal = getattr(ctx.deps, 'is_personal', True)
@@ -121,13 +133,20 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         if info.credits <= 0:
             raise InsufficientCreditsError()
 
+    async def after_tool_execute(self, ctx: RunContext[KiberniktoDeps], *, call: ToolCallPart,
+                                 tool_def: ToolDefinition, args: ValidatedToolArgs, result: object) -> object:
+        # Successful delegations only: failed or retried calls never reach this hook.
+        if tool_def.name == DELEGATE_TOOL_NAME and _billable_conversation(ctx.deps, self.conversation_id or ctx.conversation_id):
+            self._delegations += 1
+        return result
+
     async def after_run(self, ctx: RunContext[KiberniktoDeps], *, result: AgentRunResult[object]) -> AgentRunResult[object]:
         cid = _billable_conversation(ctx.deps, self.conversation_id or ctx.conversation_id)
         if cid is None:
             return result
         info = await chat_data.load(cid)  # Fresh read: a top-up landed mid-run must not be overwritten.
         previous = credit_tier(info.credits)
-        info.charge(effort=self.effort)
+        info.charge(effort=self.effort + self._delegations * max(0, AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT))
         await chat_data.save(cid, info)
         if (current := credit_tier(info.credits)) != previous:
             logger.info("Model tier changed for conversation %s: %s -> %s", cid, previous, current)
