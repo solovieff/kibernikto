@@ -71,7 +71,7 @@ Request path: `TelegramApp` → middlewares → handler → active `TelegramBrid
 - Experts are plain `pydantic_ai.Agent`s delegated via the real `SubAgents(agents=[SubAgent(a)])`;
   only a parent with the `CreditTier` capability (`harness/credit_tier.py`, wired in
   `multi_agent.py`) selects tier models and spends credits. Peer envelopes set
-  `KiberniktoDeps.billable=False`; each successful `delegate_task` also costs
+  `KiberniktoDeps.billable=False`; a successful run costs `AGENT_KIBERNIKTO_RUN_EFFORT` (default 1, `0` = free) and each successful `delegate_task` also costs
   `AGENT_KIBERNIKTO_SUBAGENT_EFFORT` credits (charged once in `after_run`); explicit `run(model=...)`/`override(model=...)` beat the tier.
 - `chat_data` (`ConversationInfo`) stores credits and per-chat `response_mode` (`text` by default); legacy JSON keys are ignored on load.
   `build_deps` loads it once into `KiberniktoDeps.chat_info` (read-only; tier selection reuses it) and

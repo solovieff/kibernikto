@@ -287,6 +287,14 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.output, 'parent-done')
                 self.assertEqual(self.chat_data.rows['7'].credits, expected)
 
+    async def test_run_effort_setting_sets_the_run_cost(self) -> None:
+        agent = self._delegating_agent(calls=0)
+        for effort, expected in ((3, 97), (0, 100)):
+            with self.subTest(run_effort=effort), patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RUN_EFFORT', effort):
+                await self.set_credits('7', 100)
+                await agent.run('hi', conversation_id='7', deps=TelegramDeps())
+                self.assertEqual(self.chat_data.rows['7'].credits, expected)
+
     async def test_failed_delegation_and_non_billable_runs_are_not_charged_extra(self) -> None:
         with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'SUBAGENT_EFFORT', 3):
             await self.set_credits('7', 100)

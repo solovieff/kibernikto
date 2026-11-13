@@ -57,6 +57,7 @@ class AgentKiberniktoSettings(BaseSettings):
 
     # Credits & model balancing for the CreditTier capability
     TRIAL_CREDITS: int = Field(default=260, description="Initial credits for a new user")
+    RUN_EFFORT: int = Field(default=1, description="Credits charged per successful main-agent run; 0 = free")
     SUBAGENT_EFFORT: int = Field(default=1, description="Extra credits charged per successful sub-agent delegation; 0 = free")
     ALLOW_ZERO_CREDITS: bool = Field(default=True, description="Continue on the poor model at zero or negative credits")
     POOR_CREDITS: int = Field(default=30, description="Below this — poor model")
