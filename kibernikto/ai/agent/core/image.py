@@ -21,7 +21,7 @@ import binascii
 import logging
 from typing import Any
 
-import httpx
+import httpx2
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import BinaryContent, ImageUrl, UserContent
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -129,7 +129,7 @@ def _decode_data_url(url: str) -> tuple[bytes, str]:
 
 
 async def _download_image(url: str) -> tuple[bytes, str]:
-    async with httpx.AsyncClient() as session:
+    async with httpx2.AsyncClient() as session:
         response = await session.get(url, timeout=120)
         response.raise_for_status()
         media_type = response.headers.get("content-type", "image/png").split(";")[0].strip() or "image/png"

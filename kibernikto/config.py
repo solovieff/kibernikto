@@ -18,6 +18,8 @@ class AppSettings(BaseSettings):
     LOG_PYDANTIC_LEVEL: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
     # raw provider HTTP request/response bodies as Logfire spans (noisy, may contain user content)
     LOG_HTTP: bool = False
+    # master switch for Telegram reactions (agent emojis, tool-call emojis, steered ✍)
+    REACTIONS_ENABLED: bool = True
 
 
 APP_SETTINGS = AppSettings()

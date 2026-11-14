@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- `AgentReaction.tool_reactions` (default: a pool of Telegram-allowed emojis): each tool call of a delegate (the root keeps its own emoji) sets a random emoji from the pool, never repeating the current one, so the reaction visibly changes while the expert works; an empty tuple disables it.
+- `AgentReaction.reaction_interval` (default 2.5 s, `0` disables): one run-wide throttle inside `AgentReaction._set`, shared by every reaction source (agent start, root and delegate tool calls) across the whole agent tree, so bursts and parallel calls send a single `setMessageReaction`.
+- `APP_REACTIONS_ENABLED` (default `true`): master switch for every Telegram reaction (agent emojis, tool-call emojis, steered ✍). `AgentReaction(enabled=...)` overrides it per instance.
+- `AgentReaction.react(ctx, deps, emoji)` is the single entry point that sets the reaction.
+- `AgentReaction` sends reactions fire-and-forget (tasks tracked in `deps.extra`): the agent no longer waits for Telegram.
 - Every expert now has an `ENABLED` switch: `AGENT_TRAVEL_KIWI_ENABLED`, `AGENT_TRAVEL_TRAVALA_ENABLED`, `AGENT_TRAVEL_TUTU_ENABLED`
   (default `false`, each must be enabled explicitly to join the travel roster; the coordinator turns off when none is left).
 - `AGENT_BUSINESS_ENABLED` (default `false`) must be `true` to load the business expert; the DaData token alone no longer enables it.

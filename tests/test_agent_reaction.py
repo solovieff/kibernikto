@@ -1,5 +1,6 @@
 """Offline AgentReaction regressions: parent and delegate emojis on the user's message, failures stay cosmetic."""
 
+import asyncio
 import os
 import unittest
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart, ToolCallPa
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai_harness.subagents import SubAgent
 
+from kibernikto.config import APP_SETTINGS
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
 from kibernikto.ai.agent.harness.image_agent import image_agent
 from kibernikto.ai.agent.telegram.agent_reaction import AgentReaction
@@ -27,9 +29,9 @@ from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.telegram_agent import build_telegram_agent
 
 
-def user_message() -> Message:
+def user_message(chat_type: str = 'private') -> Message:
     bot = AsyncMock(spec=Bot)
-    chat = Chat(id=42, type='private')
+    chat = Chat(id=42, type=chat_type)
     return Message(message_id=7, date=datetime.now(timezone.utc), chat=chat,
                    from_user=User(id=42, is_bot=False, first_name='User'), text='hi').as_(bot)
 
@@ -47,11 +49,11 @@ def scripted_model(*calls: ToolCallPart) -> FunctionModel:
 
 
 def build(*, parent: str | None, child: str | None, calls: tuple[ToolCallPart, ...] = (DELEGATE,),
-          child_calls: tuple[ToolCallPart, ...] = ()) -> Agent:
+          child_calls: tuple[ToolCallPart, ...] = (), reactions: AgentReaction | None = None) -> Agent:
     expert = Agent(model=scripted_model(*child_calls), name='child', description='child expert', metadata={'reaction': child})
     expert.tool_plain(lookup)
     sub_agents = KiberniktoSubAgents(agents=[SubAgent(expert)], agent_folders=None,
-                                     shared_capabilities=[AgentReaction()])
+                                     shared_capabilities=[reactions or AgentReaction()])
     agent = build_telegram_agent(model=scripted_model(*calls), name='parent', history_storage=None,
                                  persona=False, reaction=parent, capabilities=[sub_agents])
     agent.tool_plain(lookup)
@@ -64,7 +66,9 @@ def lookup() -> str:
 
 
 async def run(agent: Agent, message: Message | None = None, **deps: bool) -> str:
-    result = await agent.run('hi', deps=TelegramDeps(message=message, **deps))
+    run_deps = TelegramDeps(message=message, **deps)
+    result = await agent.run('hi', deps=run_deps)
+    await asyncio.gather(*run_deps.extra.get('reaction_tasks', ()))  # Reactions are fire-and-forget.
     return result.output
 
 
@@ -88,12 +92,74 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_delegation_shows_only_the_delegate_emoji(self) -> None:
         message = user_message()
-        self.assertEqual(await run(build(parent='👀', child='✍', child_calls=(LOOKUP,)), message), 'final')
+        self.assertEqual(await run(build(parent='👀', child='✍'), message), 'final')
+        self.assertEqual(emojis(message), ['✍'])
+
+    async def test_delegate_tool_calls_rotate_the_working_reaction(self) -> None:
+        message = user_message()
+        agent = build(parent='👀', child='✍', child_calls=(LOOKUP,) * 5,
+                      reactions=AgentReaction(reaction_interval=0))
+        await run(agent, message)
+        sent = emojis(message)
+        self.assertEqual(len(sent), 6)
+        self.assertEqual(sent[0], '✍')
+        self.assertTrue(set(sent[1:]) <= set(AgentReaction.tool_reactions))
+        self.assertTrue(all(a != b for a, b in zip(sent, sent[1:])))  # Every tool call visibly changes it.
+
+    async def test_reactions_are_throttled_per_run(self) -> None:
+        message = user_message()
+        await run(build(parent='👀', child='✍', child_calls=(LOOKUP,) * 5), message)  # Default interval.
+        self.assertEqual(emojis(message), ['✍'])  # One shared window: the tool calls right after the start fall in it.
+
+    async def test_throttle_is_shared_by_every_source(self) -> None:
+        message = user_message()
+        await run(build(parent='👀', child='✍', calls=(LOOKUP, DELEGATE)), message)
+        self.assertEqual(emojis(message), ['👀'])  # The delegate start is throttled by the root's tool reaction.
+
+    async def test_tool_reaction_resumes_after_the_interval(self) -> None:
+        message = user_message()
+        clock = iter(range(0, 100, 10))
+        # Patch the module's `time` name, not time.monotonic itself: the event loop uses the real clock.
+        with patch('kibernikto.ai.agent.telegram.agent_reaction.time') as fake_time:
+            fake_time.monotonic.side_effect = lambda: next(clock)
+            await run(build(parent='👀', child='✍', child_calls=(LOOKUP,) * 3), message)
+        self.assertEqual(len(emojis(message)), 4)  # Each call is 10s apart: all pass the 2.5s window.
+
+    async def test_parallel_tool_calls_send_one_reaction(self) -> None:
+        message = user_message()
+        two = ToolCallPart('lookup', {}, tool_call_id='b')
+        expert = Agent(name='child', description='child expert', metadata={'reaction': '✍'},
+                       model=FunctionModel(lambda messages, info: ModelResponse(
+                           parts=[LOOKUP, two] if len(messages) == 1 else [TextPart('done')])))
+        expert.tool_plain(lookup)
+        roster = KiberniktoSubAgents(agents=[SubAgent(expert)], agent_folders=None, shared_capabilities=[AgentReaction()])
+        parent = build_telegram_agent(model=scripted_model(DELEGATE), name='parent', history_storage=None,
+                                      persona=False, reaction='👀', capabilities=[roster])
+        await run(parent, message)
+        self.assertEqual(len(emojis(message)), 1)  # Start emoji opens the window; both parallel calls fall in it.
+
+    async def test_master_switch_silences_every_agent(self) -> None:
+        message = user_message()
+        with patch.object(APP_SETTINGS, 'REACTIONS_ENABLED', False):  # Read when the capabilities are built.
+            agent = build(parent='👀', child='✍', calls=(LOOKUP, DELEGATE), child_calls=(LOOKUP,))
+        self.assertEqual(await run(agent, message), 'final')
+        message.bot.set_message_reaction.assert_not_awaited()
+
+    async def test_working_reaction_can_be_disabled(self) -> None:
+        message = user_message()
+        expert = Agent(model=scripted_model(LOOKUP), name='child', description='child expert', metadata={'reaction': '✍'})
+        expert.tool_plain(lookup)
+        roster = KiberniktoSubAgents(agents=[SubAgent(expert)], agent_folders=None,
+                                     shared_capabilities=[AgentReaction(tool_reactions=())])
+        parent = build_telegram_agent(model=scripted_model(DELEGATE), name='parent', history_storage=None,
+                                      persona=False, reaction='👀', capabilities=[roster])
+        await run(parent, message)
         self.assertEqual(emojis(message), ['✍'])
 
     async def test_root_tool_then_delegate_last_one_stays(self) -> None:
         message = user_message()
-        await run(build(parent='👀', child='✍', calls=(LOOKUP, DELEGATE)), message)
+        agent = build(parent='👀', child='✍', calls=(LOOKUP, DELEGATE), reactions=AgentReaction(reaction_interval=0))
+        await run(agent, message)
         self.assertEqual(emojis(message), ['👀', '✍'])
 
     async def test_same_emoji_is_not_resent(self) -> None:
@@ -179,12 +245,14 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
                 def factory(**kwargs):
                     return build_travel_expert(model=scripted_model(delegate), experts=[child], **kwargs)
                 with patch.object(TRAVEL_SETTINGS, 'ENABLED', True), \
+                     patch('kibernikto.ai.agent.telegram.agent_reaction.time') as clock, \
                      patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
                      patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
                      patch('kibernikto.ai.agent.addons.travel.agent.build_travel_expert', side_effect=factory), \
                      patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
                      patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()), \
                      patch('kibernikto.ai.agent.telegram.multi_agent.CreditTier', return_value=AbstractCapability()):
+                    clock.monotonic.side_effect = iter(range(0, 1000, 10)).__next__  # Every reaction outside the window.
                     parent = build_multi_agent()
                     message = user_message()
                     root_call = ToolCallPart('delegate_task', {'agent_name': 'travel', 'task': 'find'})
@@ -229,6 +297,7 @@ class ReactionEmojiAllowedTest(unittest.IsolatedAsyncioTestCase):
             'AgentReaction.steered_reaction': AgentReaction.steered_reaction,
             'TelegramPeerAgent.reaction': inspect.signature(TelegramPeerAgent.__init__).parameters['reaction'].default,
         }
+        defaults.update({f'AgentReaction.tool_reactions[{i}]': e for i, e in enumerate(AgentReaction.tool_reactions)})
         for name, emoji in defaults.items():
             with self.subTest(source=name):
                 self.assertIn(emoji, allowed)
