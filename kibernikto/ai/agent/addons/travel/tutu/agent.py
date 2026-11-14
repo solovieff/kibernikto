@@ -13,7 +13,7 @@ from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent, de
 from kibernikto.ai.agent.harness.delegation import allow_tools, resolve_expert_model
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
-from ._prompts import TUTU_INSTRUCTIONS
+from ._prompts import TUTU_DESCRIPTION, TUTU_INSTRUCTIONS
 from .config import TUTU_SETTINGS, TutuSettings
 
 TUTU_ALLOWED_TOOLS = frozenset({
@@ -54,5 +54,5 @@ def build_tutu_expert(*, settings: TutuSettings = TUTU_SETTINGS, model: Model | 
         model_settings={**default_model_settings(), 'max_tokens': settings.MODEL_MAX_TOKENS},
         toolsets=[tutu_toolset(remote), FunctionToolset([elapsed_minutes])],
     )
-    return SubAgent(agent, name='tutu', description='Туту: авиа, отели, поезда, автобусы и электрички.',
+    return SubAgent(agent, name='tutu', description=TUTU_DESCRIPTION,
                     usage_limits=UsageLimits(tool_calls_limit=settings.MAX_TOOL_CALLS))

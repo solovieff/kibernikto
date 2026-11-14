@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class TutuSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='AGENT_TRAVEL_TUTU_', populate_by_name=True)
 
+    # Kill switch: a disabled specialist is left out of the travel roster.
+    ENABLED: bool = False
     MCP_URL: str = 'https://mcp.tutu.ru/mcp'
     MODEL_NAME: str | None = None
     MODEL_MAX_TOKENS: int = Field(default=8192, ge=1)

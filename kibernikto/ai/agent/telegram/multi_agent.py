@@ -63,10 +63,10 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
     from kibernikto.ai.agent.addons.travel.config import TRAVEL_SETTINGS
     from kibernikto.ai.agent.addons.vkusvill.config import VKUSVILL_SETTINGS
 
-    if BUSINESS_SETTINGS.DADATA_TOKEN is not None and not BUSINESS_SETTINGS.configured:
+    if BUSINESS_SETTINGS.ENABLED and BUSINESS_SETTINGS.DADATA_TOKEN is not None and not BUSINESS_SETTINGS.configured:
         logger.warning('Invalid AGENT_BUSINESS_DADATA_TOKEN; business expert is disabled')
 
-    if VKUSVILL_SETTINGS.ENABLED or TRAVEL_SETTINGS.ENABLED or BUSINESS_SETTINGS.configured:
+    if VKUSVILL_SETTINGS.ENABLED or TRAVEL_SETTINGS.active or BUSINESS_SETTINGS.active:
         from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
 
         reaction = AgentReaction()
@@ -75,12 +75,12 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
 
             experts.append(build_vkusvill_expert())
             gated_thresholds['vkusvill'] = VKUSVILL_SETTINGS.MIN_CREDITS
-        if TRAVEL_SETTINGS.ENABLED:
+        if TRAVEL_SETTINGS.active:
             from kibernikto.ai.agent.addons.travel.agent import build_travel_expert
 
             experts.append(build_travel_expert(shared_capabilities=[reaction]))
             gated_thresholds['travel'] = TRAVEL_SETTINGS.MIN_CREDITS
-        if BUSINESS_SETTINGS.configured:
+        if BUSINESS_SETTINGS.active:
             from kibernikto.ai.agent.addons.business.agent import build_business_expert
 
             experts.append(build_business_expert())

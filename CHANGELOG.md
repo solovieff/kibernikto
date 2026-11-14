@@ -3,11 +3,22 @@
 ## Unreleased
 
 ### Added
+- Every expert now has an `ENABLED` switch: `AGENT_TRAVEL_KIWI_ENABLED`, `AGENT_TRAVEL_TRAVALA_ENABLED`, `AGENT_TRAVEL_TUTU_ENABLED`
+  (default `false`, each must be enabled explicitly to join the travel roster; the coordinator turns off when none is left).
+- `AGENT_BUSINESS_ENABLED` (default `false`) must be `true` to load the business expert; the DaData token alone no longer enables it.
+- Travala accommodation search expert (`travel/travala`) under the travel coordinator: anonymous read-only access to
+  `travel-mcp.travala.com` (client registered once and cached under `FILESTORE/travala-oauth`, `client_credentials`
+  token renewed automatically); only `travala_search_hotel` and `travala_search_package` are exposed, wallet and
+  booking tools stay hidden. Env: `AGENT_TRAVEL_TRAVALA_*`.
+  The expert builds `travala.com/hotel/<slug>-<id>?check_in&check_out&hotel_id&r1` links itself (search results carry none).
 - Optional Telegram voice replies: `/toggle_voice` stores each chat's text/audio mode (legacy
   chats default to text). Audio mode uses an OpenAI-compatible TTS service and falls back to
   text when synthesis or delivery fails. See [voice configuration](deploy/README.md#voice-replies).
   Speech input is stripped of code blocks, URLs and Markdown markers, split on sentence
   boundaries, synthesized concurrently, and shows the "recording voice" chat action.
+
+### Changed
+- Travel coordinator, Tutu, Kiwi and Travala prompts are now in English (replies still follow the user's language).
 
 ### Breaking
 - `KiberniktoAgent` is gone: `build_kibernikto_agent()` returns a plain `pydantic_ai.Agent`

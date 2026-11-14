@@ -53,13 +53,19 @@ Tutu (hotels, flights, rail, buses and commuter trains) and Kiwi (flight search)
 example enables it; the library default is disabled. Access is limited to private chats with credits strictly
 above `AGENT_TRAVEL_MIN_CREDITS` (default 2000; zero disables the credit minimum but not the private-chat rule).
 The coordinator, Tutu and Kiwi models can be set independently with `AGENT_TRAVEL_MODEL_NAME`,
-`AGENT_TRAVEL_TUTU_MODEL_NAME` and `AGENT_KIWI_MODEL_NAME`; when unset, each uses the default agent model.
-`AGENT_TRAVEL_TUTU_MCP_URL` and `AGENT_KIWI_MCP_URL` override the endpoints. `AGENT_TRAVEL_MAX_TOOL_CALLS`
-limits the coordinator and Tutu runs; `AGENT_KIWI_MAX_TOOL_CALLS` limits the Kiwi run. These are per-delegation
-limits, not a global cap; child usage is forwarded to the parent. No API keys are required by the MCP endpoints.
+`AGENT_TRAVEL_TUTU_MODEL_NAME` and `AGENT_TRAVEL_KIWI_MODEL_NAME`; when unset, each uses the default agent model.
+`AGENT_TRAVEL_TUTU_MCP_URL` and `AGENT_TRAVEL_KIWI_MCP_URL` override the endpoints. `AGENT_TRAVEL_MAX_TOOL_CALLS`
+limits the coordinator and Tutu runs; `AGENT_TRAVEL_KIWI_MAX_TOOL_CALLS` limits the Kiwi run. These are per-delegation
+limits, not a global cap; child usage is forwarded to the parent. `AGENT_TRAVEL_TUTU_ENABLED`, `AGENT_TRAVEL_KIWI_ENABLED`
+and `AGENT_TRAVEL_TRAVALA_ENABLED` (default `false`) opt each specialist in; with all three off the coordinator is not loaded. No API keys are required by the MCP endpoints.
 The maximum model output defaults to 8192 tokens for each travel agent. Override the coordinator, Tutu,
 and Kiwi independently with `AGENT_TRAVEL_MODEL_MAX_TOKENS`, `AGENT_TRAVEL_TUTU_MODEL_MAX_TOKENS`,
-and `AGENT_KIWI_MODEL_MAX_TOKENS`, respectively.
+and `AGENT_TRAVEL_KIWI_MODEL_MAX_TOKENS`, respectively.
+
+Travala (hotels, search only) is a third delegate: `AGENT_TRAVEL_TRAVALA_MODEL_NAME`, `AGENT_TRAVEL_TRAVALA_MODEL_MAX_TOKENS`,
+`AGENT_TRAVEL_TRAVALA_MAX_TOOL_CALLS`, `AGENT_TRAVEL_TRAVALA_MCP_URL`. It needs no account: the bot registers an OAuth client on
+first use and caches it in `$APP_STORAGE_FILESTORE_LOCATION/travala-oauth/client.json`. Wallet and booking tools are
+not exposed.
 
 Tutu passenger registration is excluded from the toolset; search and checkout-link generation do not book or
 pay. Travelers complete checkout themselves. Search criteria go to the selected provider. Prices and
@@ -70,7 +76,8 @@ availability may change; inspect baggage and cancellation terms before purchasin
 Set `AGENT_BUSINESS_DADATA_TOKEN` to the DaData API key and secret key joined by a colon in the bot's
 private runtime environment. Never commit the value or put it in the MCP URL. The agent is available only when
 both keys are present and the token is well-formed; a malformed token disables it and emits a warning without
-printing the token. `AGENT_BUSINESS_MIN_CREDITS` defaults to 2000 (strictly greater, private chats only;
+printing the token. `AGENT_BUSINESS_ENABLED` (default `false`) is an opt-in: set it to `true` to load the
+agent; without it the token alone does nothing. `AGENT_BUSINESS_MIN_CREDITS` defaults to 2000 (strictly greater, private chats only;
 zero removes the minimum but keeps the private-chat restriction). `AGENT_BUSINESS_MODEL_NAME` is optional,
 and `AGENT_BUSINESS_MAX_TOOL_CALLS` defaults to 20. The official MCP provides company and entrepreneur lookup,
 company lookup by domain/email, and address standardization. A subset of calls can incur DaData charges; check

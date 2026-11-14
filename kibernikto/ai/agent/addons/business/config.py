@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class BusinessSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='AGENT_BUSINESS_')
 
+    # Opt-in: the expert also needs a valid token to load.
+    ENABLED: bool = False
     DADATA_TOKEN: SecretStr | None = None
     MODEL_NAME: str | None = None
     MODEL_MAX_TOKENS: int = Field(default=8192, ge=1)
@@ -20,6 +22,10 @@ class BusinessSettings(BaseSettings):
             return False
         parts = self.DADATA_TOKEN.get_secret_value().split(':')
         return len(parts) == 2 and all(p and p == p.strip() for p in parts)
+
+    @property
+    def active(self) -> bool:
+        return self.ENABLED and self.configured
 
 
 BUSINESS_SETTINGS = BusinessSettings()

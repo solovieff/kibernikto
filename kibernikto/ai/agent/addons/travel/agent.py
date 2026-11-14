@@ -8,7 +8,11 @@ from pydantic_ai.usage import UsageLimits
 from pydantic_ai_harness.subagents import SubAgent
 
 from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
+from kibernikto.ai.agent.addons.travel.kiwi.config import KIWI_SETTINGS
+from kibernikto.ai.agent.addons.travel.travala.agent import build_travala_expert
+from kibernikto.ai.agent.addons.travel.travala.config import TRAVALA_SETTINGS
 from kibernikto.ai.agent.addons.travel.tutu.agent import build_tutu_expert
+from kibernikto.ai.agent.addons.travel.tutu.config import TUTU_SETTINGS
 from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent, default_model_settings
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents, resolve_expert_model
 from kibernikto.ai.agent.harness.expert_memory import expert_memory
@@ -18,15 +22,22 @@ from ._prompts import TRAVEL_INSTRUCTIONS, TRAVEL_MEMORY_GUIDANCE, TRAVEL_MEMORY
 from .config import TRAVEL_SETTINGS, TravelSettings
 
 TRAVEL_EXPERT_NAME = 'travel'
-# Coordinator only dispatches to tutu/kiwi; keep its tool-call ceiling tight.
+# Coordinator only dispatches to tutu/kiwi/travala; keep its tool-call ceiling tight.
 COORDINATOR_MAX_TOOL_CALLS = 8
+
+
+def _enabled_specialists() -> list[SubAgent]:
+    """Specialists whose own ENABLED switch is on; tutu first (default for flights)."""
+    candidates = ((TUTU_SETTINGS, build_tutu_expert), (KIWI_SETTINGS, build_kiwi_expert),
+                  (TRAVALA_SETTINGS, build_travala_expert))
+    return [build() for specialist_settings, build in candidates if specialist_settings.ENABLED]
 
 
 def build_travel_expert(*, settings: TravelSettings = TRAVEL_SETTINGS, model: Model | None = None,
                         experts: list[SubAgent] | None = None,
                         shared_capabilities: Sequence[AgentCapability[TelegramDeps]] = ()) -> SubAgent:
     """Build the coordinator; its isolated delegates share the caller's deps and usage."""
-    children = experts if experts is not None else [build_tutu_expert(), build_kiwi_expert()]
+    children = experts if experts is not None else _enabled_specialists()
     roster = KiberniktoSubAgents(agents=children, agent_folders=None, contain_errors=True,
                                 shared_capabilities=shared_capabilities)
     agent = build_kibernikto_agent(
@@ -39,7 +50,7 @@ def build_travel_expert(*, settings: TravelSettings = TRAVEL_SETTINGS, model: Mo
     )
     return SubAgent(agent, name=TRAVEL_EXPERT_NAME,
                     description=(
-                        'Живой поиск путешествий: авиабилеты, отели, поезда, автобусы и электрички через Туту и Kiwi. '
+                        'Живой поиск путешествий: авиабилеты, жильё (отели, апартаменты, дома), поезда, автобусы и электрички через Туту, Kiwi и Travala. '
                         'Только поиск предложений и расписаний, не для общих советов о городах, визах и погоде.'
                     ),
                     usage_limits=UsageLimits(tool_calls_limit=min(settings.MAX_TOOL_CALLS, COORDINATOR_MAX_TOOL_CALLS)))

@@ -51,6 +51,17 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
                 with self.subTest(token=bad):
                     self.assertFalse(config.BusinessSettings(_env_file=None, DADATA_TOKEN=bad).configured)
 
+    async def test_expert_is_opt_in_and_needs_a_token(self):
+        business_module()
+        config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
+        token = 'demo-api:demo-secret'
+        self.assertFalse(config.BusinessSettings(_env_file=None).ENABLED)
+        off = config.BusinessSettings(_env_file=None, DADATA_TOKEN=token)
+        self.assertTrue(off.configured)
+        self.assertFalse(off.active)
+        self.assertTrue(config.BusinessSettings(_env_file=None, DADATA_TOKEN=token, ENABLED=True).active)
+        self.assertFalse(config.BusinessSettings(_env_file=None, ENABLED=True).active)
+
     async def test_authorization_uses_bearer_auth_not_url(self):
         business = business_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
@@ -122,7 +133,8 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
         business_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         from pydantic import SecretStr
-        with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('bad-secret-token')), \
+        with patch.object(config.BUSINESS_SETTINGS, 'ENABLED', True), \
+             patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('bad-secret-token')), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', False), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
              self.assertLogs('kibernikto.ai.agent.telegram.multi_agent', level='WARNING') as logs:
@@ -152,7 +164,8 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
             if any(p.part_kind == 'retry-prompt' for m in messages for p in m.parts):
                 return ModelResponse(parts=[TextPart('expert unavailable')])
             return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'business', 'task': 'find company'})])
-        with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('demo-api:demo-secret')), \
+        with patch.object(config.BUSINESS_SETTINGS, 'ENABLED', True), \
+             patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('demo-api:demo-secret')), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', False), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
              patch('kibernikto.ai.agent.addons.business.agent.build_business_expert', return_value=expert), \
@@ -175,9 +188,11 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
         config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         from kibernikto.ai.agent.harness.credit_tier import CreditTier
         from pydantic import SecretStr
-        with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('demo-api:demo-secret')), \
+        with patch.object(config.BUSINESS_SETTINGS, 'ENABLED', True), \
+             patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('demo-api:demo-secret')), \
              patch.object(config.BUSINESS_SETTINGS, 'MIN_CREDITS', 2000), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', True), \
+             patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
              patch.object(TRAVEL_SETTINGS, 'MIN_CREDITS', 3000), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
             parent = build_multi_agent()

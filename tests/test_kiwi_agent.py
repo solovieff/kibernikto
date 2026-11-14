@@ -25,7 +25,7 @@ class KiwiSettingsTests(unittest.TestCase):
     def test_defaults_and_env(self):
         settings = KiwiSettings(_env_file=None)
         self.assertEqual(settings.MCP_URL, 'https://mcp.kiwi.com')
-        with patch.dict(os.environ, {'AGENT_KIWI_MAX_TOOL_CALLS': '30'}):
+        with patch.dict(os.environ, {'AGENT_TRAVEL_KIWI_MAX_TOOL_CALLS': '30'}):
             self.assertEqual(KiwiSettings(_env_file=None).MAX_TOOL_CALLS, 30)
 
 
@@ -34,7 +34,7 @@ class KiwiSettingsTests(unittest.TestCase):
         self.assertEqual(settings.MODEL_MAX_TOKENS, 8192)
         expert = build_kiwi_expert(settings=settings, model=TestModel(), toolset=FunctionToolset())
         self.assertEqual(expert.agent.model_settings['max_tokens'], 8192)
-        with patch.dict(os.environ, {'AGENT_KIWI_MODEL_MAX_TOKENS': '12000'}):
+        with patch.dict(os.environ, {'AGENT_TRAVEL_KIWI_MODEL_MAX_TOKENS': '12000'}):
             configured = KiwiSettings(_env_file=None)
             self.assertEqual(build_kiwi_expert(settings=configured, model=TestModel(),
                                                toolset=FunctionToolset()).agent.model_settings['max_tokens'], 12000)

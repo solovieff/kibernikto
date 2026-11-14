@@ -179,6 +179,7 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
                 def factory(**kwargs):
                     return build_travel_expert(model=scripted_model(delegate), experts=[child], **kwargs)
                 with patch.object(TRAVEL_SETTINGS, 'ENABLED', True), \
+                     patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
                      patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
                      patch('kibernikto.ai.agent.addons.travel.agent.build_travel_expert', side_effect=factory), \
                      patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
@@ -198,3 +199,71 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
         from pydantic_ai.models.test import TestModel
         result = await image_agent.run('hi', model=TestModel(call_tools=[]))
         self.assertEqual((image_agent.name, result.metadata['reaction']), ('image-agent', '✍'))
+
+
+def telegram_allowed_emojis() -> set[str]:
+    """Reaction emojis Telegram accepts; the list lives in the ReactionTypeEmoji field docstring."""
+    import inspect
+    import re
+    return set(re.findall(r'"([^",.]+)"', inspect.getsource(ReactionTypeEmoji).split('one of', 1)[1]))
+
+
+class ReactionEmojiAllowedTest(unittest.IsolatedAsyncioTestCase):
+    def test_hardcoded_reactions_are_telegram_allowed(self):
+        import re
+        from pathlib import Path
+        allowed = telegram_allowed_emojis()
+        self.assertIn('👍', allowed)
+        root = Path(__file__).resolve().parent.parent / 'kibernikto'
+        used = {m for p in root.rglob('*.py') for m in re.findall(r"""['"]reaction['"]:\s*['"]([^'"]+)['"]""", p.read_text())}
+        self.assertTrue(used)
+        self.assertEqual(used - allowed, set())
+
+    def test_configured_defaults_are_telegram_allowed(self):
+        import inspect
+        from kibernikto.ai.agent.core.config import AgentKiberniktoSettings
+        from kibernikto.ai.agent.telegram.peer_agent import TelegramPeerAgent
+        allowed = telegram_allowed_emojis()
+        defaults = {
+            'AGENT_KIBERNIKTO_REACTION': AgentKiberniktoSettings.model_fields['REACTION'].default,
+            'AgentReaction.steered_reaction': AgentReaction.steered_reaction,
+            'TelegramPeerAgent.reaction': inspect.signature(TelegramPeerAgent.__init__).parameters['reaction'].default,
+        }
+        for name, emoji in defaults.items():
+            with self.subTest(source=name):
+                self.assertIn(emoji, allowed)
+
+    async def test_every_built_expert_reaction_is_telegram_allowed(self):
+        from pydantic import SecretStr
+        from pydantic_ai.models.test import TestModel
+        from pydantic_ai.toolsets import FunctionToolset
+        from kibernikto.ai.agent.addons.business.agent import build_business_expert
+        from kibernikto.ai.agent.addons.business.config import BusinessSettings
+        from kibernikto.ai.agent.addons.travel.agent import build_travel_expert
+        from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert
+        from kibernikto.ai.agent.addons.travel.travala.agent import build_travala_expert
+        from kibernikto.ai.agent.addons.travel.tutu.agent import build_tutu_expert
+        from kibernikto.ai.agent.addons.vkusvill.agent import build_vkusvill_expert
+        from kibernikto.ai.agent.addons.vkusvill.config import VkusvillSettings
+        from kibernikto.ai.agent.harness.web import _web_expert
+
+        model, tools = TestModel(call_tools=[]), FunctionToolset()
+        with patch('kibernikto.ai.agent.addons.vkusvill.agent.build_vkusvill_toolset', return_value=tools), \
+             patch('kibernikto.ai.agent.harness.delegation.infer_kibernikto_model', return_value=model), \
+             patch('kibernikto.ai.agent.harness.web.infer_kibernikto_model', return_value=model):
+            agents = [
+                image_agent,
+                _web_expert('openrouter:test/offline'),
+                build_travel_expert(model=model, experts=[]).agent,
+                build_tutu_expert(model=model, toolset=tools).agent,
+                build_kiwi_expert(model=model, toolset=tools).agent,
+                build_travala_expert(model=model, toolset=tools).agent,
+                build_business_expert(settings=BusinessSettings(_env_file=None, DADATA_TOKEN=SecretStr('fake:fake')),
+                                      model=model, toolset=tools).agent,
+                build_vkusvill_expert(VkusvillSettings(_env_file=None, MODEL_NAME='openrouter:test/offline')).agent,
+            ]
+        allowed = telegram_allowed_emojis()
+        for agent in agents:
+            with self.subTest(agent=agent.name):
+                result = await agent.run('hi', model=model, deps=TelegramDeps())
+                self.assertIn(result.metadata['reaction'], allowed)

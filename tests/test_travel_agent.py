@@ -160,9 +160,9 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         from kibernikto.ai.agent.addons.travel.tutu._prompts import TUTU_INSTRUCTIONS
         text = TUTU_INSTRUCTIONS.lower()
         self.assertIn('elapsed_minutes', text)
-        self.assertIn('пересад', text)
-        self.assertIn('актуальн', text)
-        self.assertIn('цена', text)
+        self.assertIn('connection', text)
+        self.assertIn('may change', text)
+        self.assertIn('price', text)
 
     async def test_parent_delegates_through_travel_to_tutu_and_denies_low_credit_and_groups(self):
         travel, tutu_agent = travel_module(), tutu_module()
@@ -199,6 +199,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
             return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'travel', 'task': 'find hotel'})])
 
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
+             patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
              patch('kibernikto.ai.agent.addons.travel.agent.build_travel_expert', return_value=expert), \
              patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
@@ -220,6 +221,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         from kibernikto.ai.agent.harness.credit_tier import CreditTier
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
+             patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
             parent = build_multi_agent()
             found = []
@@ -236,11 +238,33 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_default_travel_roster_includes_both_sources(self):
         travel = travel_module()
-        agent = travel.build_travel_expert(model=TestModel()).agent
+        from kibernikto.ai.agent.addons.travel.kiwi.config import KIWI_SETTINGS
+        from kibernikto.ai.agent.addons.travel.travala.config import TRAVALA_SETTINGS
+        from kibernikto.ai.agent.addons.travel.tutu.config import TUTU_SETTINGS
+        with patch.object(KIWI_SETTINGS, 'ENABLED', True), patch.object(TRAVALA_SETTINGS, 'ENABLED', True), \
+             patch.object(TUTU_SETTINGS, 'ENABLED', True):
+            agent = travel.build_travel_expert(model=TestModel()).agent
         from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
         rosters = []
         agent.root_capability.apply(lambda c: rosters.append(c) if isinstance(c, KiberniktoSubAgents) else None)
-        self.assertEqual({a.name for r in rosters for a in r.agents}, {'kiwi', 'tutu'})
+        self.assertEqual({a.name for r in rosters for a in r.agents}, {'kiwi', 'tutu', 'travala'})
+
+    async def test_specialist_enabled_flags_trim_roster_and_coordinator(self):
+        travel = travel_module()
+        from kibernikto.ai.agent.addons.travel.kiwi.config import KIWI_SETTINGS
+        from kibernikto.ai.agent.addons.travel.travala.config import TRAVALA_SETTINGS
+        from kibernikto.ai.agent.addons.travel.tutu.config import TUTU_SETTINGS
+        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
+        for cls in (type(KIWI_SETTINGS), type(TRAVALA_SETTINGS), type(TUTU_SETTINGS)):
+            self.assertFalse(cls(_env_file=None).ENABLED)
+        with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
+             patch.object(TUTU_SETTINGS, 'ENABLED', True), \
+             patch.object(KIWI_SETTINGS, 'ENABLED', False), patch.object(TRAVALA_SETTINGS, 'ENABLED', False):
+            self.assertEqual([a.name for a in travel._enabled_specialists()], ['tutu'])
+            self.assertTrue(config.TRAVEL_SETTINGS.active)
+            with patch.object(TUTU_SETTINGS, 'ENABLED', False):
+                self.assertEqual(travel._enabled_specialists(), [])
+                self.assertFalse(config.TRAVEL_SETTINGS.active)
 
     async def test_defaults_flags_and_shop_are_independent(self):
         travel_module()
@@ -252,6 +276,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
             for shop_on in (False, True):
                 with self.subTest(travel=travel_on, shop=shop_on), \
                      patch.object(config.TRAVEL_SETTINGS, 'ENABLED', travel_on), \
+                     patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
                      patch.object(VKUSVILL_SETTINGS, 'ENABLED', shop_on):
                     parent = build_multi_agent()
                     rosters = []
@@ -266,6 +291,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         travel_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
+             patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
              patch.object(config.TRAVEL_SETTINGS, 'MIN_CREDITS', 2000), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', True), \
              patch.object(VKUSVILL_SETTINGS, 'MIN_CREDITS', 2500):
@@ -285,6 +311,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         from kibernikto.ai.agent.harness.credit_tier import CreditTier
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
+             patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
              patch.object(config.TRAVEL_SETTINGS, 'MIN_CREDITS', 0), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
             parent = build_multi_agent()

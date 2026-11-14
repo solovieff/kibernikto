@@ -27,7 +27,7 @@ fields change often — read them in source, don't trust a remembered list.
 | Telegram agent + active bridge | `kibernikto/ai/agent/telegram/telegram_agent.py`, `kibernikto/telegram/bridge.py` |
 | Voice replies, settings and delivery | `kibernikto/ai/agent/telegram/speech_reply.py`, `kibernikto/ai/speech.py`, `kibernikto/telegram/utils/voice.py` |
 | Multi-agent orchestrator (parent wiring) | `kibernikto/ai/agent/telegram/multi_agent.py` |
-| App integrations (`vkusvill`, `business`, `travel` + `tutu` + `kiwi`): each has `config.py`, `_prompts.py`, `agent.py` | `kibernikto/ai/agent/addons/` |
+| App integrations (`vkusvill`, `business`, `travel` + `tutu` + `kiwi` + `travala`): each has `config.py`, `_prompts.py`, `agent.py` | `kibernikto/ai/agent/addons/` |
 | VkusVill MCP agent (`main.py --vkusvill`) | `kibernikto/ai/agent/addons/vkusvill/` |
 | Harness capabilities (transport-free, keyed on `RunContext.conversation_id`): `CreditTier`, `chat_memory`, delegation roster, web layout, experts | `kibernikto/ai/agent/harness/` |
 | Bot, Dispatcher, middleware order, lifecycle | `kibernikto/telegram/agent/telegram_app.py` |
