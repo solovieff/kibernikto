@@ -20,6 +20,14 @@ class AgentKiberniktoSettings(BaseSettings):
         default="👀", description="Parent agent's reaction on the user's message at run start; empty = none",
     )
 
+    BACKGROUND_AFTER: float = Field(
+        default=20.0, description="Seconds after which a running delegation moves to the background; 0 = never",
+    )
+
+    BACKGROUND_MAX: int = Field(
+        default=3, ge=0, description="Max delegations of one chat working in the background; 0 = no limit",
+    )
+
     HISTORY_SIZE: int = Field(default=6, description="History size")
     KEEP_THINKING_IN_HISTORY: bool = Field(
         default=False,

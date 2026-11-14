@@ -68,7 +68,7 @@ class _ActiveConversationTracker(AbstractCapability[KiberniktoDeps]):
     def get_serialization_name(cls) -> str | None:
         return None
 
-    def _default_conversation_id(self, run_id: str) -> str | None:
+    def get_default_conversation_id(self, run_id: str) -> str | None:
         return ""  # Anonymous runs stay anonymous: no random UUID for storage/billing to latch onto.
 
     def get_ordering(self) -> CapabilityOrdering | None:

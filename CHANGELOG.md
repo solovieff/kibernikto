@@ -2,9 +2,17 @@
 
 ## Unreleased
 
+### Changed
+- Upgraded `pydantic-ai`/`pydantic-ai-slim` to 2.68 and `pydantic-ai-harness` to 0.68. Memory snapshots are now recognised by dict metadata (`origin`) when sanitising history, and the anonymous-run guard uses the new `get_default_conversation_id` hook.
+
+### Fixed
+- `BackgroundDelegation` no longer keeps the deps (and their attachment binaries) of every conversation's last run forever: the entry is dropped once the run ended and none of its tasks is still running or being delivered.
+
 ### Added
+- `AGENT_KIBERNIKTO_BACKGROUND_MAX` (default 3, `0` = no limit): a chat with that many delegations already in the background gets further `delegate_task` calls refused with "wait for the reports" (the tool is skipped, not retried), and a slow foreground task stays in the foreground.
+- Background delegation (`BackgroundDelegation`, `AGENT_KIBERNIKTO_BACKGROUND_AFTER`, default 20 s, `0` disables): a top-level `delegate_task` still running after the threshold moves to the background, the parent answers the user with an acceptance note, and the finished report starts a new run in the same chat (`TelegramBridge._deliver_report`). Inert outside `TelegramApp`; tasks are lost on restart.
 - `AgentReaction.tool_reactions` (default: a pool of Telegram-allowed emojis): each tool call of a delegate (the root keeps its own emoji) sets a random emoji from the pool, never repeating the current one, so the reaction visibly changes while the expert works; an empty tuple disables it.
-- `AgentReaction.reaction_interval` (default 2.5 s, `0` disables): one run-wide throttle inside `AgentReaction._set`, shared by every reaction source (agent start, root and delegate tool calls) across the whole agent tree, so bursts and parallel calls send a single `setMessageReaction`.
+- `AgentReaction.reaction_interval` (default 5 s, `0` disables; `background_interval`, default 30 s, applies while a delegation of the run works in the background): one run-wide throttle inside `AgentReaction._set`, shared by every reaction source (agent start, root and delegate tool calls) across the whole agent tree, so bursts and parallel calls send a single `setMessageReaction`.
 - `APP_REACTIONS_ENABLED` (default `true`): master switch for every Telegram reaction (agent emojis, tool-call emojis, steered ✍). `AgentReaction(enabled=...)` overrides it per instance.
 - `AgentReaction.react(ctx, deps, emoji)` is the single entry point that sets the reaction.
 - `AgentReaction` sends reactions fire-and-forget (tasks tracked in `deps.extra`): the agent no longer waits for Telegram.

@@ -17,6 +17,7 @@ from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.models import ModelRequestContext
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.harness.background import BACKGROUND_TASKS
 from kibernikto.config import APP_SETTINGS
 
 from .deps import TelegramDeps
@@ -41,7 +42,7 @@ class AgentReaction(AbstractCapability[KiberniktoDeps]):
     to the delegate's own emoji. Any tool call reacts: the root with its own emoji, a delegate with a random
     one from ``tool_reactions`` (never the current one, so every change is visible). Whatever the source,
     every reaction goes through ``_set`` and its single throttle: at most one per ``reaction_interval`` seconds
-    per run across the whole agent tree, so bursts and parallel calls cannot flood Telegram.
+    (``background_interval`` while a delegation works in the background) per run across the whole agent tree, so bursts and parallel calls cannot flood Telegram.
     Bind it on the parent and in ``SubAgents(shared_capabilities=...)`` so delegates
     react too. Cosmetic: Telegram failures are logged and never fail the run; they are sent fire-and-forget,
     so the agent never waits for Telegram. The capability alone owns every reaction rule (emoji choice, throttle,
@@ -54,7 +55,8 @@ class AgentReaction(AbstractCapability[KiberniktoDeps]):
     skip_tools: frozenset[str] = frozenset({"delegate_task"})
     steered_reaction: str | None = "✍"
     tool_reactions: tuple[str, ...] = ("🤔", "👀", "🤓", "🔥", "🤨", "😎", "🫡", "⚡")  # Empty: no tool reactions.
-    reaction_interval: float = 2.5  # Min seconds between reactions in one run, whatever their source; 0 disables.
+    reaction_interval: float = 5.0  # Min seconds between reactions in one run, whatever their source; 0 disables.
+    background_interval: float = 30.0  # Same, while a delegated task works in the background (slow, so rarer).
 
     @classmethod
     def get_serialization_name(cls) -> str | None:
@@ -108,7 +110,8 @@ class AgentReaction(AbstractCapability[KiberniktoDeps]):
             return
         key = (deps.message.message_id, emoji)
         now = time.monotonic()
-        if deps.extra.get(_CURRENT) == key or now - deps.extra.get(_SENT_AT, -math.inf) < self.reaction_interval:
+        interval = self.background_interval if deps.extra.get(BACKGROUND_TASKS) else self.reaction_interval
+        if deps.extra.get(_CURRENT) == key or now - deps.extra.get(_SENT_AT, -math.inf) < interval:
             return  # Duplicate or throttled; claimed before any await, so parallel calls see it too.
         deps.extra[_CURRENT] = key
         deps.extra[_SENT_AT] = now

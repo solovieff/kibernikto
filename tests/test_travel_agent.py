@@ -118,7 +118,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(tools), {'search_avia', 'search_hotels', 'get_offer_details', 'create_checkout_link'})
 
         def force_forbidden(messages, info):
-            if any(p.part_kind == 'retry-prompt' for m in messages for p in m.parts):
+            if any((p.part_kind == 'retry-prompt' or getattr(p, 'outcome', None) == 'retried') for m in messages for p in m.parts):
                 return ModelResponse(parts=[TextPart('not allowed')])
             return ModelResponse(parts=[ToolCallPart('register_checkout_passengers', {})])
 
@@ -143,9 +143,9 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         tutu_agent = tutu_module()
         def model(messages, info):
             parts = [p for m in messages for p in m.parts]
-            if any(isinstance(p, ToolReturnPart) and p.tool_name == 'elapsed_minutes' for p in parts):
+            if any(isinstance(p, ToolReturnPart) and p.tool_name == 'elapsed_minutes' and p.outcome == 'success' for p in parts):
                 return ModelResponse(parts=[TextPart('duration calculated')])
-            if any(p.part_kind == 'retry-prompt' for p in parts):
+            if any((p.part_kind == 'retry-prompt' or getattr(p, 'outcome', None) == 'retried') for p in parts):
                 args = {'departure': '2027-01-27T21:15:00+03:00', 'arrival': '2027-01-28T18:50:00+07:00'}
             else:
                 args = {'departure': '2027-01-27T21:15:00', 'arrival': '2027-01-28T18:50:00+07:00'}
@@ -153,7 +153,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         agent = tutu_agent.build_tutu_expert(model=FunctionModel(model), toolset=FunctionToolset()).agent
         result = await agent.run('calculate total travel time', deps=TelegramDeps())
         results = [p.content for m in result.all_messages() for p in m.parts
-                   if isinstance(p, ToolReturnPart) and p.tool_name == 'elapsed_minutes']
+                   if isinstance(p, ToolReturnPart) and p.tool_name == 'elapsed_minutes' and p.outcome == 'success']
         self.assertEqual(results, [1055])
 
     async def test_tutu_instruction_requires_timezone_calculation_and_honest_freshness(self):
@@ -194,7 +194,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
             returns = [p for m in messages for p in m.parts if isinstance(p, ToolReturnPart)]
             if returns:
                 return ModelResponse(parts=[TextPart(str(returns[-1].content))])
-            if any(p.part_kind == 'retry-prompt' for m in messages for p in m.parts):
+            if any((p.part_kind == 'retry-prompt' or getattr(p, 'outcome', None) == 'retried') for m in messages for p in m.parts):
                 return ModelResponse(parts=[TextPart('expert unavailable')])
             return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'travel', 'task': 'find hotel'})])
 
@@ -329,7 +329,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         bad.add_function(fail, name='search_hotels')
         child = tutu_agent.build_tutu_expert(model=TestModel(), toolset=bad)
         def middle(messages, info):
-            if any(p.part_kind == 'retry-prompt' for m in messages for p in m.parts):
+            if any((p.part_kind == 'retry-prompt' or getattr(p, 'outcome', None) == 'retried') for m in messages for p in m.parts):
                 return ModelResponse(parts=[TextPart('provider unavailable')])
             return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'tutu', 'task': 'find hotel'})])
         expert = travel.build_travel_expert(model=FunctionModel(middle), experts=[child])

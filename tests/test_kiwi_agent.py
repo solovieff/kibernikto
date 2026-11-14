@@ -62,7 +62,7 @@ class KiwiMCPTests(unittest.IsolatedAsyncioTestCase):
 
         # A model cannot call feedback: the tool manager sees only the filtered definitions.
         def force_feedback(messages, info):
-            if any(part.part_kind == 'retry-prompt' for m in messages for part in m.parts):
+            if any((part.part_kind == 'retry-prompt' or getattr(part, 'outcome', None) == 'retried') for m in messages for part in m.parts):
                 return ModelResponse(parts=[TextPart('not allowed')])
             return ModelResponse(parts=[ToolCallPart('feedback-to-devs', {'text': 'x'})])
 

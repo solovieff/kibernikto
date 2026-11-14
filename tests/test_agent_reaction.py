@@ -111,6 +111,16 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
         await run(build(parent='👀', child='✍', child_calls=(LOOKUP,) * 5), message)  # Default interval.
         self.assertEqual(emojis(message), ['✍'])  # One shared window: the tool calls right after the start fall in it.
 
+    async def test_background_work_slows_reactions_down(self) -> None:
+        message = user_message()
+        clock = iter(range(0, 100, 10))
+        deps = TelegramDeps(message=message, extra={'background_tasks': {'task-1'}})
+        with patch('kibernikto.ai.agent.telegram.agent_reaction.time') as fake_time:
+            fake_time.monotonic.side_effect = lambda: next(clock)
+            await build(parent='👀', child='✍', child_calls=(LOOKUP,) * 3).run('hi', deps=deps)
+        await asyncio.gather(*deps.extra.get('reaction_tasks', ()))
+        self.assertEqual(len(emojis(message)), 2)  # 10s apart: passes 5s but not the 30s background window, so 0s and 30s.
+
     async def test_throttle_is_shared_by_every_source(self) -> None:
         message = user_message()
         await run(build(parent='👀', child='✍', calls=(LOOKUP, DELEGATE)), message)
@@ -123,7 +133,7 @@ class AgentReactionTests(unittest.IsolatedAsyncioTestCase):
         with patch('kibernikto.ai.agent.telegram.agent_reaction.time') as fake_time:
             fake_time.monotonic.side_effect = lambda: next(clock)
             await run(build(parent='👀', child='✍', child_calls=(LOOKUP,) * 3), message)
-        self.assertEqual(len(emojis(message)), 4)  # Each call is 10s apart: all pass the 2.5s window.
+        self.assertEqual(len(emojis(message)), 4)  # Each call is 10s apart: all pass the 5s window.
 
     async def test_parallel_tool_calls_send_one_reaction(self) -> None:
         message = user_message()

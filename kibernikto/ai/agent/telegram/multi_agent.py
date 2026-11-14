@@ -9,6 +9,7 @@ from pydantic_ai import Agent, ModelSettings
 from pydantic_ai_harness.subagents import SubAgent
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
+from kibernikto.ai.agent.harness.background import BackgroundDelegation
 from kibernikto.ai.agent.harness.conversation_memory import ConversationMemory
 from kibernikto.ai.agent.harness.credit_tier import CreditTier
 from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
@@ -106,7 +107,10 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
         reaction=AGENT_KIBERNIKTO_SETTINGS.REACTION,
         history_storage=get_history_storage(name),
         # Memory/recall live on the parent: no extra LLM hop per remembered fact.
-        capabilities=[CreditTier(extra_features=gated_thresholds), ConversationMemory(name), *web_capabilities, roster],
+        capabilities=[
+            CreditTier(extra_features=gated_thresholds), ConversationMemory(name), *web_capabilities, roster,
+            BackgroundDelegation(),
+        ],
     )
 
 

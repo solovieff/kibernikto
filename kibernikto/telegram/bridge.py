@@ -5,12 +5,16 @@ import logging
 import random
 import re
 from collections import OrderedDict
+from dataclasses import replace
 
 from aiogram.enums import ChatType
 from aiogram.types import BufferedInputFile, Message, ReplyParameters
 from pydantic_ai import Agent, AgentRunResult, ModelHTTPError
+from pydantic_ai.messages import BinaryContent
+from pydantic_ai_harness.subagents import DelegationTask
 
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError, map_model_error
+from kibernikto.ai.agent.harness.background import background_of, report_prompt
 from kibernikto.ai.agent.harness.conversation_history import history_storage_of, is_steered
 from kibernikto.ai.agent.telegram.chat_context import get_chat_context
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
@@ -41,6 +45,9 @@ class TelegramBridge:
         self.pre_processor = pre_processor or TelegramMessagePreprocessor()
         self.capture_peer_media = capture_peer_media
         self._peer_requests: OrderedDict[tuple[int, int, str], None] = OrderedDict()
+        self.background = background_of(agent) if agent is not None else None
+        if self.background is not None and self.background.deliver is None:
+            self.background.deliver = self._deliver_report
 
     @property
     def history_storage(self) -> HistoryStorage | None:
@@ -146,6 +153,17 @@ class TelegramBridge:
             logger.exception(error)
             reason = 'Remote model failed' if isinstance(error, ModelHTTPError) else 'Remote execution failed'
             return PeerEnvelope.create('error', reason, [], request_id=envelope.request_id)
+
+    async def _deliver_report(self, task: DelegationTask, origin: TelegramDeps, binaries: list[BinaryContent]) -> None:
+        """Feed a finished background task to the agent as a new run in its chat and send the answer."""
+        message = origin.message
+        if message is None:
+            raise RuntimeError("background task has no chat message to reply to")
+        deps = replace(origin, attachments=list(binaries), chat_info=await chat_data.load(task.conversation_id))
+        result = await self.agent.run(report_prompt(task), conversation_id=task.conversation_id, deps=deps)
+        if is_steered(result):
+            return  # A live run of this chat took the report and answers it.
+        await self.reply_to(message, result)
 
     async def reply_to(self, message: Message, result: AgentRunResult | PeerEnvelope | str | None) -> None:
         """Send the agent's response back to the chat (no-op if ``None``).

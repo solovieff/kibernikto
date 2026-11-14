@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import AsyncExitStack
 from typing import TYPE_CHECKING
 
 from aiogram import Bot, Dispatcher
@@ -71,6 +72,8 @@ class TelegramApp:
         dispatcher.include_router(reset_router)
         dispatcher.include_router(conversation_router)
 
+        lifespan = AsyncExitStack()  # Background delegation owner lives as long as polling.
+
         # Startup hook: DB tables + bot identity + optional greeting.
         async def _on_startup(bot: Bot) -> None:
             from kibernikto.storage.config import STORAGE_SETTINGS
@@ -83,6 +86,8 @@ class TelegramApp:
             identity = await fetch_bot_identity(bot)
             set_bot_identity(identity)
             await set_bot_commands(bot)
+            if bridge.background is not None:
+                await lifespan.enter_async_context(bridge.background.opened())
             logger.info("Bot started as @%s | %s", identity.username, identity.as_prompt())
             if TELEGRAM_SETTINGS.SAY_HI:
                 from kibernikto.telegram.utils.conversation import send_random_sticker
@@ -99,6 +104,7 @@ class TelegramApp:
             from kibernikto.storage.factory import shutdown_storage
             from kibernikto.utils.image_hosting import image_hosting
 
+            await lifespan.aclose()
             await shutdown_storage()
             await image_hosting.aclose()
 

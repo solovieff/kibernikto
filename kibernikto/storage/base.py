@@ -26,6 +26,12 @@ def deserialize_messages(raw) -> List[ModelMessage]:
     return _model_message_adapter.validate_python(raw)
 
 
+def _is_memory_snapshot(metadata: object) -> bool:
+    """True for the harness memory marker: a dict with ``origin`` (>=0.6x) or a legacy ``origin:scope`` string."""
+    origin = metadata.get("origin") if isinstance(metadata, dict) else metadata
+    return isinstance(origin, str) and origin.startswith("pydantic-ai-harness.memory")
+
+
 def _sanitize(messages: List[ModelMessage], *, keep_thinking: bool = False) -> List[ModelMessage]:
     """Drop instructions, binaries and reasoning so persisted history stays small.
 
@@ -54,13 +60,13 @@ def _sanitize(messages: List[ModelMessage], *, keep_thinking: bool = False) -> L
                 if isinstance(content, list):
                     filtered_subparts = [
                         sub for sub in content
-                        if not (hasattr(sub, "metadata") and isinstance(sub.metadata, str) and "pydantic-ai-harness.memory" in sub.metadata)
+                        if not _is_memory_snapshot(getattr(sub, "metadata", None))
                     ]
                     if len(filtered_subparts) != len(content):
                         if not filtered_subparts:
                             continue
                         part = dataclasses.replace(part, content=filtered_subparts)
-                elif hasattr(part, "metadata") and isinstance(part.metadata, str) and "pydantic-ai-harness.memory" in part.metadata:
+                elif _is_memory_snapshot(getattr(part, "metadata", None)):
                     continue
                 parts.append(part)
             if msg.instructions is not None or len(parts) != len(msg.parts):

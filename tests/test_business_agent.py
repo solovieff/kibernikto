@@ -89,7 +89,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
             tools = await toolset.get_tools(self.context(3000, True))
         self.assertEqual(set(tools), {'find_party', 'clean_address', 'find_company_by_email', 'find_company_by_domain'})
         def model(messages, info):
-            if any(p.part_kind == 'retry-prompt' for m in messages for p in m.parts):
+            if any((p.part_kind == 'retry-prompt' or getattr(p, 'outcome', None) == 'retried') for m in messages for p in m.parts):
                 return ModelResponse(parts=[TextPart('not allowed')])
             return ModelResponse(parts=[ToolCallPart('future_write', {})])
         agent = business.build_business_expert(model=FunctionModel(model), toolset=server).agent
@@ -161,7 +161,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
             returns = [p for m in messages for p in m.parts if isinstance(p, ToolReturnPart)]
             if returns:
                 return ModelResponse(parts=[TextPart(str(returns[-1].content))])
-            if any(p.part_kind == 'retry-prompt' for m in messages for p in m.parts):
+            if any((p.part_kind == 'retry-prompt' or getattr(p, 'outcome', None) == 'retried') for m in messages for p in m.parts):
                 return ModelResponse(parts=[TextPart('expert unavailable')])
             return ModelResponse(parts=[ToolCallPart('delegate_task', {'agent_name': 'business', 'task': 'find company'})])
         with patch.object(config.BUSINESS_SETTINGS, 'ENABLED', True), \
