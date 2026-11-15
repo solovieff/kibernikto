@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kibernikto — multi-agent AI framework with a Telegram body</title>
+<meta name="description" content="Kibernikto is a multi-agent AI framework built on pydantic-ai and aiogram 3. Run it as a ready Telegram bot, or use a plain pydantic_ai.Agent as the core of your own app.">
+<meta name="theme-color" content="#08090c">
+<meta property="og:title" content="Kibernikto">
+<meta property="og:description" content="A multi-agent AI framework with a Telegram body. Built on pydantic-ai and aiogram 3.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2308090c'/%3E%3Cpath d='M9 8v16M9 16l9-8M9 16l9 8' stroke='%235eead4' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='16' r='2.4' fill='%23a78bfa'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #08090c;
+    --bg-raised: #0f1116;
+    --line: #1e2128;
+    --line-soft: #171a20;
+    --ink: #e8eaef;
+    --ink-dim: #9aa1b0;
+    --ink-faint: #666d7d;
+    --mint: #5eead4;
+    --violet: #a78bfa;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    --max: 1080px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Faint grid + accent bloom, no images required. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 20%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 20%, transparent 75%);
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    top: -340px;
+    left: 50%;
+    width: 900px;
+    height: 700px;
+    transform: translateX(-50%);
+    z-index: -1;
+    background: radial-gradient(circle, rgba(94,234,212,.10) 0%, rgba(167,139,250,.07) 40%, transparent 68%);
+    pointer-events: none;
+  }
+
+  ::selection { background: rgba(94,234,212,.25); }
+
+  .wrap {
+    width: 100%;
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  a { color: var(--mint); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---------- nav ---------- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    background: rgba(8,9,12,.72);
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 62px;
+    gap: 16px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink);
+    font-weight: 640;
+    letter-spacing: -.01em;
+  }
+  .brand:hover { text-decoration: none; }
+  .brand svg { display: block; }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 13.5px;
+  }
+  .nav-links a { color: var(--ink-dim); }
+  .nav-links a:hover { color: var(--ink); text-decoration: none; }
+
+  .nav-cta {
+    color: var(--ink) !important;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 13px;
+    font-size: 13px;
+    font-weight: 550;
+    background: var(--bg-raised);
+    transition: border-color .18s ease, background .18s ease;
+  }
+  .nav-cta:hover { border-color: #2e333d; background: #14171d; }
+
+  .nav-cta.bot {
+    color: #04231f !important;
+    border-color: var(--mint);
+    background: var(--mint);
+  }
+  .nav-cta.bot:hover { background: #7df3e0; border-color: #7df3e0; }
+
+  @media (max-width: 980px) {
+    .nav-links a:not(.nav-cta) { display: none; }
+  }
+
+  /* ---------- hero ---------- */
+  .hero {
+    padding: 92px 0 76px;
+    text-align: center;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    background: var(--bg-raised);
+    border-radius: 999px;
+    padding: 5px 13px 5px 9px;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    letter-spacing: .01em;
+  }
+  .badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 10px var(--mint);
+    animation: pulse 3.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+
+  .badge code {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+  }
+
+  h1 {
+    margin: 26px 0 0;
+    font-size: clamp(48px, 9vw, 88px);
+    line-height: .98;
+    letter-spacing: -.045em;
+    font-weight: 700;
+    background: linear-gradient(180deg, #ffffff 30%, #9aa1b0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .tagline {
+    margin: 20px auto 0;
+    max-width: 620px;
+    font-size: clamp(16px, 2.1vw, 19px);
+    color: var(--ink-dim);
+    line-height: 1.55;
+  }
+  .tagline strong { color: var(--ink); font-weight: 560; }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 34px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 20px;
+    border-radius: 9px;
+    font-size: 14.5px;
+    font-weight: 560;
+    border: 1px solid transparent;
+    transition: transform .16s ease, background .18s ease, border-color .18s ease;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+
+  .btn-primary {
+    background: var(--mint);
+    color: #04231f;
+    border-color: var(--mint);
+  }
+  .btn-primary:hover { background: #7df3e0; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .btn-ghost:hover { border-color: #333944; background: var(--bg-raised); }
+
+  /* ---------- install strip ---------- */
+  .install {
+    margin: 40px auto 0;
+    max-width: 460px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 12px 12px 16px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--ink);
+    text-align: left;
+  }
+  .install .prompt { color: var(--mint); user-select: none; }
+  .install code { flex: 1; white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .install code::-webkit-scrollbar { display: none; }
+
+  .copy {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink-dim);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: color .18s ease, border-color .18s ease;
+  }
+  .copy:hover { color: var(--ink); border-color: #333944; }
+  .copy.done { color: var(--mint); border-color: rgba(94,234,212,.4); }
+
+  /* ---------- sections ---------- */
+  section { padding: 76px 0; }
+
+  .sec-head { margin-bottom: 40px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--mint);
+    margin: 0 0 12px;
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(26px, 3.6vw, 36px);
+    letter-spacing: -.03em;
+    line-height: 1.15;
+    font-weight: 650;
+  }
+  .sec-head p {
+    margin: 14px 0 0;
+    max-width: 640px;
+    color: var(--ink-dim);
+  }
+
+  /* ---------- feature grid ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line-soft);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .card {
+    background: var(--bg);
+    padding: 26px 24px 28px;
+    transition: background .2s ease;
+  }
+  .card:hover { background: #0b0d11; }
+
+  .card .glyph {
+    font-size: 19px;
+    line-height: 1;
+    margin-bottom: 14px;
+    display: block;
+    filter: saturate(.85);
+  }
+  .card h3 {
+    margin: 0 0 7px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .card p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+  }
+  .card code {
+    font-family: var(--mono);
+    font-size: .92em;
+    color: var(--mint);
+    background: rgba(94,234,212,.07);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ---------- architecture ---------- */
+  .stack {
+    display: grid;
+    gap: 12px;
+    max-width: 760px;
+  }
+
+  .layer {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    gap: 20px;
+    align-items: start;
+    border: 1px solid var(--line-soft);
+    border-left: 2px solid var(--line);
+    border-radius: 0 10px 10px 0;
+    background: var(--bg-raised);
+    padding: 16px 20px;
+    transition: border-left-color .2s ease, background .2s ease;
+  }
+  .layer:hover { border-left-color: var(--mint); background: #12151b; }
+
+  .layer dt {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--mint);
+    letter-spacing: -.01em;
+    padding-top: 2px;
+  }
+  .layer dd {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+  }
+  .layer dd b { color: var(--ink); font-weight: 560; }
+
+  @media (max-width: 620px) {
+    .layer { grid-template-columns: 1fr; gap: 6px; }
+  }
+
+  /* ---------- code ---------- */
+  .code-block {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #0a0c10;
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    background: rgba(255,255,255,.012);
+  }
+  .code-head span {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  pre {
+    margin: 0;
+    padding: 20px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13.2px;
+    line-height: 1.72;
+    color: #cfd4de;
+    tab-size: 4;
+  }
+  .c-kw { color: #c4a5ff; }
+  .c-str { color: #8ee6b8; }
+  .c-fn { color: #6fd6ea; }
+  .c-com { color: #575e6d; font-style: italic; }
+  .c-num { color: #f0b98d; }
+
+  /* ---------- providers ---------- */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 26px;
+  }
+  .pill {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    border: 1px solid var(--line);
+    background: var(--bg-raised);
+    border-radius: 7px;
+    padding: 6px 11px;
+  }
+  .pill.on { color: var(--mint); border-color: rgba(94,234,212,.28); }
+
+  /* ---------- split / deploy ---------- */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    margin-top: 8px;
+  }
+  @media (max-width: 780px) { .split { grid-template-columns: 1fr; } }
+
+  .panel {
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    background: var(--bg-raised);
+    padding: 22px;
+  }
+  .panel h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .panel p { margin: 0 0 14px; font-size: 14px; color: var(--ink-dim); }
+  .panel pre {
+    background: #0a0c10;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-size: 12.4px;
+    padding: 14px 15px;
+    line-height: 1.7;
+  }
+  .panel ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 14px;
+    color: var(--ink-dim);
+  }
+  .panel li { margin-bottom: 7px; }
+  .panel li::marker { color: var(--mint); }
+
+  /* ---------- experts ---------- */
+  .expert-note {
+    margin: 22px 0 0;
+    font-size: 13.5px;
+    color: var(--ink-faint);
+    max-width: 680px;
+  }
+  .expert-note code {
+    font-family: var(--mono);
+    font-size: .93em;
+    color: var(--ink-dim);
+  }
+
+  /* ---------- background flow ---------- */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin-top: 28px;
+    counter-reset: step;
+  }
+  .step {
+    position: relative;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    background: var(--bg-raised);
+    padding: 20px 20px 22px;
+  }
+  .step::before {
+    counter-increment: step;
+    content: counter(step);
+    display: block;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--mint);
+    margin-bottom: 10px;
+    opacity: .9;
+  }
+  .step h3 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; }
+  .step p { margin: 0; font-size: 13.5px; color: var(--ink-dim); line-height: 1.6; }
+  .step code {
+    font-family: var(--mono);
+    font-size: .92em;
+    color: var(--mint);
+    background: rgba(94,234,212,.07);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .facts {
+    margin: 30px 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .fact {
+    padding: 16px 20px 16px 0;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 14px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+  }
+  .fact b {
+    display: block;
+    color: var(--ink);
+    font-weight: 560;
+    margin-bottom: 3px;
+  }
+  .fact code {
+    font-family: var(--mono);
+    font-size: .92em;
+    color: var(--mint);
+  }
+
+  /* ---------- credits ---------- */
+  .tiers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 28px;
+  }
+  .tier {
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    background: var(--bg-raised);
+    padding: 22px 22px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .tier::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+  }
+  .tier.poor::after { background: #6b7280; }
+  .tier.medium::after { background: var(--violet); }
+  .tier.rich::after { background: var(--mint); }
+  .tier h3 {
+    margin: 0 0 4px;
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: .01em;
+    color: var(--ink);
+  }
+  .tier .range {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+  }
+  .tier p { margin: 0; font-size: 13.5px; color: var(--ink-dim); line-height: 1.6; }
+
+  .matrix {
+    margin-top: 26px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .mrow {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 20px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 14px;
+    color: var(--ink-dim);
+    align-items: baseline;
+  }
+  .mrow dt {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--mint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mrow dd { margin: 0; line-height: 1.6; }
+  .mrow dd b { color: var(--ink); font-weight: 560; }
+  @media (max-width: 620px) {
+    .mrow { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  /* ---------- bot CTA ---------- */
+  .cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 34px 32px;
+    background:
+      radial-gradient(ellipse 70% 140% at 0% 0%, rgba(94,234,212,.09), transparent 70%),
+      var(--bg-raised);
+  }
+  .cta h2 { font-size: clamp(22px, 3vw, 28px); margin: 0 0 6px; }
+  .cta p { margin: 0; color: var(--ink-dim); font-size: 14.5px; max-width: 480px; }
+  .cta code {
+    font-family: var(--mono);
+    font-size: .95em;
+    color: var(--mint);
+    background: rgba(94,234,212,.08);
+    padding: 2px 7px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  @media (max-width: 620px) { .cta { padding: 26px 22px; } }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top: 1px solid var(--line-soft);
+    padding: 42px 0 54px;
+    margin-top: 30px;
+  }
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    font-size: 13.5px;
+    color: var(--ink-faint);
+  }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 20px; }
+  .foot-links a { color: var(--ink-dim); }
+  .foot-note {
+    margin-top: 22px;
+    font-size: 12.5px;
+    color: #4d5462;
+    max-width: 640px;
+    line-height: 1.6;
+  }
+
+  /* ---------- motion ---------- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity .5s cubic-bezier(.22,.68,.36,1), transform .5s cubic-bezier(.22,.68,.36,1);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .badge .dot { animation: none; }
+    .btn:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#0f1116" stroke="#1e2128"/>
+        <path d="M10 8v16M10 16l8-8M10 16l8 8" stroke="#5eead4" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="24" cy="16" r="2.2" fill="#a78bfa"/>
+      </svg>
+      Kibernikto
+    </a>
+    <nav class="nav-links">
+      <a href="#capabilities">Capabilities</a>
+      <a href="#experts">Experts</a>
+      <a href="#background">Background</a>
+      <a href="#credits">Credits</a>
+      <a href="#storage">Storage</a>
+      <a href="#build">Build</a>
+      <a href="#deploy">Deploy</a>
+      <a class="nav-cta bot" href="https://t.me/kibernikto_agent">@kibernikto_agent</a>
+      <a class="nav-cta" href="https://github.com/solovieff/kibernikto">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <div class="wrap">
+    <div class="hero">
+      <span class="badge">
+        <span class="dot"></span>
+        <code>v2.0.0b1</code> — full rewrite, in beta
+      </span>
+
+      <h1>Kibernikto</h1>
+
+      <p class="tagline">
+        A multi-agent AI framework with a <strong>Telegram body</strong>.
+        Built on pydantic-ai and aiogram 3 — run it as a ready bot, or take
+        the bare agent and build your own machine around it.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://t.me/kibernikto_agent">Talk to the bot</a>
+        <a class="btn btn-ghost" href="#build">Start building</a>
+        <a class="btn btn-ghost" href="https://github.com/solovieff/kibernikto">Source</a>
+      </div>
+
+      <div class="install">
+        <span class="prompt">$</span>
+        <code id="install-cmd">pip install --pre kibernikto</code>
+        <button class="copy" data-copy="install-cmd" aria-label="Copy install command">copy</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="capabilities">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Capabilities</p>
+        <h2>Everything a bot needs, none of the scaffolding you'd write yourself.</h2>
+        <p>Two layers, one package. The Telegram transport is optional; the agent is not.</p>
+      </div>
+
+      <div class="grid">
+        <div class="card reveal">
+          <span class="glyph">✍️</span>
+          <h3>Conversations with memory</h3>
+          <p>Group and private chats with per-chat history. Pass a <code>conversation_id</code> and the history follows you.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🔉</span>
+          <h3>Voice in, voice out</h3>
+          <p>Transcribe incoming voice messages; answer with synthesized speech via <code>/toggle_voice</code>.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">📸</span>
+          <h3>Sight</h3>
+          <p>Image understanding and image generation, wired through the same agent loop as text.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🤖</span>
+          <h3>Bots as sub-agents</h3>
+          <p>Point Kibernikto at another Telegram bot and delegate. Peer envelopes are exempt from credit gating.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🧩</span>
+          <h3>Local experts</h3>
+          <p>Web, image and conversation experts composed via pydantic-ai-harness <code>SubAgents</code>. Enable with <code>--multi-agent</code>.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">💾</span>
+          <h3>Storage that scales</h3>
+          <p>History in files, SQLite or PostgreSQL; media in files or S3; public images via imgbb or S3.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">⭐️</span>
+          <h3>Subscriptions &amp; model tiers</h3>
+          <p>Credits decide which model answers — poor, medium or rich. Top up with Telegram Stars at one Star per credit; checks are independent of billing.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🔭</span>
+          <h3>Full observability</h3>
+          <p>Logfire traces every agent, model and tool call. Tool arguments land in spans, not in your logs.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🧾</span>
+          <h3>Logfire as a store</h3>
+          <p>Set <code>APP_STORAGE_DATA_BACKEND=logfire</code> and history is rebuilt from traced spans — nothing to provision. Read-only, one <code>LOGFIRE_READ_TOKEN</code>, works out of the box.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="experts">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Experts</p>
+        <h2>The parent talks. Experts work.</h2>
+        <p>A credit-tiered parent reaches every specialist through one <code style="font-family:var(--mono);font-size:.92em;color:var(--mint)">delegate_task</code> tool. Experts see nothing of the conversation — the parent hands them the exact question, links, dates and language. Errors stay contained.</p>
+      </div>
+
+      <div class="grid">
+        <div class="card reveal">
+          <span class="glyph">🌐</span>
+          <h3>web-agent</h3>
+          <p>Live internet: page URLs, news, rates, prices, weather, events. Runs as a tool-less delegate on a search-native model, or as Exa/Researcher tools on the parent when no web model is configured.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🖼</span>
+          <h3>image-agent</h3>
+          <p>Describes, generates and edits images. Picks the real URL off the message automatically — no provider filenames in your prompts.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🛒</span>
+          <h3>vkusvill</h3>
+          <p>Groceries: find products, build a cart, return a share link. Rebuild the last cart minus a few items. Personal discounts and order history after sign-in.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">✈️</span>
+          <h3>travel</h3>
+          <p>Live search for flights, hotels and apartments, trains, buses and suburban lines via Tutu, Kiwi and Travala. Schedules and offers — not travel advice.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">🏢</span>
+          <h3>business</h3>
+          <p>Russian companies and sole traders by INN, OGRN, domain or email; address standardization, via DaData. Scoped to the RF, and honest about it.</p>
+        </div>
+        <div class="card reveal">
+          <span class="glyph">📞</span>
+          <h3>Telegram peers</h3>
+          <p>Any other bot joins the roster as a sub-agent via <code>TelegramPeerAgent</code>. Correlated answers are admitted automatically — no second env allowlist.</p>
+        </div>
+      </div>
+
+      <p class="expert-note">
+        Optional experts load only when enabled, and never as an import side effect. Every expert carries a tool-call limit, so a runaway search loop fails fast instead of burning the parent's credits. Billable experts sit behind <code>CreditGatedSubAgents</code>.
+      </p>
+    </div>
+  </section>
+
+  <section id="background">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Background delegation</p>
+        <h2>Slow experts stop holding the chat hostage.</h2>
+        <p>A delegation still running after 20 seconds leaves the run. The agent gets an acceptance receipt instead of a result, tells the user the expert is still working, and answers the next message. The report arrives later.</p>
+      </div>
+
+      <div class="steps reveal">
+        <div class="step">
+          <h3>Delegate</h3>
+          <p>The parent calls <code>delegate_task</code> with the full context. Fast work returns normally — nothing changes for the easy cases.</p>
+        </div>
+        <div class="step">
+          <h3>Detach</h3>
+          <p>Past <code>20s</code> the task moves to the background. The run ends with a receipt, not a fabrication, and the chat stays responsive.</p>
+        </div>
+        <div class="step">
+          <h3>Report</h3>
+          <p>When the expert finishes, its report arrives as a <code>[Background task report]</code> turn and the agent relays it to the user.</p>
+        </div>
+      </div>
+
+      <div class="facts reveal">
+        <div class="fact">
+          <b>Two knobs, both env-only</b>
+          <code>BACKGROUND_AFTER</code> defaults to 20 s, <code>0</code> disables detachment entirely. <code>BACKGROUND_MAX</code> caps background tasks per chat at 3.
+        </div>
+        <div class="fact">
+          <b>A saturated chat waits</b>
+          <p style="margin:0">Rather than queue a fourth, the agent is told to say the others are still working. No silent pile-up.</p>
+        </div>
+        <div class="fact">
+          <b>Reports are data, not orders</b>
+          <p style="margin:0">The delivered report is wrapped as untrusted content, so a poisoned expert cannot hijack the parent.</p>
+        </div>
+        <div class="fact">
+          <b>Where it refuses to apply</b>
+          <p style="margin:0">Runs without a <code>conversation_id</code> have nowhere to deliver, so they never detach. Nested delegations report to their parent, and peer envelopes stay foreground.</p>
+        </div>
+        <div class="fact">
+          <b>Restart is honest</b>
+          <p style="margin:0">Running background tasks do not survive a process restart. Don't build billing on top of them.</p>
+        </div>
+        <div class="fact">
+          <b>Opt-in per call</b>
+          <p style="margin:0">The parent can pass <code>background=True</code> for work it already knows is slow, instead of waiting out the timer.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="credits">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Credits &amp; tiers</p>
+        <h2>Your balance picks the model.</h2>
+        <p>Not a plan, not a prompt — a conversation's credit balance decides which model answers, and the tier is pinned for the whole run. Spending down changes the model mid-relationship, quietly and on purpose.</p>
+      </div>
+
+      <div class="tiers reveal">
+        <div class="tier poor">
+          <h3>poor</h3>
+          <div class="range">&lt; 30 credits</div>
+          <p>The cheap model keeps the chat alive. Default <code style="font-family:var(--mono);color:var(--mint)">gemini-2.5-flash</code>, and everything still works.</p>
+        </div>
+        <div class="tier medium">
+          <h3>medium</h3>
+          <div class="range">30 – 499 credits</div>
+          <p>The normal model. The one you configured, with fallbacks in priority order behind it.</p>
+        </div>
+        <div class="tier rich">
+          <h3>rich</h3>
+          <div class="range">≥ 500 credits</div>
+          <p>Top tier. The same configuration carries you here — and unlocks credit-gated experts that stay hidden on lower balances.</p>
+        </div>
+      </div>
+
+      <div class="facts reveal">
+        <div class="fact">
+          <b>Charged after success, never before</b>
+          <p style="margin:0">One credit per successful run by default, plus a credit per successful <code>delegate_task</code>. Failed runs are free. Voice replies cost double.</p>
+        </div>
+        <div class="fact">
+          <b>Top-ups are Telegram Stars</b>
+          <p style="margin:0">One Star, one credit. Users run <code>/balance</code> and <code>/pay</code>; admins can <code>/pay &lt;credits&gt; &lt;tg_id&gt;</code> to grant or deduct.</p>
+        </div>
+        <div class="fact">
+          <b>At zero, a policy decision</b>
+          <p style="margin:0"><code>ALLOW_ZERO_CREDITS=true</code> drops the chat to the poor tier. Set it to <code>false</code> and billable runs are blocked with a top-up hint instead.</p>
+        </div>
+        <div class="fact">
+          <b>Subscriptions are separate</b>
+          <p style="margin:0">Star subscriptions and credit gating are independent checks. Neither one silently overrides the other.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="storage">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Logfire &amp; storage</p>
+        <h2>Traces you can query. History you can swap.</h2>
+        <p>Logfire is not a sidecar here. It instruments every agent, model and tool call — and it can also <em>be</em> the history store.</p>
+      </div>
+
+      <dl class="matrix reveal">
+        <div class="mrow">
+          <dt>logfire.instrument_pydantic_ai()</dt>
+          <dd><b>Every call is a span.</b> Agents, models, tools — with tool arguments in <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">gen_ai.tool.call.arguments</code>, not smeared across your console.</dd>
+        </div>
+        <div class="mrow">
+          <dt>APP_STORAGE_DATA_BACKEND</dt>
+          <dd><b>file, sqlite, pg, logfire.</b> The first three are ordinary stores. <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">logfire</code> rebuilds conversation history from traced <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">all_messages</code> spans — read-only, and your observability becomes your transcript.</dd>
+        </div>
+        <div class="mrow">
+          <dt>APP_STORAGE_MEDIA_BACKEND</dt>
+          <dd><b>file or s3.</b> Bucket credentials are checked with a HEAD before polling starts: an unreachable bucket crashes the bot at boot, not at the first voice message.</dd>
+        </div>
+        <div class="mrow">
+          <dt>APP_LOG_CONSOLE</dt>
+          <dd><b>stdlib or logfire.</b> Either our formatted records beside the span lines, or one merged Logfire timeline. Your choice of what the operator sees.</dd>
+        </div>
+        <div class="mrow">
+          <dt>APP_LOG_HTTP</dt>
+          <dd><b>Raw provider request and response bodies.</b> Noisy, and it may contain user content. Useful for a bad afternoon, wrong for production.</dd>
+        </div>
+        <div class="mrow">
+          <dt>APP_STORAGE_HISTORY_WINDOW_SLACK</dt>
+          <dd><b>Why SQL history still reads correctly.</b> The tail fetch reads a slack multiple of the window and walks back to a request boundary — deliberate, not a bug to tidy up.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Architecture</p>
+        <h2>Four layers. No inheritance chain to untangle.</h2>
+        <p>There is no agent superclass. You compose capabilities onto a plain <code style="font-family:var(--mono);font-size:.92em;color:var(--mint)">pydantic_ai.Agent</code> and hand it whatever transport you like.</p>
+      </div>
+
+      <dl class="stack" style="margin:0">
+        <div class="layer reveal">
+          <dt>CLI</dt>
+          <dd><b>The <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">kibernikto</code> command.</b> Reads a single env file, starts the process. One process per bot token — no exceptions, no shared pollers.</dd>
+        </div>
+        <div class="layer reveal">
+          <dt>telegram</dt>
+          <dd><b>aiogram dispatcher.</b> Conversation handlers, a middleware chain (Peer → Service → Firewall → Subscription), pre-processors for text, photo, voice and audio, and Telegram Stars payments.</dd>
+        </div>
+        <div class="layer reveal">
+          <dt>ai.agent</dt>
+          <dd><b>The brain.</b> <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">build_kibernikto_agent()</code> returns a plain <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">Agent</code> with <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">ConversationHistory</code> and <code style="font-family:var(--mono);color:var(--mint);font-size:.93em">PersonaCapability</code>. Addons hang off the side.</dd>
+        </div>
+        <div class="layer reveal">
+          <dt>storage</dt>
+          <dd><b>One contract, several backends.</b> History and chat data in files or SQL; media in files or S3. Swapped by environment, not by refactor.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <section id="build">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Build</p>
+        <h2>Take the agent. Leave the bot.</h2>
+        <p>No Telegram required. The core builder gives you a standard pydantic-ai agent with Kibernikto's memory and persona already attached.</p>
+      </div>
+
+      <div class="code-block reveal">
+        <div class="code-head">
+          <span>your_app.py</span>
+          <button class="copy" data-copy="agent-snippet" aria-label="Copy code">copy</button>
+        </div>
+<pre id="agent-snippet"><code><span class="c-kw">from</span> kibernikto.ai.agent <span class="c-kw">import</span> build_kibernikto_agent
+
+<span class="c-com"># Just a pydantic_ai.Agent — history and persona are capabilities, not a subclass.</span>
+agent = <span class="c-fn">build_kibernikto_agent</span>(
+    model<span class="c-kw">=</span><span class="c-str">"openrouter:anthropic/claude-sonnet-5"</span>,
+    history_size<span class="c-kw">=</span><span class="c-num">40</span>,
+)
+
+result = <span class="c-kw">await</span> agent.<span class="c-fn">run</span>(
+    <span class="c-str">"remind me what we decided about storage"</span>,
+    conversation_id<span class="c-kw">=</span><span class="c-str">"thread-42"</span>,   <span class="c-com"># per-conversation history</span>
+)
+
+<span class="c-fn">print</span>(result.output)                <span class="c-com"># AgentRunResult — .output, not .data</span></code></pre>
+      </div>
+
+      <div class="pills reveal">
+        <span class="pill on">openrouter:</span>
+        <span class="pill on">vsegpt:</span>
+        <span class="pill on">routerai:</span>
+        <span class="pill on">beget:</span>
+        <span class="pill">or any pydantic-ai model string</span>
+      </div>
+      <p style="margin:16px 0 0;font-size:13.5px;color:var(--ink-faint);max-width:620px">
+        New OpenAI-compatible gateway? It's one <code style="font-family:var(--mono);color:var(--ink-dim)">OPENAI_COMPATIBLE_PROVIDERS</code> entry in <code style="font-family:var(--mono);color:var(--ink-dim)">kibernikto/ai/agent/utils.py</code>. Everything else falls through to <code style="font-family:var(--mono);color:var(--ink-dim)">pydantic_ai.infer_model</code>.
+      </p>
+    </div>
+  </section>
+
+  <section id="deploy">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Deploy</p>
+        <h2>From clone to systemd in two scripts.</h2>
+      </div>
+
+      <div class="split">
+        <div class="panel reveal">
+          <h3>Run the bot</h3>
+          <p>Fill in <code style="font-family:var(--mono);color:var(--mint)">TG_BOT_KEY</code>, <code style="font-family:var(--mono);color:var(--mint)">TG_MASTER_ID</code> and one provider key.</p>
+<pre><span class="c-com"># one process per bot token</span>
+kibernikto --env_file_path=kibernikto.env
+kibernikto --env_file_path=kibernikto.env \
+  --multi-agent</pre>
+        </div>
+
+        <div class="panel reveal">
+          <h3>Run the server</h3>
+          <p><code style="font-family:var(--mono);color:var(--mint)">deploy/</code> is a ready layout: podman + systemd, one folder per bot.</p>
+<pre>deploy/scripts/rebuild.sh -b kibernikto
+deploy/scripts/update.sh</pre>
+          <ul style="margin-top:14px">
+            <li>Dockerfiles default to <code style="font-family:var(--mono)">--multi-agent</code></li>
+            <li>Zero-credit chats fall back to the cheap model</li>
+            <li>Backups and rollback in the runbook</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="bot">
+    <div class="wrap">
+      <div class="cta reveal">
+        <div>
+          <h2>It's already alive in Telegram.</h2>
+          <p>The framework ships as a working bot. Say hello to <code>@kibernikto_agent</code> — voice, images, memory and all — before you write a single line.</p>
+        </div>
+        <a class="btn btn-primary" href="https://t.me/kibernikto_agent">Open in Telegram ↗</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <span>MIT licensed · Python 3.14</span>
+      <nav class="foot-links">
+        <a href="https://t.me/kibernikto_agent">@kibernikto_agent</a>
+        <a href="https://github.com/solovieff/kibernikto">GitHub</a>
+        <a href="https://pypi.org/project/kibernikto/">PyPI</a>
+        <a href="https://ai.pydantic.dev">pydantic-ai</a>
+      </nav>
+    </div>
+    <p class="foot-note">
+      2.0 is a full rewrite — 1.x code and environment variable names are not compatible.
+      Migration details live in the changelog.
+    </p>
+  </div>
+</footer>
+
+<script>
+  // Clipboard, with a fallback for non-secure contexts.
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var src = document.getElementById(btn.dataset.copy);
+      var text = src.innerText;
+      var done = function () {
+        var prev = btn.textContent;
+        btn.textContent = 'copied';
+        btn.classList.add('done');
+        setTimeout(function () {
+          btn.textContent = prev;
+          btn.classList.remove('done');
+        }, 1400);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, function () {});
+        return;
+      }
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    });
+  });
+
+  // Staggered reveal, skipped entirely for reduced-motion users.
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var items = document.querySelectorAll('.reveal');
+  if (reduced || !('IntersectionObserver' in window)) {
+    items.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var idx = Array.prototype.indexOf.call(items, entry.target) % 3;
+        entry.target.style.transitionDelay = (idx * 70) + 'ms';
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    items.forEach(function (el) { io.observe(el); });
+  }
+</script>
+
+</body>
+</html>

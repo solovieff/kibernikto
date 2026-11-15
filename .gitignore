@@ -22,3 +22,5 @@ tg_files
 github.key
 deploy/tg_bots/*/data/
 .DS_Store
+# here.now publish cache (slug, live versionId) — machine-local, rewritten per publish
+.herenow/
