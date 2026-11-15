@@ -12,12 +12,13 @@ from pydantic_ai_harness.subagents import SubAgent
 
 from kibernikto.ai.agent.core.kibernikto_agent import build_kibernikto_agent, default_model_settings
 from kibernikto.ai.agent.harness.delegation import resolve_expert_model
+from kibernikto.ai.agent.harness.expert_memory import expert_memory
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 
-from ._prompts import HERENOW_INSTRUCTIONS
+from ._prompts import HERENOW_INSTRUCTIONS, HERENOW_MEMORY_GUIDANCE, HERENOW_MEMORY_HEADING
 from .client import HereNowClient, HereNowError, PublishedSite, SiteFile
 from .config import HERENOW_SETTINGS, HereNowSettings
-from .routing import chat_label, delete_for_chat, publish_for_chat, site_for_chat
+from .routing import active_slug, chat_label, delete_for_chat, publish_for_chat, site_for_chat
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model:
         history_storage=None,
         instructions=HERENOW_INSTRUCTIONS,
         model_settings={**default_model_settings(), 'max_tokens': settings.MODEL_MAX_TOKENS},
+        capabilities=[expert_memory(HERENOW_EXPERT_NAME, heading=HERENOW_MEMORY_HEADING,
+                                    guidance=HERENOW_MEMORY_GUIDANCE)],
         metadata={'reaction': '⚡'},
     )
 
@@ -66,6 +69,9 @@ def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model:
             files: Файлы сайта; обычно один index.html.
             title: Название сайта для владельца в here.now, коротко.
         """
+        problems = _html_problems(files)
+        if problems:
+            return _rejected(problems)
         try:
             site = await publish_for_chat(herenow, ctx.deps, _site_files(files), title=title)
         except HereNowError as exc:
@@ -94,6 +100,21 @@ def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model:
         except HereNowError as exc:
             return _error_text(exc)
         return 'Настройки сайта обновлены.'
+
+    @agent.tool
+    async def read_site(ctx: RunContext[TelegramDeps]) -> str:
+        """Прочитать index.html, который сейчас опубликован у этого чата.
+
+        Вызывай перед правкой: меняй реальную страницу, а не сочиняй новую вслепую.
+        """
+        try:
+            slug = await active_slug(herenow, chat_label(ctx.deps))
+            if slug is None:
+                return 'У этого чата ещё нет сайта: читать нечего.'
+            html = await herenow.file_text(slug)
+        except HereNowError as exc:
+            return _error_text(exc)
+        return f'index.html этого чата, {len(html)} символов:\n{html}'
 
     @agent.tool
     async def delete_site(ctx: RunContext[TelegramDeps]) -> str:
@@ -131,6 +152,37 @@ def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model:
         ),
         usage_limits=UsageLimits(tool_calls_limit=settings.MAX_TOOL_CALLS),
     )
+
+
+_PLACEHOLDERS = ('lorem ipsum', 'your tagline', 'section 1', 'пример текста', 'текст-заглушка')
+
+
+def _html_problems(files: list[PageFile]) -> list[str]:
+    """Static gate before anything goes live: a truncated or placeholder page is worse than none."""
+    page = next((f for f in files if f.path.strip() == 'index.html'), None)
+    if page is None:
+        return ['в корне сайта нет index.html']
+    html = page.content
+    lowered = html.lower()
+    problems: list[str] = []
+    if not lowered.strip().endswith('</html>'):
+        problems.append('файл не закрыт: последний тег должен быть </html> — похоже, вывод оборвался')
+    if 'name="viewport"' not in lowered and "name='viewport'" not in lowered:
+        problems.append('нет <meta name="viewport"> — на телефоне страница поедет')
+    if lowered.count('<style') != lowered.count('</style>'):
+        problems.append('непарные теги <style>')
+    if lowered.count('<script') != lowered.count('</script>'):
+        problems.append('непарные теги <script>')
+    stubs = [word for word in _PLACEHOLDERS if word in lowered]
+    if stubs:
+        problems.append('заглушки вместо текста: ' + ', '.join(stubs))
+    return problems
+
+
+def _rejected(problems: list[str]) -> str:
+    """Hand the model its own mistakes and ask for a rewrite in the same run."""
+    return ('Страница не прошла проверку, ничего не опубликовано:\n- ' + '\n- '.join(problems)
+            + '\nПерепиши index.html целиком (закрытый </html>, viewport, настоящие тексты) и вызови publish_site снова.')
 
 
 def _site_files(files: list[PageFile]) -> list[SiteFile]:

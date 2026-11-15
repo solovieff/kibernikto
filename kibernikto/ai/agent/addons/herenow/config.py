@@ -13,7 +13,7 @@ class HereNowSettings(BaseSettings):
     BASE_URL: str = 'https://here.now'
     WORKSPACE: str | None = None  # workspace subdomain the sites belong to; unset = personal account
     MODEL_NAME: str | None = None
-    MODEL_MAX_TOKENS: int = Field(default=8192, ge=1)
+    MODEL_MAX_TOKENS: int = Field(default=32000, ge=1)  # the whole page is one tool argument
     MAX_TOOL_CALLS: int = Field(default=16, ge=1)
     MAX_FILES: int = Field(default=12, ge=1)
     MAX_TOTAL_BYTES: int = Field(default=2_000_000, ge=1)

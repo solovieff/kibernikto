@@ -76,8 +76,8 @@ class HereNowClient:
             timeout=self._settings.REQUEST_TIMEOUT_SECONDS,
         )
 
-    async def _call(self, session: httpx2.AsyncClient, method: str, url: str, *,
-                    ok: tuple[int, ...] = (200, 201, 202), **kwargs) -> dict:
+    async def _send(self, session: httpx2.AsyncClient, method: str, url: str, *,
+                   ok: tuple[int, ...] = (200, 201, 202), **kwargs) -> httpx2.Response:
         """One retry on rate limit, then a typed error — never a raw httpx exception."""
         response: httpx2.Response | None = None
         for attempt in (1, 2):
@@ -91,6 +91,12 @@ class HereNowClient:
             break
         if response is None or response.status_code not in ok:
             raise _provider_error(response)
+        return response
+
+    async def _call(self, session: httpx2.AsyncClient, method: str, url: str, *,
+                    ok: tuple[int, ...] = (200, 201, 202), **kwargs) -> dict:
+        """JSON body of a successful call."""
+        response = await self._send(session, method, url, ok=ok, **kwargs)
         return response.json() if response.content else {}
 
     # ── accounts and labels ──────────────────────────────────────────────────
@@ -175,6 +181,12 @@ class HereNowClient:
         """Live site details, including ``currentVersionId`` for the optimistic-concurrency guard."""
         async with self._session() as session:
             return await self._call(session, 'GET', f'/api/v1/publish/{slug}')
+
+    async def file_text(self, slug: str, path: str = 'index.html') -> str:
+        """Read one live file as text: lets the model edit the real page instead of guessing its own markup."""
+        async with self._session() as session:
+            response = await self._send(session, 'GET', f'/api/v1/publish/{slug}/files/{path}')
+        return response.text
 
     async def delete_site(self, slug: str) -> None:
         """Delete the site for good; here.now drops its label and versions with it."""

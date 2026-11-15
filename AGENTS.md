@@ -59,6 +59,8 @@ CLI (kibernikto command / main.py)
   (`{label}.{workspace}.here.now`, label = Telegram username or `u<chat_id>`), so no local registry exists — see
   `kibernikto/ai/agent/addons/herenow/routing.py`. `delete_site` removes the site for good on an explicit request;
   here.now drops the label and versions with it, and the next publish mints a fresh site under the same label.
+  `publish_site` runs a static gate first (closed `</html>`, viewport meta, balanced style/script, no placeholder text)
+  and hands failures back to the model to rewrite; `read_site` returns the live `index.html` so edits patch the real page.
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)

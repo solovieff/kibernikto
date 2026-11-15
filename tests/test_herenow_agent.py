@@ -28,7 +28,10 @@ from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
 from kibernikto.ai.agent.addons.travel.config import TRAVEL_SETTINGS
 from kibernikto.ai.agent.addons.vkusvill.config import VKUSVILL_SETTINGS
 
-PAGE = [SiteFile(path='index.html', content='<h1>привет</h1>')]
+PAGE_HTML = ('<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+             '<meta name="viewport" content="width=device-width, initial-scale=1">'
+             '<style>h1{color:#333}</style></head><body><h1>привет</h1></body></html>')
+PAGE = [SiteFile(path='index.html', content=PAGE_HTML)]
 
 
 def herenow_agent():
@@ -86,6 +89,11 @@ class FakeClient:
         if slug in self.gone:
             raise HereNowError('http_404', 'site not found')
         return {'slug': slug, 'siteUrl': f'https://{slug}.here.now/', 'currentVersionId': 'v1'}
+
+    async def file_text(self, slug: str, path: str = 'index.html') -> str:
+        if slug in self.gone:
+            raise HereNowError('http_404', 'site not found')
+        return PAGE_HTML
 
     async def delete_site(self, slug: str) -> None:
         # The provider drops the label together with the site.
@@ -218,7 +226,8 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         agent_module = herenow_agent()
         client = FakeClient()
         client.publish_error = HereNowError('version_conflict', 'stale base version')
-        expert = agent_module.build_herenow_expert(model=self._model('publish_site', {'files': []}), client=client)
+        expert = agent_module.build_herenow_expert(
+            model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': PAGE_HTML}]}), client=client)
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42, username='gosu'))
         self.assertIn('одновременно', result.output)
         self.assertIn('Перечитай', result.output)
@@ -227,7 +236,8 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         agent_module = herenow_agent()
         client = FakeClient()
         client.publish_error = HereNowError('workspace_not_ready', 'provisioning')
-        expert = agent_module.build_herenow_expert(model=self._model('publish_site', {'files': []}), client=client)
+        expert = agent_module.build_herenow_expert(
+            model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': PAGE_HTML}]}), client=client)
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42))
         self.assertIn('через минуту', result.output)
 
@@ -255,11 +265,46 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         agent_module = herenow_agent()
         client = FakeClient()
         expert = agent_module.build_herenow_expert(
-            model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': '<h1>hi</h1>'}]}),
+            model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': PAGE_HTML}]}),
             client=client)
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42, username='gosu'))
         self.assertEqual(result.output.splitlines()[-1], 'https://gosu.kibernikto.here.now')
         self.assertEqual(client.published[0][1][0].content_type, 'text/html; charset=utf-8')
+
+    async def test_truncated_page_is_rejected_before_any_request(self):
+        agent_module = herenow_agent()
+        client = FakeClient()
+        broken = PAGE_HTML[:PAGE_HTML.index('</body>')]  # mid-page cut, exactly what a token cap produces
+        expert = agent_module.build_herenow_expert(
+            model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': broken}]}), client=client)
+        result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42, username='gosu'))
+        self.assertIn('не прошла проверку', result.output)
+        self.assertIn('оборвался', result.output)
+        self.assertEqual(client.published, [])
+
+    async def test_placeholder_text_is_rejected(self):
+        agent_module = herenow_agent()
+        client = FakeClient()
+        stub = PAGE_HTML.replace('<h1>привет</h1>', '<h1>Lorem ipsum</h1>')
+        expert = agent_module.build_herenow_expert(
+            model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': stub}]}), client=client)
+        result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42))
+        self.assertIn('заглушки', result.output)
+        self.assertEqual(client.published, [])
+
+    async def test_read_site_returns_the_live_page(self):
+        agent_module = herenow_agent()
+        client = FakeClient()
+        await self._publish(client, TelegramDeps(user_id=42, username='gosu'))
+        expert = agent_module.build_herenow_expert(model=self._model('read_site', {}), client=client)
+        result = await expert.agent.run('покажи сайт', deps=TelegramDeps(user_id=42, username='gosu'))
+        self.assertIn('index.html этого чата', result.output)
+        self.assertIn('<h1>привет</h1>', result.output)
+
+    async def test_read_site_without_a_site_explains(self):
+        expert = herenow_agent().build_herenow_expert(model=self._model('read_site', {}), client=FakeClient())
+        result = await expert.agent.run('покажи сайт', deps=TelegramDeps(user_id=42))
+        self.assertIn('ещё нет сайта', result.output)
 
     async def test_delete_removes_the_chat_site_and_frees_the_label(self):
         agent_module = herenow_agent()
