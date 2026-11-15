@@ -3,9 +3,11 @@
 import logging
 
 from aiogram import F, Router
+from aiogram.enums import ChatType
 from aiogram.filters import Command, CommandObject
 from aiogram.types import LabeledPrice, Message, PreCheckoutQuery
 
+from kibernikto.ai.agent.harness.tariff import Tariff
 from kibernikto.storage.singletons import chat_data
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.utils.permissions import is_from_admin
@@ -80,7 +82,8 @@ async def cmd_balance(message: Message, command: CommandObject) -> None:
     args = (command.args or '').split()
     if not args:
         info = await chat_data.load(str(message.chat.id))
-        await message.answer(f'💳 Balance: {info.credits} credits. Top up: /pay [stars]')
+        tariff = Tariff(info.credits, is_personal=message.chat.type == ChatType.PRIVATE)
+        await message.answer(tariff.balance_text())
         return
     if not _is_admin(message):
         await message.answer('Only admins can check other users.')

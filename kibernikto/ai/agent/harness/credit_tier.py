@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field, replace
-from typing import Literal
 
 from pydantic_ai import AgentRunResult, ModelSelectionContext, RunContext
 from pydantic_ai.capabilities import AbstractCapability, ModelSelector
@@ -20,6 +19,7 @@ from pydantic_ai.usage import RunUsage
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
 from kibernikto.ai.agent.core.errors import InsufficientCreditsError
+from kibernikto.ai.agent.harness.tariff import Tariff, credit_tier
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 from kibernikto.storage.models import ConversationInfo
 from kibernikto.storage.singletons import chat_data
@@ -28,38 +28,27 @@ logger = logging.getLogger(__name__)
 
 DELEGATE_TOOL_NAME = "delegate_task"  # Tool name of the harness ``SubAgents`` capability.
 
-type Tier = Literal["poor", "medium", "rich"]
-
-
-def credit_tier(credits: int) -> Tier:
-    """Return the tier for a credit balance; thresholds mirror ``ConversationInfo.model_name``."""
-    s = AGENT_KIBERNIKTO_SETTINGS
-    if credits < s.POOR_CREDITS:
-        return "poor"
-    if credits >= s.RICH_CREDITS:
-        return "rich"
-    return "medium"
-
 
 def format_credit_status(
         credits: int,
         *,
-        effort: int = 1,
-        subagent_effort: int = 0,
         conversation_id: str | None = None,
         is_admin: bool = False,
+        is_personal: bool = True,
 ) -> str:
-    """Format the current credit balance, tier thresholds and Telegram payment commands for the model."""
+    """Format the current credit balance, tier thresholds, paid-expert access and payment commands for the model."""
     s = AGENT_KIBERNIKTO_SETTINGS
-    tier = credit_tier(credits)
+    tariff = Tariff(credits, is_personal=is_personal)
+    tier = tariff.tier
     zero_policy = "switches to poor tier" if s.ALLOW_ZERO_CREDITS else "blocks runs until topped up"
     status = (
-        f"credits: {credits} | tier: {tier} | cost_per_run: {effort} | cost_per_subagent_call: {subagent_effort} | "
-        f"billing: 1 credit per {s.TOKENS_PER_CREDIT} tokens of the run, the above is the minimum | "
+        f"credits: {credits} | tier: {tier} | "
         f"tiers: poor (<{s.POOR_CREDITS}), medium ({s.POOR_CREDITS}..{s.RICH_CREDITS - 1}), rich (>={s.RICH_CREDITS}) | "
         f"at_zero: {zero_policy} | "
         "commands: /balance (check balance), /pay [stars] (top up in private chat with Telegram Stars, 1 Star = 1 credit)"
     )
+    if experts := tariff.experts_line():
+        status += f" | {experts}"
     if is_admin:
         self_id = conversation_id or "<your_tg_id>"
         status += (
@@ -114,9 +103,14 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         return FunctionToolset([self.check_credits])
 
     async def check_credits(self, ctx: RunContext[KiberniktoDeps]) -> str:
-        """Return this conversation's credit balance, active model tier, thresholds and top-up commands.
+        """Return this chat's tariff: credit balance, model tier, which paid experts are open or locked and why.
 
-        Call only when the user asks about credits, balance, limits, model tier/quality or how to pay/top up.
+        Paid experts (site publishing, grocery shopping, travel search, company lookup) are hidden from your
+        delegation roster unless the chat is private and rich enough. Call this when the user asks about credits,
+        balance, limits, model quality or how to pay/top up, and ALSO whenever the user asks for something an expert
+        would do (build a website, buy groceries, find flights, check a company) and you have no such agent:
+        the result says whether it is locked, what is missing and how to unlock it, so explain that instead of
+        refusing or improvising.
         """
         cid = _billable_conversation(ctx.deps, self.conversation_id or ctx.conversation_id)
         if cid is None:
@@ -124,8 +118,7 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         info = await self._load_info(ctx.deps, cid)
         is_admin = isinstance(ctx.deps, KiberniktoDeps) and ctx.deps.is_admin
         return format_credit_status(
-            info.credits, effort=self._run_cost(info), subagent_effort=AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT,
-            conversation_id=cid, is_admin=is_admin,
+            info.credits, conversation_id=cid, is_admin=is_admin, is_personal=getattr(ctx.deps, 'is_personal', True),
         )
 
     async def before_run(self, ctx: RunContext[KiberniktoDeps]) -> None:

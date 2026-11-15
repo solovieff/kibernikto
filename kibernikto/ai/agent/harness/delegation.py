@@ -13,7 +13,7 @@ from pydantic_ai.toolsets import AbstractToolset
 from pydantic_ai_harness.subagents import SubAgent, SubAgents
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
-from kibernikto.ai.agent.harness.credit_tier import credit_tier
+from kibernikto.ai.agent.harness.tariff import expert_allowed
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 
 logger = logging.getLogger(__name__)
@@ -44,13 +44,6 @@ def resolve_expert_model(model: Model | None, model_name: str | None) -> Model |
     if model is not None:
         return model
     return infer_kibernikto_model(model_name) if model_name else ...
-
-
-def expert_allowed(*, credits: int | None, is_personal: bool) -> bool:
-    """Paid experts: personal chats in the rich tier only; a group chat never sees them."""
-    if not is_personal or credits is None:
-        return False
-    return credit_tier(credits) == "rich"
 
 
 async def conversation_credits(ctx: RunContext[KiberniktoDeps]) -> int | None:
