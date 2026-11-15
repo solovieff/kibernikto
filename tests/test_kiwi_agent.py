@@ -14,6 +14,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai_harness.subagents import SubAgent
 
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
 from kibernikto.ai.agent.addons.travel.kiwi.config import KiwiSettings
 from kibernikto.ai.agent.addons.travel.kiwi.agent import build_kiwi_expert, search_only_toolset
@@ -88,13 +89,13 @@ class KiwiGatingTests(unittest.IsolatedAsyncioTestCase):
         return RunContext(deps=TelegramDeps(is_personal=personal, chat_info=ConversationInfo(credits=credits)),
                           model=TestModel(), usage=RunUsage(), conversation_id='42')
 
-    async def test_two_experts_have_independent_thresholds(self):
+    async def test_gated_expert_needs_rich_personal_chat_and_others_stay(self):
         kiwi = build_kiwi_expert(model=TestModel(), toolset=FunctionToolset())
-        other = SubAgent(kiwi.agent, name='vkusvill')
-        roster = CreditGatedSubAgents(agents=[kiwi, other], min_credits=2000,
-                                      gated_thresholds={'kiwi': 3000, 'vkusvill': 2000})
-        for credits, personal, expected in [(2000, True, set()), (2001, True, {'vkusvill'}),
-                                            (3001, True, {'kiwi', 'vkusvill'}), (5000, False, set())]:
-            with self.subTest(credits=credits, personal=personal):
-                run = await roster.for_run(self.context(credits, personal))
-                self.assertEqual({a.name for a in run.agents}, expected)
+        free = SubAgent(kiwi.agent, name='free')
+        roster = CreditGatedSubAgents(agents=[kiwi, free], gated_names=('kiwi',))
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RICH_CREDITS', 500):
+            for credits, personal, expected in [(499, True, {'free'}), (500, True, {'kiwi', 'free'}),
+                                                (5000, False, {'free'})]:
+                with self.subTest(credits=credits, personal=personal):
+                    run = await roster.for_run(self.context(credits, personal))
+                    self.assertEqual({a.name for a in run.agents}, expected)

@@ -26,9 +26,6 @@ class VkusvillSettings(BaseSettings):
     ENABLED: bool = Field(
         default=False, description='Wire the shop expert into build_multi_agent() delegation',
     )
-    MIN_CREDITS: int = Field(
-        default=2000, description='Personal chats above this balance may delegate to the shop; 0 = no floor',
-    )
     HISTORY_SIZE: int = Field(
         default=49, description='Message window for the shop agent; larger than the library default',
     )

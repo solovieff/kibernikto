@@ -57,7 +57,7 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
         image_agent.model = infer_kibernikto_model(AGENT_KIBERNIKTO_SETTINGS.POOR_MODEL)
     web_capabilities, web_experts = web_layout()
     experts = [*(SubAgent(agent) for agent in _EXPERT_AGENTS), *web_experts, *delegates]
-    gated_thresholds: dict[str, int] = {}
+    gated_names: list[str] = []
     roster: KiberniktoSubAgents
     # Optional experts are loaded only when enabled.
     from kibernikto.ai.agent.addons.business.config import BUSINESS_SETTINGS
@@ -75,23 +75,23 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
             from kibernikto.ai.agent.addons.vkusvill.agent import build_vkusvill_expert
 
             experts.append(build_vkusvill_expert())
-            gated_thresholds['vkusvill'] = VKUSVILL_SETTINGS.MIN_CREDITS
+            gated_names.append('vkusvill')
         if TRAVEL_SETTINGS.active:
             from kibernikto.ai.agent.addons.travel.agent import build_travel_expert
 
             experts.append(build_travel_expert(shared_capabilities=[reaction]))
-            gated_thresholds['travel'] = TRAVEL_SETTINGS.MIN_CREDITS
+            gated_names.append('travel')
         if BUSINESS_SETTINGS.active:
             from kibernikto.ai.agent.addons.business.agent import build_business_expert
 
             experts.append(build_business_expert())
-            gated_thresholds['business'] = BUSINESS_SETTINGS.MIN_CREDITS
+            gated_names.append('business')
         roster = CreditGatedSubAgents(
             agents=experts,
             agent_folders=None,
             contain_errors=True,
             shared_capabilities=[reaction],
-            gated_thresholds=gated_thresholds,
+            gated_names=tuple(gated_names),
         )
     else:
         roster = KiberniktoSubAgents(
@@ -108,7 +108,7 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
         history_storage=get_history_storage(name),
         # Memory/recall live on the parent: no extra LLM hop per remembered fact.
         capabilities=[
-            CreditTier(extra_features=gated_thresholds), ConversationMemory(name), *web_capabilities, roster,
+            CreditTier(), ConversationMemory(name), *web_capabilities, roster,
             BackgroundDelegation(),
         ],
     )

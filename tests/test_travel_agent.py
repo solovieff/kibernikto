@@ -17,6 +17,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry
 
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
@@ -203,9 +204,10 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
              patch('kibernikto.ai.agent.addons.travel.agent.build_travel_expert', return_value=expert), \
              patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
-             patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()):
+             patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()), \
+             patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RICH_CREDITS', 500):
             parent = build_multi_agent()
-            for credits, personal, expected in [(2001, True, 1), (2000, True, 0), (5000, False, 0)]:
+            for credits, personal, expected in [(500, True, 1), (499, True, 0), (5000, False, 0)]:
                 with self.subTest(credits=credits, personal=personal):
                     seen.clear()
                     deps = TelegramDeps(is_personal=personal, chat_info=ConversationInfo(credits=credits), billable=False)
@@ -216,10 +218,9 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
                     if expected:
                         self.assertIn('hotel-found-from-tutu', str(result.output))
 
-    async def test_parent_roster_exposes_travel_not_kiwi_and_reports_credit_status(self):
+    async def test_parent_roster_exposes_travel_but_not_kiwi(self):
         travel_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
-        from kibernikto.ai.agent.harness.credit_tier import CreditTier
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
              patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
@@ -230,11 +231,6 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('travel', names)
             self.assertNotIn('kiwi', names)
             self.assertNotIn('tutu', names)
-            tier = next(cap for cap in parent.root_capability.capabilities if isinstance(cap, CreditTier))
-            self.assertIn('travel (>2000 credits, available)', (await tier.check_credits(self.context(2001, True))).lower())
-            self.assertIn('travel (>2000 credits, locked)', (await tier.check_credits(self.context(2000, True))).lower())
-            self.assertIn('travel (>2000 credits, unavailable in groups)',
-                          (await tier.check_credits(self.context(5000, False))).lower())
 
     async def test_default_travel_roster_includes_both_sources(self):
         travel = travel_module()
@@ -271,7 +267,6 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         defaults = config.TravelSettings(_env_file=None)
         self.assertFalse(defaults.ENABLED)
-        self.assertEqual(defaults.MIN_CREDITS, 2000)
         for travel_on in (False, True):
             for shop_on in (False, True):
                 with self.subTest(travel=travel_on, shop=shop_on), \
@@ -287,39 +282,22 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual('vkusvill' in names, shop_on)
                     self.assertNotIn('kiwi', names)
 
-    async def test_travel_and_shop_thresholds_are_independent(self):
+    async def test_travel_and_shop_share_the_rich_tier_rule(self):
         travel_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
         with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
              patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
-             patch.object(config.TRAVEL_SETTINGS, 'MIN_CREDITS', 2000), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', True), \
-             patch.object(VKUSVILL_SETTINGS, 'MIN_CREDITS', 2500):
+             patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RICH_CREDITS', 500):
             parent = build_multi_agent()
             rosters = []
             parent.root_capability.apply(
                 lambda c: rosters.append(c) if isinstance(c, CreditGatedSubAgents) else None)
-            for credits, personal, expected in [(2000, True, set()), (2001, True, {'travel'}),
-                                                (2500, True, {'travel'}), (2501, True, {'travel', 'vkusvill'}),
+            for credits, personal, expected in [(499, True, set()), (500, True, {'travel', 'vkusvill'}),
                                                 (9000, False, set())]:
                 with self.subTest(credits=credits, personal=personal):
                     run = await rosters[0].for_run(self.context(credits, personal))
                     self.assertEqual({a.name for a in run.agents} & {'travel', 'vkusvill'}, expected)
-
-    async def test_zero_credit_threshold_remains_private(self):
-        travel_module()
-        config = importlib.import_module('kibernikto.ai.agent.addons.travel.config')
-        from kibernikto.ai.agent.harness.credit_tier import CreditTier
-        with patch.object(config.TRAVEL_SETTINGS, 'ENABLED', True), \
-             patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
-             patch.object(config.TRAVEL_SETTINGS, 'MIN_CREDITS', 0), \
-             patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
-            parent = build_multi_agent()
-            tier = next(c for c in parent.root_capability.capabilities if isinstance(c, CreditTier))
-            self.assertIn('travel (no minimum credits, available)',
-                          (await tier.check_credits(self.context(0, True))).lower())
-            self.assertIn('travel (no minimum credits, unavailable in groups)',
-                          (await tier.check_credits(self.context(3000, False))).lower())
 
     async def test_expert_failure_is_contained_for_travel_agent(self):
         travel, tutu_agent = travel_module(), tutu_module()

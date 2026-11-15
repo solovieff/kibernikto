@@ -82,7 +82,6 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
     effort: int | None = None  # None = ``AGENT_KIBERNIKTO_RUN_EFFORT``.
     models: dict[str, Model] = field(default_factory=dict)  # Model-name cache; pre-fill to inject models.
     conversation_id: str | None = None
-    extra_features: dict[str, int] = field(default_factory=dict)
     _run_info: ConversationInfo | None = field(default=None, init=False, repr=False)
     _delegations: int = field(default=0, init=False, repr=False)  # Per-run copy only (see ``for_run``).
 
@@ -119,20 +118,10 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
             return "credits: untracked (non-billable run)"
         info = await self._load_info(ctx.deps, cid)
         is_admin = isinstance(ctx.deps, KiberniktoDeps) and ctx.deps.is_admin
-        status = format_credit_status(
+        return format_credit_status(
             info.credits, effort=self._run_cost(info), subagent_effort=AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT,
             conversation_id=cid, is_admin=is_admin,
         )
-        if not self.extra_features:
-            return status
-        personal = getattr(ctx.deps, 'is_personal', True)
-        features = []
-        for name, threshold in self.extra_features.items():
-            requirement = f'>{threshold} credits' if threshold > 0 else 'no minimum credits'
-            availability = ('unavailable in groups' if not personal else
-                            'available' if threshold <= 0 or info.credits > threshold else 'locked')
-            features.append(f'{name} ({requirement}, {availability})')
-        return status + ' | extra features (private chats only): ' + ', '.join(features)
 
     async def before_run(self, ctx: RunContext[KiberniktoDeps]) -> None:
         if AGENT_KIBERNIKTO_SETTINGS.ALLOW_ZERO_CREDITS:

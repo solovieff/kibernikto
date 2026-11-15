@@ -16,6 +16,7 @@ from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
+from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
@@ -42,7 +43,6 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {}, clear=True):
             missing = config.BusinessSettings(_env_file=None)
             self.assertFalse(missing.configured)
-            self.assertEqual(missing.MIN_CREDITS, 2000)
             with patch.dict(os.environ, {'AGENT_BUSINESS_DADATA_TOKEN': 'demo-api:demo-secret'}):
                 configured = config.BusinessSettings(_env_file=None)
                 self.assertTrue(configured.configured)
@@ -120,14 +120,14 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
     async def test_no_key_means_no_business_agent(self):
         business_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
-        from kibernikto.ai.agent.harness.credit_tier import CreditTier
         with patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', None), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', False), \
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
             parent = build_multi_agent()
-            tier = next(c for c in parent.root_capability.capabilities if isinstance(c, CreditTier))
-            self.assertNotIn('business', tier.extra_features)
-            self.assertNotIn('business', (await tier.check_credits(self.context(3000, True))).lower())
+            from kibernikto.ai.agent.harness.delegation import KiberniktoSubAgents
+            found = []
+            parent.root_capability.apply(lambda c: found.append(c) if isinstance(c, KiberniktoSubAgents) else None)
+            self.assertNotIn('business', {a.name for cap in found for a in cap.agents})
 
     async def test_invalid_token_warns_without_disclosing_it(self):
         business_module()
@@ -142,7 +142,7 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('AGENT_BUSINESS_DADATA_TOKEN', str(logs.output))
         self.assertNotIn('bad-secret-token', str(logs.output))
 
-    async def test_parent_delegates_only_private_and_strictly_above_threshold(self):
+    async def test_parent_delegates_only_private_and_rich(self):
         business = business_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
         from pydantic import SecretStr
@@ -170,9 +170,10 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
              patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
              patch('kibernikto.ai.agent.addons.business.agent.build_business_expert', return_value=expert), \
              patch('kibernikto.ai.agent.telegram.multi_agent.get_history_storage', return_value=MemoryHistoryStorage()), \
-             patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()):
+             patch('kibernikto.ai.agent.telegram.multi_agent.ConversationMemory', return_value=AbstractCapability()), \
+             patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RICH_CREDITS', 500):
             parent = build_multi_agent()
-            for credits, personal, expected in [(2000, True, 0), (2001, True, 1), (9000, False, 0)]:
+            for credits, personal, expected in [(499, True, 0), (500, True, 1), (9000, False, 0)]:
                 with self.subTest(credits=credits, personal=personal):
                     seen.clear()
                     deps = TelegramDeps(is_personal=personal, chat_info=ConversationInfo(credits=credits), billable=False)
@@ -183,27 +184,20 @@ class BusinessTests(unittest.IsolatedAsyncioTestCase):
                     if expected:
                         self.assertIn('company-verified-from-dadata', result.output)
 
-    async def test_business_roster_is_separately_gated_and_advertised(self):
+    async def test_business_roster_is_gated_with_travel(self):
         business_module()
         config = importlib.import_module('kibernikto.ai.agent.addons.business.config')
-        from kibernikto.ai.agent.harness.credit_tier import CreditTier
         from pydantic import SecretStr
         with patch.object(config.BUSINESS_SETTINGS, 'ENABLED', True), \
              patch.object(config.BUSINESS_SETTINGS, 'DADATA_TOKEN', SecretStr('demo-api:demo-secret')), \
-             patch.object(config.BUSINESS_SETTINGS, 'MIN_CREDITS', 2000), \
              patch.object(TRAVEL_SETTINGS, 'ENABLED', True), \
              patch('kibernikto.ai.agent.addons.travel.tutu.config.TUTU_SETTINGS.ENABLED', True), \
-             patch.object(TRAVEL_SETTINGS, 'MIN_CREDITS', 3000), \
-             patch.object(VKUSVILL_SETTINGS, 'ENABLED', False):
+             patch.object(VKUSVILL_SETTINGS, 'ENABLED', False), \
+             patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RICH_CREDITS', 500):
             parent = build_multi_agent()
             rosters = []
             parent.root_capability.apply(lambda c: rosters.append(c) if isinstance(c, CreditGatedSubAgents) else None)
-            for credits, personal, expected in [(2000, True, set()), (2001, True, {'business'}),
-                                                (3001, True, {'business', 'travel'}), (9000, False, set())]:
+            for credits, personal, expected in [(499, True, set()), (500, True, {'business', 'travel'}),
+                                                (9000, False, set())]:
                 run = await rosters[0].for_run(self.context(credits, personal))
                 self.assertEqual({a.name for a in run.agents} & {'business', 'travel'}, expected)
-            tier = next(c for c in parent.root_capability.capabilities if isinstance(c, CreditTier))
-            self.assertIn('business (>2000 credits, available)',
-                          (await tier.check_credits(self.context(2001, True))).lower())
-            self.assertIn('business (>2000 credits, unavailable in groups)',
-                          (await tier.check_credits(self.context(9000, False))).lower())

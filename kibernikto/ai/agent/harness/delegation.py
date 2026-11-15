@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 
 from pydantic_ai import RunContext
 from pydantic_ai.models import Model
@@ -13,6 +13,7 @@ from pydantic_ai.toolsets import AbstractToolset
 from pydantic_ai_harness.subagents import SubAgent, SubAgents
 
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
+from kibernikto.ai.agent.harness.credit_tier import credit_tier
 from kibernikto.ai.agent.utils import infer_kibernikto_model
 
 logger = logging.getLogger(__name__)
@@ -45,13 +46,11 @@ def resolve_expert_model(model: Model | None, model_name: str | None) -> Model |
     return infer_kibernikto_model(model_name) if model_name else ...
 
 
-def expert_allowed(*, credits: int | None, is_personal: bool, min_credits: int) -> bool:
-    """Personal chats above the credit floor only; a group chat never sees gated experts."""
-    if not is_personal:
+def expert_allowed(*, credits: int | None, is_personal: bool) -> bool:
+    """Paid experts: personal chats in the rich tier only; a group chat never sees them."""
+    if not is_personal or credits is None:
         return False
-    if min_credits <= 0:
-        return True
-    return credits is not None and credits > min_credits
+    return credit_tier(credits) == "rich"
 
 
 async def conversation_credits(ctx: RunContext[KiberniktoDeps]) -> int | None:
@@ -83,23 +82,19 @@ class CreditGatedSubAgents(KiberniktoSubAgents):
     """Roster per run: gated experts disappear when the conversation may not use them."""
 
     gated_names: tuple[str, ...] = ()
-    min_credits: int = 0
-    gated_thresholds: dict[str, int] = field(default_factory=dict)
 
     async def for_run(self, ctx: RunContext[object]) -> KiberniktoSubAgents:
         run = await super().for_run(ctx)
-        thresholds = {name: self.min_credits for name in self.gated_names}
-        thresholds.update(self.gated_thresholds)
-        if not thresholds:
+        if not self.gated_names:
             return run
         credits = await conversation_credits(ctx)
         personal = getattr(ctx.deps, "is_personal", True)
 
         def permitted(agent: SubAgent) -> bool:
             name = _agent_name(agent)
-            if name is None or name not in thresholds:
+            if name is None or name not in self.gated_names:
                 return True
-            return expert_allowed(credits=credits, is_personal=personal, min_credits=thresholds[name])
+            return expert_allowed(credits=credits, is_personal=personal)
 
         kept = [agent for agent in run.agents if permitted(agent)]
         if len(kept) == len(run.agents):

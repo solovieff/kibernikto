@@ -50,8 +50,8 @@ speech provider receives the reply text and delivery tags; no FFmpeg processing 
 
 `AGENT_TRAVEL_ENABLED=true` enables one travel coordinator in the multi-agent bot. It can delegate to
 Tutu (hotels, flights, rail, buses and commuter trains) and Kiwi (flight search). The bundled deployment
-example enables it; the library default is disabled. Access is limited to private chats with credits strictly
-above `AGENT_TRAVEL_MIN_CREDITS` (default 2000; zero disables the credit minimum but not the private-chat rule).
+example enables it; the library default is disabled. Access is limited to private chats in the rich credit tier
+(`AGENT_KIBERNIKTO_RICH_CREDITS`).
 The coordinator, Tutu and Kiwi models can be set independently with `AGENT_TRAVEL_MODEL_NAME`,
 `AGENT_TRAVEL_TUTU_MODEL_NAME` and `AGENT_TRAVEL_KIWI_MODEL_NAME`; when unset, each uses the default agent model.
 `AGENT_TRAVEL_TUTU_MCP_URL` and `AGENT_TRAVEL_KIWI_MCP_URL` override the endpoints. `AGENT_TRAVEL_MAX_TOOL_CALLS`
@@ -77,8 +77,8 @@ Set `AGENT_BUSINESS_DADATA_TOKEN` to the DaData API key and secret key joined by
 private runtime environment. Never commit the value or put it in the MCP URL. The agent is available only when
 both keys are present and the token is well-formed; a malformed token disables it and emits a warning without
 printing the token. `AGENT_BUSINESS_ENABLED` (default `false`) is an opt-in: set it to `true` to load the
-agent; without it the token alone does nothing. `AGENT_BUSINESS_MIN_CREDITS` defaults to 2000 (strictly greater, private chats only;
-zero removes the minimum but keeps the private-chat restriction). `AGENT_BUSINESS_MODEL_NAME` is optional,
+agent; without it the token alone does nothing. Access is limited to private chats in the rich credit tier.
+`AGENT_BUSINESS_MODEL_NAME` is optional,
 and `AGENT_BUSINESS_MAX_TOOL_CALLS` defaults to 20. The official MCP provides company and entrepreneur lookup,
 company lookup by domain/email, and address standardization. A subset of calls can incur DaData charges; check
 https://dadata.ru/mcp/ and your account's tariff. Requests send the supplied business identifiers or addresses

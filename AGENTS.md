@@ -53,7 +53,7 @@ CLI (kibernikto command / main.py)
 - VkusVill: `main.py --vkusvill` swaps the agent, the transport stays stock; tools come from `MCPToolset`
   (`kibernikto/ai/agent/addons/vkusvill/mcp.py`). There is no order tool upstream — the flow ends with a cart share link
 - VkusVill as an expert (`AGENT_VKUSVILL_ENABLED=true`): `build_vkusvill_expert()` joins the delegation roster and
-  `CreditGatedSubAgents` drops it per run unless the chat is private and above `AGENT_VKUSVILL_MIN_CREDITS`
+  `CreditGatedSubAgents` drops it per run unless the chat is private and in the rich credit tier (`AGENT_KIBERNIKTO_RICH_CREDITS`)
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)
