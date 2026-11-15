@@ -57,7 +57,8 @@ CLI (kibernikto command / main.py)
 - here.now expert (`AGENT_HERENOW_ENABLED=true` + `AGENT_HERENOW_API_KEY`): `build_herenow_expert()` publishes static
   sites into the workspace from `AGENT_HERENOW_WORKSPACE`; the chat→site mapping is the provider's site label
   (`{label}.{workspace}.here.now`, label = Telegram username or `u<chat_id>`), so no local registry exists — see
-  `kibernikto/ai/agent/addons/herenow/routing.py`. Sites are not deletable through the bot: only publish/update/metadata.
+  `kibernikto/ai/agent/addons/herenow/routing.py`. `delete_site` removes the site for good on an explicit request;
+  here.now drops the label and versions with it, and the next publish mints a fresh site under the same label.
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)

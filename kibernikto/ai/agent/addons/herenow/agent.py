@@ -17,7 +17,7 @@ from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from ._prompts import HERENOW_INSTRUCTIONS
 from .client import HereNowClient, HereNowError, PublishedSite, SiteFile
 from .config import HERENOW_SETTINGS, HereNowSettings
-from .routing import publish_for_chat, site_for_chat
+from .routing import chat_label, delete_for_chat, publish_for_chat, site_for_chat
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,21 @@ def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model:
         except HereNowError as exc:
             return _error_text(exc)
         return 'Настройки сайта обновлены.'
+
+    @agent.tool
+    async def delete_site(ctx: RunContext[TelegramDeps]) -> str:
+        """Удалить сайт этого чата навсегда.
+
+        Вызывай только по явной просьбе удалить сайт или страницу. Адрес перестаёт открываться, версии
+        пропадают; для правок используй publish_site.
+        """
+        try:
+            slug = await delete_for_chat(herenow, ctx.deps)
+        except HereNowError as exc:
+            return _error_text(exc)
+        if slug is None:
+            return 'У этого чата нет сайта: удалять нечего.'
+        return f'Сайт удалён. {chat_label(ctx.deps)}.{_workspace_suffix(settings)} больше не открывается.'
 
     @agent.tool
     async def site_info(ctx: RunContext[TelegramDeps]) -> str:

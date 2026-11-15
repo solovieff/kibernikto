@@ -176,6 +176,11 @@ class HereNowClient:
         async with self._session() as session:
             return await self._call(session, 'GET', f'/api/v1/publish/{slug}')
 
+    async def delete_site(self, slug: str) -> None:
+        """Delete the site for good; here.now drops its label and versions with it."""
+        async with self._session() as session:
+            await self._call(session, 'DELETE', f'/api/v1/publish/{slug}', ok=(200, 202, 204))
+
     async def set_access(self, slug: str, mode: str = ANYONE_WITH_LINK) -> dict:
         """Set the visitor policy; workspace sites start as members-only, so a new chat site must be opened."""
         async with self._session() as session:

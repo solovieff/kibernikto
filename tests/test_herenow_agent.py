@@ -17,7 +17,12 @@ from pydantic_ai.models.function import FunctionModel
 from kibernikto.ai.agent.addons.herenow.address import label_for_chat
 from kibernikto.ai.agent.addons.herenow.client import HereNowClient, HereNowError, PublishedSite, SiteFile
 from kibernikto.ai.agent.addons.herenow.config import HereNowSettings
-from kibernikto.ai.agent.addons.herenow.routing import chat_label, publish_for_chat, site_for_chat
+from kibernikto.ai.agent.addons.herenow.routing import (
+    chat_label,
+    delete_for_chat,
+    publish_for_chat,
+    site_for_chat,
+)
 from kibernikto.ai.agent.telegram.deps import TelegramDeps
 from kibernikto.ai.agent.telegram.multi_agent import build_multi_agent
 from kibernikto.ai.agent.addons.travel.config import TRAVEL_SETTINGS
@@ -38,6 +43,7 @@ class FakeClient:
         self.published: list[tuple[str | None, list[SiteFile], str | None]] = []
         self.assigned: list[tuple[str, str]] = []
         self.deleted: list[str] = []
+        self.deleted_sites: list[str] = []
         self.opened: list[str] = []
         self.patched: list[tuple[str, dict]] = []
         self.update_error: HereNowError | None = None
@@ -80,6 +86,14 @@ class FakeClient:
         if slug in self.gone:
             raise HereNowError('http_404', 'site not found')
         return {'slug': slug, 'siteUrl': f'https://{slug}.here.now/', 'currentVersionId': 'v1'}
+
+    async def delete_site(self, slug: str) -> None:
+        # The provider drops the label together with the site.
+        self.deleted_sites.append(slug)
+        self.gone.add(slug)
+        for label, record in list(self.label_records.items()):
+            if record.get('slug') == slug:
+                self.label_records.pop(label, None)
 
     async def set_access(self, slug: str, mode: str = 'anyone_with_link') -> dict:
         if slug in self.gone:
@@ -246,6 +260,34 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42, username='gosu'))
         self.assertEqual(result.output.splitlines()[-1], 'https://gosu.kibernikto.here.now')
         self.assertEqual(client.published[0][1][0].content_type, 'text/html; charset=utf-8')
+
+    async def test_delete_removes_the_chat_site_and_frees_the_label(self):
+        agent_module = herenow_agent()
+        client = FakeClient()
+        await self._publish(client, TelegramDeps(user_id=42, username='gosu'))
+        expert = agent_module.build_herenow_expert(model=self._model('delete_site', {}), client=client)
+        result = await expert.agent.run('удали сайт', deps=TelegramDeps(user_id=42, username='gosu'))
+        self.assertEqual(client.deleted_sites, ['site1'])
+        self.assertEqual(client.label_records, {})
+        self.assertIn('удалён', result.output)
+
+    async def test_delete_without_a_site_does_not_call_the_provider(self):
+        agent_module = herenow_agent()
+        client = FakeClient()
+        expert = agent_module.build_herenow_expert(model=self._model('delete_site', {}), client=client)
+        result = await expert.agent.run('удали сайт', deps=TelegramDeps(user_id=42))
+        self.assertEqual(client.deleted_sites, [])
+        self.assertIn('нет сайта', result.output)
+
+    async def test_delete_tolerates_a_site_that_is_already_gone(self):
+        client = FakeClient({'gosu': {'label': 'gosu', 'slug': 'site1', 'status': 'active',
+                                      'url': 'https://gosu.kibernikto.here.now'}})
+
+        async def missing(slug: str) -> None:
+            raise HereNowError('http_404', 'site not found')
+
+        client.delete_site = missing
+        self.assertEqual(await delete_for_chat(client, TelegramDeps(user_id=42, username='gosu')), 'site1')
 
     async def test_no_key_means_no_herenow_agent(self):
         with patch.object(TRAVEL_SETTINGS, 'ENABLED', False), \

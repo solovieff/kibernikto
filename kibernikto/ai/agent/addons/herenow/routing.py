@@ -45,6 +45,20 @@ async def publish_for_chat(client: HereNowClient, deps: object, files: list[Site
     return await _route(client, label, site)
 
 
+async def delete_for_chat(client: HereNowClient, deps: object) -> str | None:
+    """Delete this chat's site; returns its slug, or ``None`` when the chat never had one."""
+    slug = await active_slug(client, chat_label(deps))
+    if not slug:
+        return None
+    try:
+        await client.delete_site(slug)
+    except HereNowError as exc:
+        if exc.code not in _STALE_CODES:
+            raise
+        logger.info('here.now site %s was already gone', slug)
+    return slug
+
+
 async def site_for_chat(client: HereNowClient, deps: object) -> tuple[str, str | None, PublishedSite | None]:
     """Label, slug and live site of this chat; the site is ``None`` before the first publish."""
     label = chat_label(deps)
