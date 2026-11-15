@@ -13,7 +13,7 @@ class StorageSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_STORAGE_")
 
     FILESTORE_LOCATION: str = Field(default="~/.kibernikto", description="Root directory for file-based storage")
-    DATA_BACKEND: Literal["file", "pg", "sqlite"] = Field(default="file")
+    DATA_BACKEND: Literal["file", "pg", "sqlite", "logfire"] = Field(default="file")
     MEDIA_BACKEND: Literal["file", "s3"] = Field(default="file")
 
     PG_DSN: str | None = Field(default=None, description="postgresql+asyncpg://user:pass@host:5432/db")

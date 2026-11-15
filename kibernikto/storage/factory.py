@@ -28,6 +28,9 @@ def get_history_storage(name: str = "default") -> "HistoryStorage":
     if STORAGE_SETTINGS.DATA_BACKEND in ("pg", "sqlite"):
         from kibernikto.storage.sql.history import SqlHistoryStorage
         storage: HistoryStorage = SqlHistoryStorage(name=name)
+    elif STORAGE_SETTINGS.DATA_BACKEND == "logfire":
+        from kibernikto.storage.logfire.history import LogfireHistoryStorage
+        storage = LogfireHistoryStorage(name=name)
     else:
         from kibernikto.storage.file.history import FileStoreHistoryStorage
         storage = FileStoreHistoryStorage(name=name)
