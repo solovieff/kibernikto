@@ -46,14 +46,20 @@ def get_chat_data_storage() -> "ChatDataStore":
     if _chat_data_storage is not None:
         return _chat_data_storage
 
+    from kibernikto.storage.base import LoggedChatData
+
     if STORAGE_SETTINGS.DATA_BACKEND in ("pg", "sqlite"):
         from kibernikto.storage.sql.chat_data import SqlChatDataStorage
-        _chat_data_storage = SqlChatDataStorage()
+        inner: ChatDataStore = SqlChatDataStorage()
+    elif STORAGE_SETTINGS.DATA_BACKEND == "logfire":
+        from kibernikto.storage.logfire.chat_data import LogfireChatDataStorage
+        inner = LogfireChatDataStorage()  # Its failed query serves defaults: a load snapshot would overwrite the real balance.
     else:
         from kibernikto.storage.file.chat_data import ChatDataStorage
-        _chat_data_storage = ChatDataStorage()
+        inner = ChatDataStorage()
 
-    logger.info("Chat data backend: %s -> %s", STORAGE_SETTINGS.DATA_BACKEND, type(_chat_data_storage).__name__)
+    _chat_data_storage = LoggedChatData(inner, snapshot_on_load=STORAGE_SETTINGS.DATA_BACKEND != "logfire")
+    logger.info("Chat data backend: %s -> %s", STORAGE_SETTINGS.DATA_BACKEND, type(inner).__name__)
     return _chat_data_storage
 
 

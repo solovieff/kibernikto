@@ -1,13 +1,19 @@
 import dataclasses
+import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Protocol, runtime_checkable
 
+import logfire
 from pydantic import TypeAdapter
 from pydantic_ai.messages import FilePart, ModelMessage, ModelRequest, ModelResponse, ThinkingPart
 
 if TYPE_CHECKING:  # Annotation-only: a runtime import closes storage.models -> core.config -> agent -> storage.base.
     from kibernikto.storage.models import ConversationInfo
+
+logger = logging.getLogger(__name__)
+
+CHAT_DATA_RECORD = "chat_data"  # Record name shared by the writer (LoggedChatData) and the Logfire reader.
 
 _DEFAULT_HISTORY_SIZE = 13
 
@@ -144,6 +150,35 @@ class ChatDataStore(Protocol):
     async def load(self, conversation_id: str) -> ConversationInfo: ...
 
     async def save(self, conversation_id: str, info: ConversationInfo) -> None: ...
+
+
+def emit_chat_data(conversation_id: str, info: ConversationInfo) -> None:
+    """Write one ``chat_data`` Logfire record (the snapshot ``LogfireChatDataStorage`` reads back)."""
+    logfire.info(
+        CHAT_DATA_RECORD, conversation_id=str(conversation_id), credits=info.credits, response_mode=info.response_mode
+    )
+
+
+class LoggedChatData:
+    """``ChatDataStore`` decorator: every save, and the first load per chat, emits a ``chat_data`` record."""
+
+    def __init__(self, inner: ChatDataStore, *, snapshot_on_load: bool = True) -> None:
+        self._inner = inner
+        self._snapshot_on_load = snapshot_on_load  # Off for a backend whose load may return an unsaved fallback.
+        self._seen: set[str] = set()
+
+    async def load(self, conversation_id: str) -> ConversationInfo:
+        info = await self._inner.load(conversation_id)
+        cid = str(conversation_id)
+        if self._snapshot_on_load and cid not in self._seen:
+            self._seen.add(cid)
+            emit_chat_data(cid, info)  # Covers defaults the backend created inside load and pre-existing chats.
+        return info
+
+    async def save(self, conversation_id: str, info: ConversationInfo) -> None:
+        await self._inner.save(conversation_id, info)
+        self._seen.add(str(conversation_id))
+        emit_chat_data(conversation_id, info)
 
 
 class MemoryHistoryStorage:
