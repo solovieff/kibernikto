@@ -82,7 +82,7 @@ class Tariff:
         if not self.is_personal:
             return f"experts: locked: {listing} | reason: group chats never get them, write in a private chat | rule: {rule}"
         return (f"experts: locked: {listing} | reason: {self.credits_to_experts} more credits needed, "
-                f"top up with /pay | rule: {rule}")
+                f"top up the balance | rule: {rule}")
 
     def balance_text(self) -> str:
         """User-facing /balance message: balance, tier, expert access."""

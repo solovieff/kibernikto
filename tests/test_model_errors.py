@@ -54,12 +54,12 @@ class MapModelErrorTests(unittest.TestCase):
 class UserFacingModelErrorTests(unittest.TestCase):
     def test_image_routing_failure_gets_clear_hint(self) -> None:
         text = user_facing_model_error(ModelHTTPError(404, 'm', IMAGE_BODY))
-        self.assertIn('картинк', text)
+        self.assertIn('images', text)
         self.assertNotIn('routing', text)
         self.assertNotIn('endpoint', text)
 
     def test_status_codes_map_to_short_messages(self) -> None:
-        cases = {429: 'перегружена', 401: 'доступе', 403: 'доступе', 503: 'недоступна'}
+        cases = {429: 'overloaded', 401: 'denied', 403: 'denied', 503: 'unavailable'}
         for status, fragment in cases.items():
             with self.subTest(status=status):
                 self.assertIn(fragment, user_facing_model_error(ModelHTTPError(status, 'm', {'message': 'x'})))
@@ -119,7 +119,7 @@ class ConversationHandlerTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ModelHTTPError):
                 await conversation._process_and_reply(message)
         hint = answer.await_args.args[0]
-        self.assertIn('картинк', hint)
+        self.assertIn('images', hint)
         self.assertNotIn('failed_routing_step', hint)
         agent.reply_to.assert_not_awaited()
 
@@ -134,7 +134,7 @@ class ConversationHandlerTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(conversation._bridge_module, 'get_telegram_bridge', return_value=agent):
             with self.assertRaises(RuntimeError):
                 await conversation._process_and_reply(message)
-        self.assertIn('администратор', answer.await_args.args[0])
+        self.assertIn('administrator', answer.await_args.args[0])
 
 
 if __name__ == '__main__':

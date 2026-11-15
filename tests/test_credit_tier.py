@@ -372,8 +372,7 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(observed_tool_returns), 1)
         self.assertIn('credits: 120', observed_tool_returns[0])
         self.assertIn('tier: medium', observed_tool_returns[0])
-        self.assertIn('/balance', observed_tool_returns[0])
-        self.assertIn('/pay [stars]', observed_tool_returns[0])
+        self.assertNotIn('/pay [stars]', observed_tool_returns[0])
         self.assertNotIn('admin_commands', observed_tool_returns[0])
         self.assertEqual(self.chat_data.loads, 2)  # Initial load shared by _select + check_credits, plus after_run charge.
 

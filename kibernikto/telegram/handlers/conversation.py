@@ -31,7 +31,7 @@ async def _process_and_reply(message: Message) -> None:
     except Exception as error:
         # Re-raised so ErrorsMiddleware reports it; user gets a short hint instead of silence.
         hint = user_facing_model_error(error) if isinstance(error, ModelHTTPError) else (
-            "Не получилось ответить, сообщение передано администратору.")
+            "Could not answer, the message was passed to the administrator.")
         await message.answer(hint)
         raise
     await bridge.reply_to(message, result)

@@ -146,9 +146,9 @@ class VoiceDeliveryTests(unittest.IsolatedAsyncioTestCase):
             await cmd_toggle_voice(message)
         self.assertEqual(state.response_mode, 'text')
         explanation = message.answer.await_args.args[0]
-        self.assertIn('конфиденциальност', explanation.lower())
-        self.assertIn('голосов', explanation.lower())
-        self.assertIn('текстом', explanation.lower())
+        self.assertIn('privacy', explanation.lower())
+        self.assertIn('voice', explanation.lower())
+        self.assertIn('text', explanation.lower())
 
     async def test_voice_delivery_error_reverts_text_mode(self):
         from kibernikto.telegram.handlers.commands import cmd_toggle_voice
@@ -342,7 +342,7 @@ class VoiceDeliveryTests(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs('kibernikto.telegram.utils.conversation'):
             await reply(message, result)
         sent = [call.args[0].text for call in bot.await_args_list]
-        self.assertTrue(any('конфиденциальност' in text.lower() for text in sent))
+        self.assertTrue(any('privacy' in text.lower() for text in sent))
         self.assertTrue(any('Hello' in text for text in sent))
 
     async def test_links_stay_clickable_in_voice_mode(self):

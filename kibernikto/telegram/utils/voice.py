@@ -3,8 +3,8 @@
 from aiogram.exceptions import TelegramBadRequest
 
 VOICE_PRIVACY_NOTICE = (
-    'Telegram не разрешает мне отправлять тебе голосовые. '
-    'Проверь: Настройки → Конфиденциальность → Голосовые сообщения. Пока отвечаю текстом.'
+    'Telegram does not let me send you voice messages. '
+    'Check: Settings → Privacy → Voice Messages. Replying with text for now.'
 )
 
 

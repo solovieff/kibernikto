@@ -24,9 +24,9 @@ from .tools import attach_shop_tools
 
 VKUSVILL_EXPERT_NAME = 'vkusvill'
 VKUSVILL_EXPERT_DESCRIPTION = (
-    'Покупки во ВкусВилле: найти продукты по каталогу, собрать корзину и вернуть ссылку на неё, '
-    'пересобрать последнюю корзину без указанных позиций, а также забыть её, когда заказ оформлен. '
-    'Персональные скидки и история заказов — только после входа. Только личные покупки, не для общих вопросов.'
+    'Shopping at VkusVill: find products in the catalog, build a cart and return its link, '
+    'rebuild the last cart without the given items, and forget it once the order is placed. '
+    'Personal discounts and order history only after login. Personal shopping only, not for general questions.'
 )
 
 

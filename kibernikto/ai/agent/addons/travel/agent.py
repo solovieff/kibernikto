@@ -50,7 +50,7 @@ def build_travel_expert(*, settings: TravelSettings = TRAVEL_SETTINGS, model: Mo
     )
     return SubAgent(agent, name=TRAVEL_EXPERT_NAME,
                     description=(
-                        'Живой поиск путешествий: авиабилеты, жильё (отели, апартаменты, дома), поезда, автобусы и электрички через Туту, Kiwi и Travala. '
-                        'Только поиск предложений и расписаний, не для общих советов о городах, визах и погоде.'
+                        'Live travel search: flights, stays (hotels, apartments, houses), trains, buses and commuter trains via Tutu, Kiwi and Travala. '
+                        'Only searches offers and schedules, not for general advice on cities, visas and weather.'
                     ),
                     usage_limits=UsageLimits(tool_calls_limit=min(settings.MAX_TOOL_CALLS, COORDINATOR_MAX_TOOL_CALLS)))

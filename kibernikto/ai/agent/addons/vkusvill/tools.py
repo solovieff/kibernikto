@@ -12,11 +12,11 @@ def attach_shop_tools(agent: Agent[TelegramDeps]) -> Agent[TelegramDeps]:
 
     @agent.tool
     async def forget_shop_cart(ctx: RunContext[TelegramDeps]) -> str:
-        """Забыть последнюю корзину и найденные товары этого чата.
+        """Forget the last cart and the products found in this chat.
 
-        Вызывай, когда человек говорит, что заказ оформлен или оплачен, либо просит забыть корзину.
+        Call when the person says the order is placed or paid, or asks to forget the cart.
         """
         await forget_shop_memory(ctx.deps)
-        return 'Корзина и найденные товары забыты.'
+        return 'The cart and found products are forgotten.'
 
     return agent

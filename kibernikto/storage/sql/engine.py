@@ -52,10 +52,10 @@ def _create_engine() -> None:
 async def ensure_db_initialized() -> None:
     """Create tables once per process. Safe to call from any async context.
 
-    Telegram: вызывается в ``_on_startup`` (telegram_app.py) — engine создаётся
-    в том же event loop что и polling.
+    Telegram: called from ``_on_startup`` (telegram_app.py) — the engine is created
+    in the same event loop as polling.
 
-    Standalone (без Telegram): вызови один раз перед ``agent.run()``:
+    Standalone (no Telegram): call once before ``agent.run()``:
 
         await ensure_db_initialized()
         result = await agent.run('...', chat_id=123)

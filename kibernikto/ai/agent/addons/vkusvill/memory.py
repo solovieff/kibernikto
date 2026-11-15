@@ -51,7 +51,7 @@ def _product_line(item: dict[str, Any]) -> tuple[int, str] | None:
         product_id = int(item['id'])
     except (KeyError, TypeError, ValueError):
         return None
-    name = str(item.get('name') or f'товар {product_id}').replace('&nbsp;', ' ')
+    name = str(item.get('name') or f'item {product_id}').replace('&nbsp;', ' ')
     price = (item.get('price') or {}).get('current') if isinstance(item.get('price'), dict) else None
     return product_id, f'{name} — {price} ₽' if price is not None else name
 
@@ -81,9 +81,9 @@ def _render_basket(key: str, products: object, link: str) -> str:
             product_id = int(product['id'])
         except (KeyError, TypeError, ValueError):
             continue
-        name = seen.get(product_id, f'товар {product_id}').split(' — ')[0]
+        name = seen.get(product_id, f'item {product_id}').split(' — ')[0]
         lines.append(f'{name} × {product.get("q", 1)}')
-    return '; '.join(lines) + f'. Ссылка: {link}'
+    return '; '.join(lines) + f'. Link: {link}'
 
 
 def _state_path(key: str) -> str:
@@ -156,12 +156,12 @@ async def hydrate(key: str) -> None:
 
 SHOP_MEMORY_HEADING = 'Shop memory'
 SHOP_MEMORY_GUIDANCE = (
-    "У тебя есть блокнот про покупки этого человека. Сохранённые заметки приходят в блоке "
-    f"«{SHOP_MEMORY_HEADING}» его последнего сообщения — он их не писал и не видит, поэтому не цитируй их. "
-    "Записывай через write_memory только то, что действительно пригодится в следующий раз: "
-    "какие товары человек хвалил, что просил больше не брать, постоянные вкусы "
-    "(жирность, объём, бренд, «без сахара»). Не записывай случайные позиции и сам заказ целиком — "
-    "для него есть отдельная память корзины. Держи заметки короткими и правь их, а не дублируй."
+    "You have a notebook about this person's shopping. Saved notes arrive in the "
+    f"\"{SHOP_MEMORY_HEADING}\" block of their latest message; they neither wrote nor see them, so do not quote them. "
+    "Use write_memory only for what will really help next time: "
+    "products the person praised, what they asked never to take again, lasting tastes "
+    "(fat content, volume, brand, 'no sugar'). Do not store random items or the whole order: "
+    "the cart has its own memory. Keep notes short and edit them instead of duplicating."
 )
 
 
@@ -206,7 +206,7 @@ def catalog_note(deps: object) -> str:
         return ''
     lines = '\n'.join(f'- id {product_id}: {text}' for product_id, text in seen.items())
     return (
-        '\n\nТовары, уже найденные в этом чате (бери id отсюда, не ищи их заново):\n' + lines
+        '\n\nProducts already found in this chat (take ids from here, do not search for them again):\n' + lines
     )
 
 
@@ -217,9 +217,9 @@ def basket_note(deps: object) -> str:
     if not basket:
         return ''
     return (
-        '\n\nПоследняя собранная корзина в этом чате: ' + basket +
-        '\nЕсли просят что-то поменять — собери новый набор из тех же позиций с поправкой '
-        'и обязательно скажи: предыдущую корзину не открывай, актуальна новая.'
+        '\n\nLast cart built in this chat: ' + basket +
+        '\nIf asked to change something, build a new set from the same items with the fix '
+        'and be sure to say: do not open the previous cart, the new one is current.'
     )
 
 

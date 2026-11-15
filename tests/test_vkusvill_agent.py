@@ -125,19 +125,19 @@ class VkusvillAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_instructions_carry_the_shopping_contract(self) -> None:
         await self.agent.run('привет', deps=TelegramDeps())
         instructions = self.model.requests[-1].instructions or ''
-        self.assertIn('ВкусВилл', instructions)
-        self.assertIn('Не занимайся исследованиями', instructions)
-        self.assertIn('Не переспрашивай по понятному списку', instructions)
-        self.assertIn('Корзину создавай только когда просят собрать', instructions)
-        self.assertIn('не понимает «сок в маленькой таре»', instructions)
+        self.assertIn('VkusVill', instructions)
+        self.assertIn('Do no research', instructions)
+        self.assertIn('Do not ask about a clear list', instructions)
+        self.assertIn('Create a cart only when asked to build', instructions)
+        self.assertIn('but not "juice in a small container"', instructions)
         self.assertIn('sort="price_asc"', instructions)
         self.assertIn('category_id', instructions)
-        self.assertIn('не трать их на повторы', instructions)
+        self.assertIn('do not waste them on repeats', instructions)
         self.assertIn('mode="custom"', instructions)
         self.assertIn('vkusvill_product_details', instructions)
         self.assertIn('vkusvill_cart_link_create', instructions)
         self.assertIn('vkusvill.ru/mobile?basket&share=', instructions)
-        self.assertIn('не оформляешь заказ', instructions)
+        self.assertIn('do not place the order', instructions)
 
     async def test_generic_persona_is_not_injected(self) -> None:
         await self.agent.run('привет', deps=TelegramDeps())
@@ -161,8 +161,8 @@ class VkusvillExpertGateTests(unittest.TestCase):
     def test_expert_is_a_named_subagent_with_routing_description(self) -> None:
         expert = build_vkusvill_expert()
         self.assertEqual(expert.name, VKUSVILL_EXPERT_NAME)
-        self.assertIn('ВкусВилл', expert.description)
-        self.assertIn('забыть', expert.description)
+        self.assertIn('VkusVill', expert.description)
+        self.assertIn('forget', expert.description)
 
     def test_default_settings_keep_the_expert_off(self) -> None:
         self.assertFalse(VkusvillSettings().ENABLED)
@@ -232,7 +232,7 @@ class BasketMemoTests(unittest.IsolatedAsyncioTestCase):
         note = basket_note(ctx.deps)
         self.assertIn('Круассан на масле × 2', note)
         self.assertIn('share=1', note)
-        self.assertIn('предыдущую корзину не открывай', note)
+        self.assertIn('do not open the previous cart', note)
 
     async def test_conversations_do_not_leak_baskets(self) -> None:
         from kibernikto.ai.agent.addons.vkusvill.memory import basket_note, clear_basket, remember_basket

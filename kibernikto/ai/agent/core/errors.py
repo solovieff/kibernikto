@@ -14,7 +14,7 @@ class InsufficientCreditsError(Exception):
     """A billable run was refused because its chat has no credits left."""
 
     def __init__(self) -> None:
-        super().__init__('Кредиты закончились. Пополни баланс: /pay. Проверить баланс: /balance.')
+        super().__init__('Credits ran out. Top up: /pay. Check balance: /balance.')
 
 
 @dataclass(frozen=True)
@@ -46,20 +46,20 @@ def _status_and_body(code: int, fragment: str) -> Matcher:
 
 RULES: tuple[Rule, ...] = (
     Rule(_status_and_body(404, 'Filter by Image Support'),
-         ModelErrorInfo('no_image_support', 'Эта модель не умеет работать с картинками. Попробуй текст или выбери другую модель.')),
+         ModelErrorInfo('no_image_support', 'This model cannot work with images. Try text or pick another model.')),
     Rule(_status(429),
-         ModelErrorInfo('rate_limited', 'Модель сейчас перегружена, попробуй через минуту.')),
+         ModelErrorInfo('rate_limited', 'The model is overloaded right now, try again in a minute.')),
     Rule(_status(401, 403),
-         ModelErrorInfo('access_denied', 'Модель отказала в доступе. Сообщи администратору.')),
+         ModelErrorInfo('access_denied', 'The model denied access. Tell the administrator.')),
     Rule(_status(404),
-         ModelErrorInfo('model_not_found', 'Выбранная модель недоступна. Сообщи администратору.')),
+         ModelErrorInfo('model_not_found', 'The selected model is unavailable. Tell the administrator.')),
     Rule(_status(400, 413, 422),
-         ModelErrorInfo('bad_request', 'Запрос не принят моделью (слишком большой или неподходящий). Попробуй короче.')),
+         ModelErrorInfo('bad_request', 'The model rejected the request (too large or unsuitable). Try something shorter.')),
     Rule(_status(500, 502, 503, 504),
-         ModelErrorInfo('provider_unavailable', 'Модель временно недоступна, попробуй позже.')),
+         ModelErrorInfo('provider_unavailable', 'The model is temporarily unavailable, try again later.')),
 )
 
-FALLBACK = ModelErrorInfo('unknown', 'Не получилось получить ответ от модели. Попробуй ещё раз.')
+FALLBACK = ModelErrorInfo('unknown', 'Could not get an answer from the model. Try again.')
 
 
 def map_model_error(error: ModelHTTPError) -> ModelErrorInfo:

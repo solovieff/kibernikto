@@ -52,8 +52,8 @@ def build_business_expert(*, settings: BusinessSettings = BUSINESS_SETTINGS, mod
         agent,
         name='business',
         description=(
-            'DaData (только РФ): проверка российских компаний и ИП по ИНН, ОГРН, домену или почте; '
-            'стандартизация адресов РФ. Не для зарубежных компаний и общих вопросов.'
+            'DaData (Russia only): checks Russian companies and sole proprietors by INN, OGRN, domain or email; '
+            'standardizes Russian addresses. Not for foreign companies or general questions.'
         ),
         usage_limits=UsageLimits(tool_calls_limit=settings.MAX_TOOL_CALLS),
     )

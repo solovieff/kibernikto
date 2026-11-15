@@ -65,13 +65,13 @@ async def cmd_toggle_voice(message: types.Message) -> None:
     if info.response_mode == 'audio':
         info.response_mode = 'text'
         await chat_data.save(cid, info)
-        await message.answer('Ок, теперь отвечаю текстом.')
+        await message.answer('Ok, replying with text now.')
         return
     try:
-        audio = await synthesize_speech('Ок, теперь отвечаю голосом.')
+        audio = await synthesize_speech('Ok, replying with voice now.')
     except Exception:
         logger.exception('Failed to enable voice replies')
-        await message.answer('Не получилось включить голос. Пока отвечаю текстом.')
+        await message.answer('Could not enable voice. Replying with text for now.')
         return
     info = await chat_data.load(cid)
     info.response_mode = 'audio'
@@ -86,5 +86,5 @@ async def cmd_toggle_voice(message: types.Message) -> None:
         info = await chat_data.load(cid)
         info.response_mode = 'text'
         await chat_data.save(cid, info)
-        notice = VOICE_PRIVACY_NOTICE if voice_messages_restricted(error) else 'Не получилось отправить голосовое. Пока отвечаю текстом.'
+        notice = VOICE_PRIVACY_NOTICE if voice_messages_restricted(error) else 'Could not send the voice message. Replying with text for now.'
         await message.answer(notice)

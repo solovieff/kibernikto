@@ -36,7 +36,7 @@ def format_credit_status(
         is_admin: bool = False,
         is_personal: bool = True,
 ) -> str:
-    """Format the current credit balance, tier thresholds, paid-expert access and payment commands for the model."""
+    """Format the current credit balance, tier thresholds, and paid-expert access for the model."""
     s = AGENT_KIBERNIKTO_SETTINGS
     tariff = Tariff(credits, is_personal=is_personal)
     tier = tariff.tier
@@ -44,8 +44,7 @@ def format_credit_status(
     status = (
         f"credits: {credits} | tier: {tier} | "
         f"tiers: poor (<{s.POOR_CREDITS}), medium ({s.POOR_CREDITS}..{s.RICH_CREDITS - 1}), rich (>={s.RICH_CREDITS}) | "
-        f"at_zero: {zero_policy} | "
-        "commands: /balance (check balance), /pay [stars] (top up in private chat with Telegram Stars, 1 Star = 1 credit)"
+        f"at_zero: {zero_policy}"
     )
     if experts := tariff.experts_line():
         status += f" | {experts}"
@@ -103,14 +102,10 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         return FunctionToolset([self.check_credits])
 
     async def check_credits(self, ctx: RunContext[KiberniktoDeps]) -> str:
-        """Return this chat's tariff: credit balance, model tier, which paid experts are open or locked and why.
+        """Tariff info for this chat: credit balance, tier, which paid experts are available and the access rules.
 
-        Paid experts (site publishing, grocery shopping, travel search, company lookup) are hidden from your
-        delegation roster unless the chat is private and rich enough. Call this when the user asks about credits,
-        balance, limits, model quality or how to pay/top up, and ALSO whenever the user asks for something an expert
-        would do (build a website, buy groceries, find flights, check a company) and you have no such agent:
-        the result says whether it is locked, what is missing and how to unlock it, so explain that instead of
-        refusing or improvising.
+        Call it when the user asks about credits, limits or access, or wants something an expert would do
+        but none is in your roster. Explain the result to the user instead of refusing or improvising.
         """
         cid = _billable_conversation(ctx.deps, self.conversation_id or ctx.conversation_id)
         if cid is None:
