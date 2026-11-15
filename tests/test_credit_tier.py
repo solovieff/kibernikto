@@ -14,6 +14,7 @@ os.environ['APP_STORAGE_MEDIA_BACKEND'] = 'file'
 from pydantic_ai import ModelMessage, ModelResponse, RetryPromptPart, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.usage import RequestUsage
 from pydantic_ai_harness.exa import ExaSearch
 from pydantic_ai_harness.subagents import SubAgent, SubAgents
 
@@ -259,11 +260,11 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
             await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
         self.assertEqual(self.chat_data.rows['7'].credits, 100)
 
-    def _delegating_agent(self, calls: int, *, child_fails: bool = False):
+    def _delegating_agent(self, calls: int, *, child_fails: bool = False, child_usage: RequestUsage | None = None):
         def child_model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
             if child_fails:
                 raise RuntimeError('child down')
-            return ModelResponse(parts=[TextPart('child-done')])
+            return ModelResponse(parts=[TextPart('child-done')], usage=child_usage or RequestUsage())
 
         child = build_kibernikto_agent(model=FunctionModel(child_model), name='child', history_storage=None)
         child.description = 'test child'
@@ -287,10 +288,44 @@ class CreditTierTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.output, 'parent-done')
                 self.assertEqual(self.chat_data.rows['7'].credits, expected)
 
+    async def test_a_run_is_charged_by_its_tokens_above_the_floor(self) -> None:
+        heavy = ModelResponse(parts=[TextPart(MEDIUM)], usage=RequestUsage(input_tokens=9_000, output_tokens=3_000))
+        self.tier.models[MEDIUM] = FunctionModel(lambda messages, info: heavy)
+        await self.set_credits('7', 100)
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'TOKENS_PER_CREDIT', 5_000):
+            await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
+        self.assertEqual(self.chat_data.rows['7'].credits, 97)  # 12k tokens: 3 credits beats the floor of 1.
+
+    async def test_subagent_tokens_are_billed_into_the_same_run(self) -> None:
+        agent = self._delegating_agent(calls=1, child_usage=RequestUsage(input_tokens=9_000, output_tokens=3_000))
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'TOKENS_PER_CREDIT', 5_000), \
+                patch.object(AGENT_KIBERNIKTO_SETTINGS, 'SUBAGENT_EFFORT', 0):
+            await self.set_credits('7', 100)
+            await agent.run('hi', conversation_id='7', deps=TelegramDeps())
+        self.assertEqual(self.chat_data.rows['7'].credits, 97)  # The parent reports no tokens; the child's count.
+
+    async def test_cache_reads_are_priced_at_a_fraction_of_a_fresh_token(self) -> None:
+        cached = ModelResponse(parts=[TextPart(MEDIUM)], usage=RequestUsage(cache_read_tokens=50_000))
+        self.tier.models[MEDIUM] = FunctionModel(lambda messages, info: cached)
+        await self.set_credits('7', 100)
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'TOKENS_PER_CREDIT', 5_000), \
+                patch.object(AGENT_KIBERNIKTO_SETTINGS, 'CACHE_TOKEN_WEIGHT', 0.1):
+            await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
+        self.assertEqual(self.chat_data.rows['7'].credits, 99)  # 50k cache reads weigh 5k: one credit.
+
+    async def test_token_pricing_off_falls_back_to_fixed_efforts(self) -> None:
+        heavy = ModelResponse(parts=[TextPart(MEDIUM)], usage=RequestUsage(input_tokens=90_000))
+        self.tier.models[MEDIUM] = FunctionModel(lambda messages, info: heavy)
+        await self.set_credits('7', 100)
+        with patch.object(AGENT_KIBERNIKTO_SETTINGS, 'TOKENS_PER_CREDIT', 0):
+            await self.agent.run('hi', conversation_id='7', deps=TelegramDeps())
+        self.assertEqual(self.chat_data.rows['7'].credits, 99)
+
     async def test_run_effort_setting_sets_the_run_cost(self) -> None:
         agent = self._delegating_agent(calls=0)
         for effort, expected in ((3, 97), (0, 100)):
-            with self.subTest(run_effort=effort), patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RUN_EFFORT', effort):
+            with self.subTest(run_effort=effort), patch.object(AGENT_KIBERNIKTO_SETTINGS, 'RUN_EFFORT', effort), \
+                    patch.object(AGENT_KIBERNIKTO_SETTINGS, 'TOKENS_PER_CREDIT', 0):
                 await self.set_credits('7', 100)
                 await agent.run('hi', conversation_id='7', deps=TelegramDeps())
                 self.assertEqual(self.chat_data.rows['7'].credits, expected)

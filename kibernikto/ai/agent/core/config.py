@@ -67,6 +67,13 @@ class AgentKiberniktoSettings(BaseSettings):
     TRIAL_CREDITS: int = Field(default=260, description="Initial credits for a new user")
     RUN_EFFORT: int = Field(default=1, description="Credits charged per successful main-agent run; 0 = free")
     SUBAGENT_EFFORT: int = Field(default=1, description="Extra credits charged per successful sub-agent delegation; 0 = free")
+    TOKENS_PER_CREDIT: int = Field(
+        default=5000, ge=0,
+        description="Credits per this many tokens of a run, sub-agents included; 0 = fixed efforts only",
+    )
+    CACHE_TOKEN_WEIGHT: float = Field(
+        default=0.1, ge=0, description="Weight of a cache-read token against a fresh one when pricing a run",
+    )
     ALLOW_ZERO_CREDITS: bool = Field(default=True, description="Continue on the poor model at zero or negative credits")
     POOR_CREDITS: int = Field(default=30, description="Below this — poor model")
     RICH_CREDITS: int = Field(default=500, description="Above this — rich model")
@@ -94,6 +101,7 @@ def agent_summary(name: str, agent_settings: AgentKiberniktoSettings = AGENT_KIB
         'POOR_CREDITS': s.POOR_CREDITS,
         'RICH_CREDITS': s.RICH_CREDITS,
         'TRIAL_CREDITS': s.TRIAL_CREDITS,
+        'TOKENS_PER_CREDIT': s.TOKENS_PER_CREDIT,
         'ALLOW_ZERO_CREDITS': s.ALLOW_ZERO_CREDITS,
         'HISTORY_SIZE': s.HISTORY_SIZE,
         'MODEL_MAX_TOKENS': s.MODEL_MAX_TOKENS,

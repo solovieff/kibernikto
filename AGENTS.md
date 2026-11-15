@@ -61,6 +61,10 @@ CLI (kibernikto command / main.py)
   here.now drops the label and versions with it, and the next publish mints a fresh site under the same label.
   `publish_site` runs a static gate first (closed `</html>`, viewport meta, balanced style/script, no placeholder text)
   and hands failures back to the model to rewrite; `read_site` returns the live `index.html` so edits patch the real page.
+- Credits (`CreditTier`, `kibernikto/ai/agent/harness/credit_tier.py`): a successful run is billed by its tokens —
+  one credit per `AGENT_KIBERNIKTO_TOKENS_PER_CREDIT` (default 5000), cache reads weighted by
+  `AGENT_KIBERNIKTO_CACHE_TOKEN_WEIGHT` — and never below `RUN_EFFORT` + `SUBAGENT_EFFORT` per successful
+  `delegate_task`. Harness `forward_usage` is on, so every expert's tokens land in the parent run's usage.
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)

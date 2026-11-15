@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
@@ -14,6 +15,7 @@ from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.models import Model
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets import FunctionToolset
+from pydantic_ai.usage import RunUsage
 
 from kibernikto.ai.agent.core.config import AGENT_KIBERNIKTO_SETTINGS
 from kibernikto.ai.agent.core.deps import KiberniktoDeps
@@ -53,6 +55,7 @@ def format_credit_status(
     zero_policy = "switches to poor tier" if s.ALLOW_ZERO_CREDITS else "blocks runs until topped up"
     status = (
         f"credits: {credits} | tier: {tier} | cost_per_run: {effort} | cost_per_subagent_call: {subagent_effort} | "
+        f"billing: 1 credit per {s.TOKENS_PER_CREDIT} tokens of the run, the above is the minimum | "
         f"tiers: poor (<{s.POOR_CREDITS}), medium ({s.POOR_CREDITS}..{s.RICH_CREDITS - 1}), rich (>={s.RICH_CREDITS}) | "
         f"at_zero: {zero_policy} | "
         "commands: /balance (check balance), /pay [stars] (top up in private chat with Telegram Stars, 1 Star = 1 credit)"
@@ -70,10 +73,12 @@ def format_credit_status(
 
 @dataclass
 class CreditTier(AbstractCapability[KiberniktoDeps]):
-    """Pick the model by the conversation's credit tier once per run, then charge ``effort`` after success (``0`` = free run).
+    """Pick the model by the conversation's credit tier once per run, then charge it after success.
 
-    Every successful ``delegate_task`` call adds ``SUBAGENT_EFFORT`` credits on top of the run's ``effort``;
-    chats in voice (``audio``) mode pay the run ``effort`` twice.
+    A run is priced by its tokens: one credit per ``TOKENS_PER_CREDIT`` tokens of the whole run, every
+    sub-agent included, with cache reads weighted by ``CACHE_TOKEN_WEIGHT``. The fixed ``effort`` is only the
+    floor: run effort plus ``SUBAGENT_EFFORT`` per successful ``delegate_task`` (``0`` = free run), and chats in
+    voice (``audio``) mode pay the run effort twice.
 
     Explicit ``run(model=...)`` / ``agent.override(model=...)`` still win over the selection;
     non-billable runs use the agent's constructor model. Failed runs are never charged.
@@ -145,7 +150,8 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         if cid is None:
             return result
         info = await chat_data.load(cid)  # Fresh read: a top-up landed mid-run must not be overwritten.
-        total = self._run_cost(info) + self._delegations * max(0, AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT)
+        floor = self._run_cost(info) + self._delegations * max(0, AGENT_KIBERNIKTO_SETTINGS.SUBAGENT_EFFORT)
+        total = max(floor, _usage_credits(result.usage))  # Whole run, sub-agents included: the floor is a minimum.
         if total == 0:
             return result  # Free run: nothing to charge (``charge`` itself bills at least 1).
         previous = credit_tier(info.credits)
@@ -177,6 +183,16 @@ class CreditTier(AbstractCapability[KiberniktoDeps]):
         if name not in self.models:
             self.models[name] = infer_kibernikto_model(name)
         return self.models[name]
+
+
+def _usage_credits(usage: RunUsage) -> int:
+    """Credits for the tokens the run burned: a published site is billed like the work it did."""
+    s = AGENT_KIBERNIKTO_SETTINGS
+    if s.TOKENS_PER_CREDIT <= 0:
+        return 0
+    cached = usage.cache_read_tokens * max(0.0, s.CACHE_TOKEN_WEIGHT)  # Cache reads are the cheap ones.
+    tokens = usage.input_tokens + usage.cache_write_tokens + usage.output_tokens + cached
+    return math.ceil(tokens / s.TOKENS_PER_CREDIT)
 
 
 def _billable_conversation(deps: object, conversation_id: str | None) -> str | None:
