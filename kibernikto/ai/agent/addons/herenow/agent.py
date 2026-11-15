@@ -36,8 +36,8 @@ _CONTENT_TYPES = {
 class PageFile(BaseModel):
     """One file of the site; CSS and JS are only needed if you refuse to inline them."""
 
-    path: str = Field(description='Путь от корня сайта, например index.html или assets/style.css')
-    content: str = Field(description='Полное содержимое файла как текст')
+    path: str = Field(description='Path from the site root, e.g. index.html or assets/style.css')
+    content: str = Field(description='Full file contents as text')
 
 
 def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model: Model | None = None,
@@ -60,14 +60,14 @@ def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model:
     @agent.tool
     async def publish_site(ctx: RunContext[TelegramDeps], files: list[PageFile],
                            title: str | None = None) -> str:
-        """Опубликовать или обновить сайт этого чата.
+        """Publish or update the site of this chat.
 
-        Вызывай, когда человек просит сделать, изменить или переопубликовать страницу. Первый вызов создаёт
-        сайт и постоянный адрес чата, следующие обновляют тот же сайт. index.html обязателен.
+        Call when the person asks to build, change or republish a page. The first call creates the site and the
+        permanent address of the chat; later calls update the same site. index.html is required.
 
         Args:
-            files: Файлы сайта; обычно один index.html.
-            title: Название сайта для владельца в here.now, коротко.
+            files: Site files; usually a single index.html.
+            title: Short owner-facing site title in here.now.
         """
         problems = _html_problems(files)
         if problems:
@@ -81,108 +81,108 @@ def build_herenow_expert(*, settings: HereNowSettings = HERENOW_SETTINGS, model:
     @agent.tool
     async def update_site_meta(ctx: RunContext[TelegramDeps], title: str | None = None,
                                password: str | None = None) -> str:
-        """Изменить название или поставить пароль на уже опубликованный сайт этого чата без перепубликации.
+        """Change the title or set a visitor password on the published site without republishing it.
 
         Args:
-            title: Новое название сайта для владельца.
-            password: Пароль для посетителей; пустая строка снимает пароль.
+            title: New owner-facing site title.
+            password: Visitor password; an empty string removes it.
         """
         if title is None and password is None:
-            return 'Нечего менять: нужен title или password.'
+            return 'Nothing to change: pass title or password.'
         try:
             _, slug, _ = await site_for_chat(herenow, ctx.deps)
         except HereNowError as exc:
             return _error_text(exc)
         if not slug:
-            return 'У этого чата ещё нет сайта: сначала опубликуй его через publish_site.'
+            return 'This chat has no site yet: publish it with publish_site first.'
         try:
             await herenow.patch_metadata(slug, title=title, password=password or None)
         except HereNowError as exc:
             return _error_text(exc)
-        return 'Настройки сайта обновлены.'
+        return 'Site settings updated.'
 
     @agent.tool
     async def read_site(ctx: RunContext[TelegramDeps]) -> str:
-        """Прочитать index.html, который сейчас опубликован у этого чата.
+        """Read the index.html currently published for this chat.
 
-        Вызывай перед правкой: меняй реальную страницу, а не сочиняй новую вслепую.
+        Call before editing: change the real page instead of inventing a new one blind.
         """
         try:
             slug = await active_slug(herenow, chat_label(ctx.deps))
             if slug is None:
-                return 'У этого чата ещё нет сайта: читать нечего.'
+                return 'This chat has no site yet: nothing to read.'
             html = await herenow.file_text(slug)
         except HereNowError as exc:
             return _error_text(exc)
-        return f'index.html этого чата, {len(html)} символов:\n{html}'
+        return f"index.html of this chat, {len(html)} chars:\n{html}"
 
     @agent.tool
     async def delete_site(ctx: RunContext[TelegramDeps]) -> str:
-        """Удалить сайт этого чата навсегда.
+        """Delete the site of this chat for good.
 
-        Вызывай только по явной просьбе удалить сайт или страницу. Адрес перестаёт открываться, версии
-        пропадают; для правок используй publish_site.
+        Call only on an explicit request to delete the site or the page. The address stops opening and the
+        versions are gone; use publish_site for edits.
         """
         try:
             slug = await delete_for_chat(herenow, ctx.deps)
         except HereNowError as exc:
             return _error_text(exc)
         if slug is None:
-            return 'У этого чата нет сайта: удалять нечего.'
-        return f'Сайт удалён. {chat_label(ctx.deps)}.{_workspace_suffix(settings)} больше не открывается.'
+            return 'This chat has no site: nothing to delete.'
+        return f'Site deleted. {chat_label(ctx.deps)}.{_workspace_suffix(settings)} no longer opens.'
 
     @agent.tool
     async def site_info(ctx: RunContext[TelegramDeps]) -> str:
-        """Показать адрес и состояние сайта этого чата. Вызывай, когда человек спрашивает, где его сайт."""
+        """Show the address and state of the site of this chat. Call when the person asks where the site is."""
         try:
             label, slug, site = await site_for_chat(herenow, ctx.deps)
         except HereNowError as exc:
             return _error_text(exc)
         if site is None:
-            return f'Сайта ещё нет. Адрес при публикации будет {label}.{_workspace_suffix(settings)}.'
-        return f'Сайт чата: {site.url}'
+            return f'No site yet. On publish the address will be {label}.{_workspace_suffix(settings)}.'
+        return f'Site of this chat: {site.url}'
 
     return SubAgent(
         agent,
         name=HERENOW_EXPERT_NAME,
         description=(
-            'Публикация статических сайтов в интернете: собрать одностраничный сайт, лендинг или визитку '
-            'и выложить по постоянному адресу этого чата, обновлять и переопубликовывать его. '
-            'Не для поиска информации и не для работы с файлами.'
+            'Publishing static sites on the internet: build a one-page site, landing page or business card '
+            'and put it on the permanent address of this chat, then update and republish it. '
+            'Not for researching information and not for working with files.'
         ),
         usage_limits=UsageLimits(tool_calls_limit=settings.MAX_TOOL_CALLS),
     )
 
 
-_PLACEHOLDERS = ('lorem ipsum', 'your tagline', 'section 1', 'пример текста', 'текст-заглушка')
+_PLACEHOLDERS = ('lorem ipsum', 'your tagline', 'section 1', 'placeholder text', 'dummy text')
 
 
 def _html_problems(files: list[PageFile]) -> list[str]:
     """Static gate before anything goes live: a truncated or placeholder page is worse than none."""
     page = next((f for f in files if f.path.strip() == 'index.html'), None)
     if page is None:
-        return ['в корне сайта нет index.html']
+        return ['no index.html at the site root']
     html = page.content
     lowered = html.lower()
     problems: list[str] = []
     if not lowered.strip().endswith('</html>'):
-        problems.append('файл не закрыт: последний тег должен быть </html> — похоже, вывод оборвался')
+        problems.append('the file is not closed: the last tag must be </html> — the output looks truncated')
     if 'name="viewport"' not in lowered and "name='viewport'" not in lowered:
-        problems.append('нет <meta name="viewport"> — на телефоне страница поедет')
+        problems.append('no <meta name="viewport"> — the page will slide on a phone')
     if lowered.count('<style') != lowered.count('</style>'):
-        problems.append('непарные теги <style>')
+        problems.append('unbalanced <style> tags')
     if lowered.count('<script') != lowered.count('</script>'):
-        problems.append('непарные теги <script>')
+        problems.append('unbalanced <script> tags')
     stubs = [word for word in _PLACEHOLDERS if word in lowered]
     if stubs:
-        problems.append('заглушки вместо текста: ' + ', '.join(stubs))
+        problems.append('filler instead of real text: ' + ', '.join(stubs))
     return problems
 
 
 def _rejected(problems: list[str]) -> str:
     """Hand the model its own mistakes and ask for a rewrite in the same run."""
-    return ('Страница не прошла проверку, ничего не опубликовано:\n- ' + '\n- '.join(problems)
-            + '\nПерепиши index.html целиком (закрытый </html>, viewport, настоящие тексты) и вызови publish_site снова.')
+    return ('The page failed the checks and nothing was published:\n- ' + '\n- '.join(problems)
+            + '\nRewrite index.html in full (closed </html>, viewport, real copy) and call publish_site again.')
 
 
 def _site_files(files: list[PageFile]) -> list[SiteFile]:
@@ -203,7 +203,7 @@ def _workspace_suffix(settings: HereNowSettings) -> str:
 def _published_text(site: PublishedSite) -> str:
     """Hand the address over as a bare URL on its own line: the prompt copies it verbatim."""
     url = site.label_url or site.url
-    return f'Сайт опубликован и живой.\n{url}'
+    return f'The site is published and live.\n{url}'
 
 
 def _error_text(exc: HereNowError) -> str:
@@ -211,14 +211,14 @@ def _error_text(exc: HereNowError) -> str:
     logger.info('here.now tool failed: %s', exc)
     match exc.code:
         case 'workspace_not_ready':
-            return 'Публикация временно недоступна: домен воркспейса ещё готовится. Попробуй через минуту.'
+            return 'Publishing is temporarily unavailable: the workspace domain is still being prepared. Try again in a minute.'
         case 'version_conflict':
-            return 'Сайт одновременно обновили в другом месте. Перечитай текущую версию и опубликуй заново.'
+            return 'The site was updated elsewhere at the same time. Re-read the current version and publish again.'
         case 'site_too_large' | 'too_many_files' | 'missing_index' | 'bad_path' | 'empty_site':
-            return f'Сайт не проходит ограничения публикации: {exc.message}. Упрости структуру и попробуй снова.'
+            return f'The site does not fit the publishing limits: {exc.message}. Simplify the structure and try again.'
         case 'invalid_label':
-            return 'Не удалось занять адрес для этого чата. Сайт доступен по резервной ссылке из публикации.'
+            return 'Could not claim the address for this chat. The site is reachable at the fallback link from the publish result.'
         case 'transport' | 'upload_failed':
-            return 'here.now не ответил как ожидалось. Попробуй опубликовать ещё раз позже.'
+            return 'here.now did not answer as expected. Try publishing again later.'
         case _:
-            return f'Публикация не удалась ({exc.code}): {exc.message}'
+            return f'Publishing failed ({exc.code}): {exc.message}'

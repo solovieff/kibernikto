@@ -229,8 +229,8 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         expert = agent_module.build_herenow_expert(
             model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': PAGE_HTML}]}), client=client)
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42, username='gosu'))
-        self.assertIn('одновременно', result.output)
-        self.assertIn('Перечитай', result.output)
+        self.assertIn('elsewhere', result.output)
+        self.assertIn('Re-read', result.output)
 
     async def test_tool_reports_error_codes_without_raising(self):
         agent_module = herenow_agent()
@@ -239,7 +239,7 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         expert = agent_module.build_herenow_expert(
             model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': PAGE_HTML}]}), client=client)
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42))
-        self.assertIn('через минуту', result.output)
+        self.assertIn('in a minute', result.output)
 
     async def test_update_meta_without_a_site_explains_instead_of_calling(self):
         agent_module = herenow_agent()
@@ -247,7 +247,7 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         expert = agent_module.build_herenow_expert(
             model=self._model('update_site_meta', {'title': 'Визитка'}), client=client)
         result = await expert.agent.run('поставь название', deps=TelegramDeps(user_id=42))
-        self.assertIn('ещё нет сайта', result.output)
+        self.assertIn('no site yet', result.output)
         self.assertEqual(client.patched, [])
 
     async def test_access_failure_does_not_block_the_publish(self):
@@ -278,8 +278,8 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         expert = agent_module.build_herenow_expert(
             model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': broken}]}), client=client)
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42, username='gosu'))
-        self.assertIn('не прошла проверку', result.output)
-        self.assertIn('оборвался', result.output)
+        self.assertIn('failed the checks', result.output)
+        self.assertIn('truncated', result.output)
         self.assertEqual(client.published, [])
 
     async def test_placeholder_text_is_rejected(self):
@@ -289,7 +289,7 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         expert = agent_module.build_herenow_expert(
             model=self._model('publish_site', {'files': [{'path': 'index.html', 'content': stub}]}), client=client)
         result = await expert.agent.run('сделай сайт', deps=TelegramDeps(user_id=42))
-        self.assertIn('заглушки', result.output)
+        self.assertIn('filler', result.output)
         self.assertEqual(client.published, [])
 
     async def test_read_site_returns_the_live_page(self):
@@ -298,13 +298,13 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         await self._publish(client, TelegramDeps(user_id=42, username='gosu'))
         expert = agent_module.build_herenow_expert(model=self._model('read_site', {}), client=client)
         result = await expert.agent.run('покажи сайт', deps=TelegramDeps(user_id=42, username='gosu'))
-        self.assertIn('index.html этого чата', result.output)
+        self.assertIn('index.html of this chat', result.output)
         self.assertIn('<h1>привет</h1>', result.output)
 
     async def test_read_site_without_a_site_explains(self):
         expert = herenow_agent().build_herenow_expert(model=self._model('read_site', {}), client=FakeClient())
         result = await expert.agent.run('покажи сайт', deps=TelegramDeps(user_id=42))
-        self.assertIn('ещё нет сайта', result.output)
+        self.assertIn('no site yet', result.output)
 
     async def test_delete_removes_the_chat_site_and_frees_the_label(self):
         agent_module = herenow_agent()
@@ -314,7 +314,7 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         result = await expert.agent.run('удали сайт', deps=TelegramDeps(user_id=42, username='gosu'))
         self.assertEqual(client.deleted_sites, ['site1'])
         self.assertEqual(client.label_records, {})
-        self.assertIn('удалён', result.output)
+        self.assertIn('Site deleted', result.output)
 
     async def test_delete_without_a_site_does_not_call_the_provider(self):
         agent_module = herenow_agent()
@@ -322,7 +322,7 @@ class HereNowTests(unittest.IsolatedAsyncioTestCase):
         expert = agent_module.build_herenow_expert(model=self._model('delete_site', {}), client=client)
         result = await expert.agent.run('удали сайт', deps=TelegramDeps(user_id=42))
         self.assertEqual(client.deleted_sites, [])
-        self.assertIn('нет сайта', result.output)
+        self.assertIn('no site', result.output)
 
     async def test_delete_tolerates_a_site_that_is_already_gone(self):
         client = FakeClient({'gosu': {'label': 'gosu', 'slug': 'site1', 'status': 'active',
