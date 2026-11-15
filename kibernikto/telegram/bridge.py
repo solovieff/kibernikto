@@ -187,7 +187,7 @@ class TelegramBridge:
             return
         if result is not None:
             await reply(target, result)
-            if TELEGRAM_SETTINGS.STICKER_IDS and random.random() < TELEGRAM_SETTINGS.STICKER_PROBABILITY:
+            if (TELEGRAM_SETTINGS.STICKER_IDS or TELEGRAM_SETTINGS.STICKER_SET) and random.random() < TELEGRAM_SETTINGS.STICKER_PROBABILITY:
                 try:
                     await send_random_sticker(
                         chat_id=target.chat.id,

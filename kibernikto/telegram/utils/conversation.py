@@ -44,8 +44,21 @@ _MEDIA_CLASSES = {
 }
 
 
+async def sticker_pool(bot: Bot, sticker_list: List[str]) -> List[str]:
+    if not TELEGRAM_SETTINGS.STICKER_SET:
+        return sticker_list
+    try:
+        sticker_set = await bot.get_sticker_set(TELEGRAM_SETTINGS.STICKER_SET)
+    except Exception:
+        logger.exception('Failed to load sticker set %s; using STICKER_IDS', TELEGRAM_SETTINGS.STICKER_SET)
+        return sticker_list
+    return [sticker.file_id for sticker in sticker_set.stickers] or sticker_list
+
+
 async def send_random_sticker(chat_id: int, sticker_list: List[str], bot: Bot) -> None:
-    await bot.send_sticker(sticker=choice(sticker_list), chat_id=chat_id)
+    pool = await sticker_pool(bot, sticker_list)
+    if pool:
+        await bot.send_sticker(sticker=choice(pool), chat_id=chat_id)
 
 
 def is_reply(message: Message) -> bool:

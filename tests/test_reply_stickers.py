@@ -17,6 +17,7 @@ from aiogram.types import Chat, Message, User
 from kibernikto.telegram.bridge import TelegramBridge
 from kibernikto.telegram.config import TELEGRAM_SETTINGS
 from kibernikto.telegram.peer_protocol import PeerEnvelope
+from kibernikto.telegram.utils.conversation import send_random_sticker
 
 
 class ReplyStickerTests(unittest.IsolatedAsyncioTestCase):
@@ -131,6 +132,39 @@ class ReplyStickerTests(unittest.IsolatedAsyncioTestCase):
 
         self.bot.session.make_request.assert_awaited_once()
         sticker.assert_not_awaited()
+
+
+class StickerSetTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        self.bot = Bot('100:offline-test-token')
+        self.bot.get_sticker_set = AsyncMock(return_value=SimpleNamespace(
+            stickers=[SimpleNamespace(file_id='pack-a'), SimpleNamespace(file_id='pack-b')]))
+        self.bot.send_sticker = AsyncMock()
+
+    async def asyncTearDown(self) -> None:
+        await self.bot.session.close()
+
+    async def test_random_sticker_comes_from_pack_when_set(self) -> None:
+        with patch.object(TELEGRAM_SETTINGS, 'STICKER_SET', 'my_pack'):
+            await send_random_sticker(chat_id=7, sticker_list=['listed'], bot=self.bot)
+
+        self.bot.get_sticker_set.assert_awaited_once_with('my_pack')
+        self.assertIn(self.bot.send_sticker.await_args.kwargs['sticker'], {'pack-a', 'pack-b'})
+
+    async def test_pack_failure_falls_back_to_sticker_ids(self) -> None:
+        self.bot.get_sticker_set = AsyncMock(side_effect=RuntimeError('not found'))
+        with patch.object(TELEGRAM_SETTINGS, 'STICKER_SET', 'missing'):
+            with self.assertLogs('kibernikto.telegram.utils.conversation', level='ERROR'):
+                await send_random_sticker(chat_id=7, sticker_list=['listed'], bot=self.bot)
+
+        self.bot.send_sticker.assert_awaited_once_with(sticker='listed', chat_id=7)
+
+    async def test_no_pack_uses_sticker_ids_without_api_call(self) -> None:
+        with patch.object(TELEGRAM_SETTINGS, 'STICKER_SET', None):
+            await send_random_sticker(chat_id=7, sticker_list=['listed'], bot=self.bot)
+
+        self.bot.get_sticker_set.assert_not_awaited()
+        self.bot.send_sticker.assert_awaited_once_with(sticker='listed', chat_id=7)
 
 
 if __name__ == '__main__':

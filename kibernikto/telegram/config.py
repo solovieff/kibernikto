@@ -22,6 +22,7 @@ class TelegramSettings(BaseSettings):
                                       description="In group chats, kibernikto will react to this phrases and his bot name")
     SAY_HI: bool = Field(default=False, description="If to send system telegram message on start")
     STICKER_IDS: List[str] = ["CAACAgIAAxkBAAEQPFJpZpza5ISCVgABh0uT6CYX9HgwevYAAu5KAAK-HmBK9OlWUNgz8-w4BA"]
+    STICKER_SET: str | None = Field(default=None, description="Sticker pack short name; random sticker is taken from it instead of STICKER_IDS")
     STICKER_PROBABILITY: float = Field(default=0.13, description="How often to send stickers")
     MAX_MESSAGE_LENGTH: int = Field(default=4096, description="Do not change, telegram default")
     MAX_CAPTION_LENGTH: int = Field(default=1023, description="Do not change, telegram default")
