@@ -36,7 +36,7 @@ CLI (kibernikto command / main.py)
   │     ├── core/kibernikto_agent.py (build_kibernikto_agent)
   │     ├── telegram/telegram_agent.py (build_telegram_agent)
   │     ├── telegram/telegram_capability.py (TelegramCapability)
-  │     ├── addons/ (vkusvill, business, travel+tutu+kiwi+travala: config.py, _prompts.py, agent.py)
+  │     ├── addons/ (vkusvill, business, travel+tutu+kiwi+travala, herenow: config.py, _prompts.py, agent.py)
   │     │     vkusvill: (build_vkusvill_agent: MCPToolset over mcp.vkusvill.ru + shopping prompt;
   │     │              AGENT_VKUSVILL_* settings, anonymous or OAuth 2.0 + PKCE)
   │     └── utils.py (infer_kibernikto_model)
@@ -54,6 +54,10 @@ CLI (kibernikto command / main.py)
   (`kibernikto/ai/agent/addons/vkusvill/mcp.py`). There is no order tool upstream — the flow ends with a cart share link
 - VkusVill as an expert (`AGENT_VKUSVILL_ENABLED=true`): `build_vkusvill_expert()` joins the delegation roster and
   `CreditGatedSubAgents` drops it per run unless the chat is private and in the rich credit tier (`AGENT_KIBERNIKTO_RICH_CREDITS`)
+- here.now expert (`AGENT_HERENOW_ENABLED=true` + `AGENT_HERENOW_API_KEY`): `build_herenow_expert()` publishes static
+  sites into the workspace from `AGENT_HERENOW_WORKSPACE`; the chat→site mapping is the provider's site label
+  (`{label}.{workspace}.here.now`, label = Telegram username or `u<chat_id>`), so no local registry exists — see
+  `kibernikto/ai/agent/addons/herenow/routing.py`. Sites are not deletable through the bot: only publish/update/metadata.
 
 ### Logging
 - All logging through Logfire (`logfire.instrument_pydantic_ai()`)

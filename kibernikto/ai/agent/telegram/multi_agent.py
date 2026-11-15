@@ -61,13 +61,15 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
     roster: KiberniktoSubAgents
     # Optional experts are loaded only when enabled.
     from kibernikto.ai.agent.addons.business.config import BUSINESS_SETTINGS
+    from kibernikto.ai.agent.addons.herenow.config import HERENOW_SETTINGS
     from kibernikto.ai.agent.addons.travel.config import TRAVEL_SETTINGS
     from kibernikto.ai.agent.addons.vkusvill.config import VKUSVILL_SETTINGS
 
     if BUSINESS_SETTINGS.ENABLED and BUSINESS_SETTINGS.DADATA_TOKEN is not None and not BUSINESS_SETTINGS.configured:
         logger.warning('Invalid AGENT_BUSINESS_DADATA_TOKEN; business expert is disabled')
 
-    if VKUSVILL_SETTINGS.ENABLED or TRAVEL_SETTINGS.active or BUSINESS_SETTINGS.active:
+    if (VKUSVILL_SETTINGS.ENABLED or TRAVEL_SETTINGS.active or BUSINESS_SETTINGS.active
+            or HERENOW_SETTINGS.active):
         from kibernikto.ai.agent.harness.delegation import CreditGatedSubAgents
 
         reaction = AgentReaction()
@@ -86,6 +88,11 @@ def _build_parent(delegates: list[SubAgent]) -> Agent[TelegramDeps]:
 
             experts.append(build_business_expert())
             gated_names.append('business')
+        if HERENOW_SETTINGS.active:
+            from kibernikto.ai.agent.addons.herenow.agent import build_herenow_expert
+
+            experts.append(build_herenow_expert())
+            gated_names.append('herenow')
         roster = CreditGatedSubAgents(
             agents=experts,
             agent_folders=None,
